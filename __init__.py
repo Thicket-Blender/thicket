@@ -30,7 +30,7 @@ bl_info = {
     "category": "Import"
 }
 
-#import threading, time
+import threading, time
 import bpy, laubwerk, os.path
 from bpy.props import (BoolProperty,
                        FloatProperty,
@@ -55,6 +55,8 @@ s_items = []
 plant = None
 locale = "en"
 alt_locale = "en_US"
+mt_loaded = False # Indicates if all model types have been loaded.
+ms_loaded = False # Indicates if all model seasons have been loaded.
 #TODO get the locale from the current blender installation via bpy.app.translations.locale. This can be void.
 
 
@@ -67,6 +69,10 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
     filename_ext = ".lbw.gz"
     short_ext = ".lbw"
     oldpath = ""
+    watch_thread = None
+    is_running = False
+    restart_thread = False
+    
     filter_glob = StringProperty(
             default="*.lbw;*.lbw.gz",
             options={'HIDDEN'},
@@ -92,6 +98,7 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
     
     def update_seasons(self, context):    
         global locale, alt_locale, s_items, plant
+        print ("updating seasons")
         s_items = []
         for qualifier in plant.models[self["model_type"]].qualifiers:
             qualab = plant.models[self["model_type"]].qualifierLabels[qualifier] 
@@ -104,31 +111,44 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
         self["model_season"] = plant.defaultModel.defaultQualifier
     
     def model_type_callback(self, context):
-        global m_items
+        global m_items, mt_loaded
         """ Queries the plant object for available models and creates a dropdown list """
         return m_items
         
     def model_season_callback(self, context):
-        global s_items
+        global s_items, ms_loaded
         return s_items
+#        if ms_loaded:
+#            return s_items
+#        else:
+#            return [("Loading...","Loading...","")]
         
     model_type = EnumProperty(items=model_type_callback, name="Model", update=update_seasons)
     model_season = EnumProperty(items=model_season_callback, name="Season")
     
     def execute(self, context):
         global plant
+        # Stop the thread
+        self.is_running = False
         # Set the model_id to the currently selected model type.
         self.model_id = models.index(self.model_type)
         # Use this dictionary to store additional parameters like season and so on.
-        keywords = self.as_keywords(ignore=("filter_glob","oldpath",
+        keywords = self.as_keywords(ignore=("filter_glob","oldpath","is_running","restart_thread","watch_thread"
 											))
         keywords["model_id"] =  self.model_id
         keywords["plant"] = plant
         return import_lbw.LBWImportDialog.load(self, context, **keywords)   
         
     def invoke(self, context, event):
+        global mt_loaded, ms_loaded
         print ('invoked')
         self.oldpath = self.filepath
+        self.restart_thread = False
+        self.is_running = True
+        mt_loaded = False
+        ms_loaded = False
+        self.watch_thread = lbw_watch(self)                
+        self.watch_thread.start()
         context.window_manager.fileselect_add(self)
         # This would be the right spot to change the directory.
         return {'RUNNING_MODAL'} 
@@ -137,7 +157,10 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
         """
         Called when a new file is selected. Resets the values of the import parameters to default.
         """
-        global models, locale, m_items, plant        
+        global mt_loaded, ms_loaded
+        ms_loaded = False
+        mt_loaded = False
+        self.restart_thread = True        
         self.leaf_density=100.0
         self.render_mode="FULL"
         self.viewport_mode="PROXY"
@@ -147,26 +170,15 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
         self.lod_max_level = 1
         self.leaf_amount=100.0
         self.lod_subdiv = 1
-        if plant:
-            print('recreating labels')
-            # Recreate the m_types and m_items
-            m_items = []
-            for model in plant.models:
-                label = model.labels[min(model.labels)]
-                if locale in model.labels:
-                    label = model.labels[locale]
-                m_items.append((str(model.name),str(label),""))
-                models.append(str(model.name))
-            self.model_type = plant.defaultModel.name
-            self.model_id = models.index(self.model_type)
-        
+
+    
     def draw(self, context):
         global locale, alt_locale, plant
         layout = self.layout
         if not self.filepath == self.oldpath:
             self.oldpath = self.filepath
+            plant = None
             if os.path.isfile(self.filepath):
-                plant = laubwerk.load(self.filepath)
                 self.reinit_values()
             
         if plant:
@@ -175,10 +187,14 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
                 pname = plant.labels[locale][0]
             elif alt_locale in plant.labels:
                 pname = plant.labels[alt_locale][0]
-            
+            # Create the UI entries.
             layout.label("%s(%s)" % (pname, plant.name))
-            layout.prop(self,"model_type")
-            layout.prop(self,"model_season")
+            if mt_loaded is False:
+                layout.label("Loading...")
+            sub = layout.column()
+            sub.active = mt_loaded == True
+            sub.prop(self,"model_type")
+            sub.prop(self,"model_season")
             row = layout.row()
             box = row.box()
             box.label("Display settings")
@@ -204,20 +220,41 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
             layout.label("Choose a Laubwerk file.")
 
             
-# class lbw_watch(threading.Thread):
+class lbw_watch(threading.Thread):
     
-    # def __init__(self, clob):
-        # threading.Thread.__init__(self)
-        # self.daemon = True # so Blender can quit cleanly
-        # self.name='lbw_watch'
-        # self.clob = clob # The calling class instance.
+    def __init__(self, clob):
+        threading.Thread.__init__(self)
+        self.daemon = True # so Blender can quit cleanly
+        self.name='lbw_watch'
+        self.clob = clob # The calling class instance.
     
-    # def run(self):
-            # time.sleep(0.1) # sleep 100 Milliseconds.
-            # try:
-                # self.clob.scene.leaf_amount = self.clob.object["leaf_amount"]
-            # except Exception as detail:
-                # print("lbw watch exception:", detail)            
+    def run(self):
+        global models, plant, m_items, s_items, locale, mt_loaded
+        while self.clob.is_running:
+            time.sleep(0.1) # sleep 100 Milliseconds.
+            try:
+                if self.clob.restart_thread:
+                    # Recreate the m_types and m_items
+                    m_items = []
+                    s_items = []
+                    mt_loaded = False
+                    plant = laubwerk.load(self.clob.filepath)
+                    if plant:
+                        self.clob.restart_thread = False
+                        for model in plant.models:
+                            time.sleep(0.05)
+                            if self.clob.restart_thread:
+                                break
+                            label = model.labels[min(model.labels)]
+                            if locale in model.labels:
+                                label = model.labels[locale]
+                            m_items.append((str(model.name),str(label),""))
+                            models.append(str(model.name))
+                        self.clob.model_type = plant.defaultModel.name
+                        self.clob.model_id = models.index(self.clob.model_type)
+                        mt_loaded = True
+            except Exception as detail:
+                print("lbw watch exception:", detail)
 
                 
 class lbwPanel(bpy.types.Panel):     # panel to display laubwerk plant specific properties.
@@ -235,8 +272,6 @@ class lbwPanel(bpy.types.Panel):     # panel to display laubwerk plant specific 
                 current_path = context.object["lbw_path"]
                 plant = laubwerk.load(current_path)
                 self.object = context.object
-                #self.tr = lbw_watch(self)                
-                #self.tr.start()
             return True
             
     
