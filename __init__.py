@@ -22,7 +22,7 @@ bl_info = {
     "name": "Laubwerk lbw.gz format importer",
     "author": "Fabian Quosdorf",
     "version": (0, 1, 0),
-    "blender": (2, 7, 2),
+    "blender": (2, 80, 0),
     "location": "File > Import",
     "description": "Import LBW.GZ, Import Laubwerk mesh, UV's, materials and textures",
     "warning": "",
@@ -30,8 +30,14 @@ bl_info = {
     "category": "Import"
 }
 
-import threading, time
-import bpy, laubwerk, os.path
+import sys
+import os.path
+import threading
+import time
+
+import bpy
+import laubwerk
+
 from bpy.props import (BoolProperty,
                        FloatProperty,
                        IntProperty,
@@ -73,26 +79,22 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
     is_running = False
     restart_thread = False
 
-    filter_glob = StringProperty(
-            default = "*.lbw;*.lbw.gz",
-            options = {'HIDDEN'},
-            )
+    filter_glob: StringProperty(default = "*.lbw;*.lbw.gz", options = {'HIDDEN'})
+    filepath: StringProperty(name = "File Path", maxlen = 1024, default = "")
 
-    filepath = StringProperty(name = "File Path",
-        maxlen = 1024, default = "")
 #    directory = StringProperty(name = "Directory", subtype = 'DIR_PATH', default = "D:\\Program Files\\Laubwerk\\Plants", options = {'HIDDEN', 'SKIP_SAVE'})
-    leaf_density = FloatProperty(name = "Leaf density",
+    leaf_density: FloatProperty(name = "Leaf density",
         description = "The density of the leafs of the plant.",
         default = 100.0, min = 0.01, max = 100.0, subtype = 'PERCENTAGE')
     model_id = 0
-    render_mode = EnumProperty(items = [("PROXY", "Convex Hull", ""), ("FULL", "Full Geometry", "")], name = "Render")
-    viewport_mode = EnumProperty(items = [("PROXY", "Convex Hull", ""), ("FULL", "Full Geometry", "")], name = "Viewport")
-    lod_cull_thick = BoolProperty(name = "Cull by Thickness", default = False)
-    lod_min_thick = FloatProperty(name = "Min. Thickness", default = 0.1, min = 0.1, max = 10000.0, step = 1.0)
-    lod_cull_level = BoolProperty(name = "Cull by Level", default = False)
-    lod_max_level = IntProperty(name = "Maximum Level", default = 3, min = 0, max = 10, step = 1)
-    lod_subdiv = IntProperty(name = "Subdivision", default = 1, min = 0, max = 5, step = 1)
-    leaf_amount = FloatProperty(name = "Leaf amount",
+    render_mode: EnumProperty(items = [("PROXY", "Convex Hull", ""), ("FULL", "Full Geometry", "")], name = "Render")
+    viewport_mode: EnumProperty(items = [("PROXY", "Convex Hull", ""), ("FULL", "Full Geometry", "")], name = "Viewport")
+    lod_cull_thick: BoolProperty(name = "Cull by Thickness", default = False)
+    lod_min_thick: FloatProperty(name = "Min. Thickness", default = 0.1, min = 0.1, max = 10000.0, step = 1.0)
+    lod_cull_level: BoolProperty(name = "Cull by Level", default = False)
+    lod_max_level: IntProperty(name = "Maximum Level", default = 3, min = 0, max = 10, step = 1)
+    lod_subdiv: IntProperty(name = "Subdivision", default = 1, min = 0, max = 5, step = 1)
+    leaf_amount: FloatProperty(name = "Leaf amount",
         description = "The amount of leafs of the plant.",
         default = 100.0, min = 0.01, max = 100.0, subtype = 'PERCENTAGE')
 
@@ -123,8 +125,8 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
 #        else:
 #            return [("Loading...", "Loading...", "")]
 
-    model_type = EnumProperty(items = model_type_callback, name = "Model", update = update_seasons)
-    model_season = EnumProperty(items = model_season_callback, name = "Season")
+    model_type: EnumProperty(items = model_type_callback, name = "Model", update = update_seasons)
+    model_season: EnumProperty(items = model_season_callback, name = "Season")
 
     def execute(self, context):
         global plant
@@ -152,7 +154,7 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
         # This would be the right spot to change the directory.
         return {'RUNNING_MODAL'}
 
-    def reinit_values(self):
+    def reinit_values(self, context):
         """
         Called when a new file is selected. Resets the values of the import parameters to default.
         """
@@ -160,16 +162,11 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
         ms_loaded = False
         mt_loaded = False
         self.restart_thread = True
-        self.leaf_density = 100.0
-        self.render_mode = "FULL"
-        self.viewport_mode = "PROXY"
-        self.lod_cull_thick = False
-        self.lod_min_thick = 0.1
-        self.lod_cull_level = False
-        self.lod_max_level = 1
-        self.leaf_amount = 100.0
-        self.lod_subdiv = 1
 
+        # reset property defaults
+        props = context.object.bl_rna.properties
+        for prop in ["leaf_density", "render_mode", "viewport_mode", "lod_cull_thick", "lod_min_thick", "lod_cull_level", "lod_max_level", "leaf_amount", "lod_subdiv"]:
+            self.__setattr__(prop, props[prop].default)
 
     def draw(self, context):
         global locale, alt_locale, plant
@@ -178,7 +175,7 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
             self.oldpath = self.filepath
             plant = None
             if os.path.isfile(self.filepath):
-                self.reinit_values()
+                self.reinit_values(context)
 
         if plant:
             pname = plant.labels[min(plant.labels)][0]
@@ -187,21 +184,21 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
             elif alt_locale in plant.labels:
                 pname = plant.labels[alt_locale][0]
             # Create the UI entries.
-            layout.label("%s(%s)" % (pname, plant.name))
+            layout.label(text = "%s(%s)" % (pname, plant.name))
             if mt_loaded is False:
-                layout.label("Loading...")
+                layout.label(text = "Loading...")
             sub = layout.column()
             sub.active = mt_loaded == True
             sub.prop(self, "model_type")
             sub.prop(self, "model_season")
             row = layout.row()
             box = row.box()
-            box.label("Display settings")
+            box.label(text = "Display settings")
             box.prop(self, "render_mode")
             box.prop(self, "viewport_mode")
             row = layout.row()
             box2 = row.box()
-            box2.label("Level of Detail")
+            box2.label(text = "Level of Detail")
             box2.prop(self, "leaf_density")
             box = box2.box()
             box.prop(self, "lod_cull_thick")
@@ -216,7 +213,7 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
             box2.prop(self, "lod_subdiv")
             box2.prop(self, "leaf_amount")
         else:
-            layout.label("Choose a Laubwerk file.")
+            layout.label(text = "Choose a Laubwerk file.")
 
 
 class lbw_watch(threading.Thread):
@@ -261,6 +258,7 @@ class lbwPanel(bpy.types.Panel):     # panel to display laubwerk plant specific 
     bl_region_type = "WINDOW"           # show up in: object context
     bl_label = "Laubwerk Plant"           # name of the new panel
     bl_context = "object"
+    bl_rna = None # FIXME: why do I need this? dvhart
     tr = None
 
     @classmethod
@@ -314,7 +312,6 @@ def menu_func_import(self, context):
 
 
 def register():
-    bpy.utils.register_class(lbwPanel)   # register panel
     # create LBW Settings
     bpy.types.Object.leaf_density = FloatProperty(name = "Leaf density",
         description = "The density of the leafs of the plant.",
@@ -330,18 +327,13 @@ def register():
         description = "The amount of leafs of the plant.",
         default = 100.0, min = 0.01, max = 100.0, subtype = 'PERCENTAGE', options = {'HIDDEN'})
 
-    bpy.utils.register_module(__name__)
-
-    bpy.types.INFO_MT_file_import.append(menu_func_import)
+    bpy.utils.register_class(ImportLBW)
+    bpy.types.TOPBAR_MT_file_import.append(menu_func_import)
 
 
 def unregister():
-    bpy.utils.unregister_module(__name__)
-    # Check if the Panel is actually registered and remove it.
-    if "bl_rna" in lbwPanel.__dict__:
-        bpy.utils.unregister_class(lbwPanel)
-
-    bpy.types.INFO_MT_file_import.remove(menu_func_import)
+    bpy.utils.unregister_class(ImportLBW)
+    bpy.types.TOPBAR_MT_file_import.remove(menu_func_import)
 
 if __name__ == "__main__":
     register()

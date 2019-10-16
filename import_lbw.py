@@ -71,7 +71,8 @@ class LBWImportDialog(bpy.types.Operator):
         print("viewport mode is %s" % viewport_mode)
         mesh_laubwerk = None
         if viewport_mode == "PROXY":
-            mesh_laubwerk = model.getProxy(model.qualifiers[model.qualifiers.index(model_season)])
+            #mesh_laubwerk = model.getProxy(model.qualifiers[model.qualifiers.index(model_season)])
+            mesh_laubwerk = model.get_proxy(model_season)
         else:
             mesh_laubwerk = model.getMesh(qualifierName = model_season, maxBranchLevel = lod_max_level, minThickness = lod_min_thick,
             leafAmount = leaf_amount / 100.0, leafDensity = leaf_density / 100.0, maxSubDivLevel = lod_subdiv)
@@ -107,8 +108,8 @@ class LBWImportDialog(bpy.types.Operator):
         object["leaf_amount"] = leaf_amount
 
         #set mesh location
-        object.location = bpy.context.scene.cursor_location
-        bpy.context.scene.objects.link(object)
+        object.location = bpy.context.scene.cursor.location
+        bpy.context.scene.collection.objects.link(object)
 
         #create mesh from python data
         mesh.from_pydata(verts_list, [], polygon_list)
@@ -116,14 +117,15 @@ class LBWImportDialog(bpy.types.Operator):
         me = object.data
 
         #set created tree to active object
-        bpy.ops.object.select_all(action = 'DESELECT')
-        bpy.context.scene.objects.active = bpy.data.objects[object.name]
-        object.select = True
+        bpy.ops.object.select_all(action= 'DESELECT')
+        bpy.context.view_layer.objects.active = bpy.data.objects[object.name]
+        if not object.select_get():
+            object.select_set(True)
         #set shadingmode to smooth
         bpy.ops.object.shade_smooth()
 
         #create a UV Map Layer for the tree
-        mesh.uv_textures.new()
+        mesh.uv_layers.new()
 
         #write uvs
         for uv in mesh_laubwerk.uvs:
