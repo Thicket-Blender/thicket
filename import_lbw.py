@@ -151,6 +151,17 @@ class LBWImportDialog(bpy.types.Operator):
                     bpy.data.materials.new(plantmat.name)
                     mat = bpy.data.materials.get(plantmat.name)
 
+                    # dvhart: FIXME: this surely isn't correct since the UI suggests we may have both models...
+                    if viewport_mode == "PROXY":
+                        if matID[0] == -1:
+                            mat.diffuse_color = plant.getFoliageColor(model_season)
+                        else:
+                            mat.diffuse_color = plant.getWoodColor(model_season)
+                    else:
+                        # TODO: create a node material with complete textures
+                        #       this should be it's own method
+                        mat.diffuse_color = plantmat.getFront().diffuseColor + (1.0,)
+
                 me.materials.append(mat)
 
             MatIndex = me.materials.find(plantmat.name)
