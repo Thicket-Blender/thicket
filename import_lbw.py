@@ -145,33 +145,24 @@ class LBWImportDialog(bpy.types.Operator):
             plantmat = plant.materials[matID[0]]
             if matID[0] not in materials:
                 materials.append(matID[0])
-                checkexistingmat = bpy.data.materials.get(plantmat.name)
-                if checkexistingmat is None:
+                mat = bpy.data.materials.get(plantmat.name)
+                if mat is None:
                     # Add new material to current object
                     bpy.data.materials.new(plantmat.name)
                     mat = bpy.data.materials.get(plantmat.name)
-                    me.materials.append(mat)
-                    MatIndex = me.materials.find(plantmat.name)
-                    me.polygons[i].material_index = MatIndex
-                else:
-                    # Add existing material to current object
-                    me.materials.append(checkexistingmat)
-                    MatIndex = me.materials.find(plantmat.name)
-                    me.polygons[i].material_index = MatIndex
-                    print('PolygonID: ' + str(me.polygons[i].material_index))
+
+                me.materials.append(mat)
+
+            MatIndex = me.materials.find(plantmat.name)
+            if MatIndex != -1:
+                me.polygons[i].material_index = MatIndex
+                print('PolygonID: %d, MaterialIndex: %d' % (me.polygons[i].material_index, MatIndex))
             else:
-                MatIndex = me.materials.find(plantmat.name)
-                if MatIndex != -1:
-                    me.polygons[i].material_index = MatIndex
-                    #print('PolygonID: ' + str(me.polygons[i].index))
-                    #print('Materialindex: ' + str(MatIndex))
-                else:
-                    print('Material ' + plantmat.name + ' nicht gefunden.')
+                print('Material %s not found' % plantmat.name)
+
             i += 1
 
-        time_new = time.time()
-
-        print("finished importing: %r in %.4f sec." % (filepath, (time_new - time_main)))
+        print("finished importing: %r in %.4f sec." % (filepath, (time.time() - time_main)))
         return {'FINISHED'}
 
 
