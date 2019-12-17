@@ -151,27 +151,50 @@ class LBWImportDialog(bpy.types.Operator):
                     bpy.data.materials.new(plantmat.name)
                     mat = bpy.data.materials.get(plantmat.name)
 
+                    # dvhart: create the nodes tree?
+                    mat.use_nodes = True
+                    nodes = mat.node_tree.nodes
+                    # NOTE: Clear all nodes - OR we could assume BSDF Principled and
+                    # Output as defaults and just change the color input...
+                    nodes.clear()
+                    # create diffuse node
+                    node_dif = nodes.new(type = 'ShaderNodeBsdfPrincipled')
+                    node_dif.location = 0,0
+                    # create output node
+                    node_out = nodes.new(type = 'ShaderNodeOutputMaterial')
+                    node_out.location = 400,0
+                    # link nodes
+                    links = mat.node_tree.links
+                    link = links.new(node_dif.outputs[0], node_out.inputs[0])
+
                     # dvhart: FIXME: this surely isn't correct since the UI suggests we may have both models...
                     if viewport_mode == "PROXY":
                         if matID[0] == -1:
                             mat.diffuse_color = plant.getFoliageColor(model_season)
+                            node_dif.inputs[0].default_value = mat.diffuse_color
                         else:
                             mat.diffuse_color = plant.getWoodColor(model_season)
+                            node_dif.inputs[0].default_value = mat.diffuse_color
                     else:
                         # TODO: create a node material with complete textures
                         #       this should be it's own method
                         mat.diffuse_color = plantmat.getFront().diffuseColor + (1.0,)
+                        # TODO: get the image
+                        node_dif.inputs[0].default_value = mat.diffuse_color
 
                 me.materials.append(mat)
 
             MatIndex = me.materials.find(plantmat.name)
             if MatIndex != -1:
                 me.polygons[i].material_index = MatIndex
-                print('PolygonID: %d, MaterialIndex: %d' % (me.polygons[i].material_index, MatIndex))
+                #print('PolygonID: %d, MaterialIndex: %d' % (me.polygons[i].material_index, MatIndex))
             else:
                 print('Material %s not found' % plantmat.name)
 
             i += 1
+        print("Processed %d polygon material IDs" % i)
+        print("Created %d blender materials" % len(me.materials))
+        print("...from %d plant materials" % len(materials))
 
         print("finished importing: %r in %.4f sec." % (filepath, (time.time() - time_main)))
         return {'FINISHED'}
