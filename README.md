@@ -2,6 +2,8 @@
 
 This project implements a Python plugin to import Laubwerk plant models into Blender. It facilitates the Python Extension delivered with all versions of the Laubwerk Player Plugin. It can be used with all Laubwerk Plants Kits, including the [Laubwerk Plants Kit Freebie](http://www.laubwerk.com/store/plants-kit-freebie).
 
+![doc/acerp-cycles.png](doc/acerp-cycles.png)
+
 ## What is this repository for?
 
 This repository contains the latest version of the plugin and can be used to contribute improvements.
