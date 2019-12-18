@@ -165,7 +165,7 @@ class LBWImportDialog(bpy.types.Operator):
                     node_out.location = 400,0
                     # link nodes
                     links = mat.node_tree.links
-                    link = links.new(node_dif.outputs[0], node_out.inputs[0])
+                    links.new(node_dif.outputs[0], node_out.inputs[0])
 
                     # dvhart: FIXME: this surely isn't correct since the UI suggests we may have both models...
                     if viewport_mode == "PROXY":
@@ -176,11 +176,74 @@ class LBWImportDialog(bpy.types.Operator):
                             mat.diffuse_color = plant.getWoodColor(model_season)
                             node_dif.inputs[0].default_value = mat.diffuse_color
                     else:
-                        # TODO: create a node material with complete textures
-                        #       this should be it's own method
                         mat.diffuse_color = plantmat.getFront().diffuseColor + (1.0,)
-                        # TODO: get the image
+
+                        # Diffuse Texture (FIXME: Assumes one sided)
+                        print("Diffuse Texture: %s" % plantmat.getFront().diffuseTexture)
+                        img_path = plantmat.getFront().diffuseTexture
+                        node_img = nodes.new(type = 'ShaderNodeTexImage')
+                        node_img.image = bpy.data.images.load(img_path)
                         node_dif.inputs[0].default_value = mat.diffuse_color
+                        links.new(node_img.outputs[0], node_dif.inputs[0])
+
+                        # Alpha Texture
+                        alpha_path = plantmat.alphaTexture
+                        print("Alpha Texture: %s" % plantmat.alphaTexture)
+                        if alpha_path != '':
+                            # Enable leaf clipping in Eevee
+                            mat.blend_method = 'CLIP'
+                            # TODO: mat.transparent_shadow_method = 'CLIP' ?
+                            if alpha_path == img_path:
+                                links.new(node_img.outputs['Alpha'], node_dif.inputs['Alpha'])
+                            # TODO: does the following condition ever occur with
+                            # Laubwerk plants? When is the _a clip mask used?
+                            #else:
+                            #    node_alpha = nodes.new(type = 'ShaderNodeTexImage')
+                            #    node_alpha.image = bpy.data.images.load(alpha_path)
+                            #    node_alpha.image.colorspace_settings.is_data = True
+                            #    links.new(node_alpha.outputs['Color'], node_dif.inputs['Alpha'])
+
+                        # Subsurface Texture
+                        print("Subsurface Texture: %s" % plantmat.subsurfaceTexture)
+                        print("Subsurface Color: " + str(plantmat.subsurfaceColor))
+                        print("Subsurface Depth: %f" % plantmat.subsurfaceDepth)
+                        if plantmat.subsurfaceColor:
+                            node_dif.inputs['Subsurface Color'].default_value = plantmat.subsurfaceColor + (1.0,)
+                            node_dif.inputs['Subsurface'].default_value = plantmat.subsurfaceDepth
+
+                        sub_path = plantmat.subsurfaceTexture
+                        if sub_path != '':
+                            if not plantmat.subsurfaceColor:
+                                print("ERROR: no subsurfaceColor with a subsurfaceImage")
+                            node_sub = nodes.new(type = 'ShaderNodeTexImage')
+                            node_sub.image = bpy.data.images.load(sub_path)
+
+                            if plantmat.subsurfaceDepth == 0.0:
+                                node_sub.image.colorspace_settings.is_data = True
+                                links.new(node_sub.outputs['Color'], node_dif.inputs['Transmission'])
+                            else:
+                                links.new(node_sub.outputs['Color'], node_dif.inputs['Subsurface Color'])
+
+                        # Bump Texture
+                        print("Bump Texture: %s" % plantmat.getFront().bumpTexture)
+                        bump_path = plantmat.getFront().bumpTexture
+                        if bump_path != '':
+                            node_bumpimg = nodes.new(type = 'ShaderNodeTexImage')
+                            node_bumpimg.image = bpy.data.images.load(bump_path)
+                            node_bumpimg.image.colorspace_settings.is_data = True
+                            node_bump = nodes.new(type = 'ShaderNodeBump')
+                            # TODO: Calibrate strength and distance
+                            print("Bump Strength: %f" % plantmat.getFront().bumpStrength)
+                            node_bump.inputs['Strength'].default_value = plantmat.getFront().bumpStrength
+                            node_bump.inputs['Distance'].default_value = 0.02
+                            links.new(node_bumpimg.outputs['Color'], node_bump.inputs['Height'])
+                            links.new(node_bump.outputs['Normal'], node_dif.inputs['Normal'])
+
+
+                        print("Displacement Texture: %s" % plantmat.displacementTexture)
+                        print("Normal Texture: %s" % plantmat.getFront().normalTexture)
+                        print("Specular Texture: %s" % plantmat.getFront().specularTexture)
+                        print("--------------------")
 
                 me.materials.append(mat)
 
