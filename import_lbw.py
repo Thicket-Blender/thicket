@@ -152,6 +152,8 @@ class LBWImportDialog(bpy.types.Operator):
                     mat = bpy.data.materials.get(plantmat.name)
 
                     # dvhart: create the nodes tree?
+                    NW=300
+                    NH=300
                     mat.use_nodes = True
                     nodes = mat.node_tree.nodes
                     # NOTE: Clear all nodes - OR we could assume BSDF Principled and
@@ -159,10 +161,10 @@ class LBWImportDialog(bpy.types.Operator):
                     nodes.clear()
                     # create diffuse node
                     node_dif = nodes.new(type = 'ShaderNodeBsdfPrincipled')
-                    node_dif.location = 0,0
+                    node_dif.location = 2 * NW, 2 * NH
                     # create output node
                     node_out = nodes.new(type = 'ShaderNodeOutputMaterial')
-                    node_out.location = 400,0
+                    node_out.location = 3 * NW, 2 * NH
                     # link nodes
                     links = mat.node_tree.links
                     links.new(node_dif.outputs[0], node_out.inputs[0])
@@ -182,6 +184,7 @@ class LBWImportDialog(bpy.types.Operator):
                         print("Diffuse Texture: %s" % plantmat.getFront().diffuseTexture)
                         img_path = plantmat.getFront().diffuseTexture
                         node_img = nodes.new(type = 'ShaderNodeTexImage')
+                        node_img.location = 0, 2 * NH
                         node_img.image = bpy.data.images.load(img_path)
                         node_dif.inputs[0].default_value = mat.diffuse_color
                         links.new(node_img.outputs[0], node_dif.inputs[0])
@@ -216,6 +219,7 @@ class LBWImportDialog(bpy.types.Operator):
                             if not plantmat.subsurfaceColor:
                                 print("ERROR: no subsurfaceColor with a subsurfaceImage")
                             node_sub = nodes.new(type = 'ShaderNodeTexImage')
+                            node_sub.location = 0, NH
                             node_sub.image = bpy.data.images.load(sub_path)
 
                             if plantmat.subsurfaceDepth == 0.0:
@@ -229,9 +233,11 @@ class LBWImportDialog(bpy.types.Operator):
                         bump_path = plantmat.getFront().bumpTexture
                         if bump_path != '':
                             node_bumpimg = nodes.new(type = 'ShaderNodeTexImage')
+                            node_bumpimg.location = 0, 0
                             node_bumpimg.image = bpy.data.images.load(bump_path)
                             node_bumpimg.image.colorspace_settings.is_data = True
                             node_bump = nodes.new(type = 'ShaderNodeBump')
+                            node_bump.location = NW, 0
                             # TODO: Calibrate strength and distance
                             print("Bump Strength: %f" % plantmat.getFront().bumpStrength)
                             node_bump.inputs['Strength'].default_value = plantmat.getFront().bumpStrength
