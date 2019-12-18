@@ -21,10 +21,6 @@ This repository contains the latest version of the plugin and can be used to con
 * After you did this, the Laubwerk import Addon is available through *File* -> *Import* -> *Laubwerk Plant (.lbw.gz)*. 
 * More general information about Blender Add-Ons can be found [here](http://wiki.blender.org/index.php/Doc:2.6/Manual/Extensions/Python/Add-Ons).
 
-### Contribution guidelines ###
-
-There are not fixed contribution guidelines, yet.
-
 ### Who do I talk to? ###
 
 * Repository Owner: Fabian Quosdorf (<fabian@faqgames.net>)
