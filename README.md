@@ -8,6 +8,8 @@ This project implements a Python plugin to import Laubwerk plant models into Ble
 
 This repository contains the latest version of the plugin and can be used to contribute improvements.
 
+This project is an updated fork of https://bitbucket.org/laubwerk/lbwbl.
+
 ## How do I get set up?
 
 ### Prerequisites
