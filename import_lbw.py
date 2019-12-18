@@ -148,15 +148,12 @@ class LBWImportDialog(bpy.types.Operator):
                     bpy.data.materials.new(plantmat.name)
                     mat = bpy.data.materials.get(plantmat.name)
 
-                    # dvhart: create the nodes tree?
                     NW=300
                     NH=300
                     mat.use_nodes = True
                     nodes = mat.node_tree.nodes
-                    # NOTE: Clear all nodes - OR we could assume BSDF Principled and
-                    # Output as defaults and just change the color input...
                     nodes.clear()
-                    # create diffuse node
+                    # create Principled BSDF node (primary multi-layer mixer node)
                     node_dif = nodes.new(type = 'ShaderNodeBsdfPrincipled')
                     node_dif.location = 2 * NW, 2 * NH
                     # create output node
@@ -187,6 +184,8 @@ class LBWImportDialog(bpy.types.Operator):
                         links.new(node_img.outputs[0], node_dif.inputs[0])
 
                         # Alpha Texture
+                        # Blender render engines support using the diffuse map alpha channel. We
+                        # assume this rather than a separate alpha image.
                         alpha_path = plantmat.alphaTexture
                         print("Alpha Texture: %s" % plantmat.alphaTexture)
                         if alpha_path != '':
@@ -195,35 +194,29 @@ class LBWImportDialog(bpy.types.Operator):
                             # TODO: mat.transparent_shadow_method = 'CLIP' ?
                             if alpha_path == img_path:
                                 links.new(node_img.outputs['Alpha'], node_dif.inputs['Alpha'])
-                            # TODO: does the following condition ever occur with
-                            # Laubwerk plants? When is the _a clip mask used?
-                            #else:
-                            #    node_alpha = nodes.new(type = 'ShaderNodeTexImage')
-                            #    node_alpha.image = bpy.data.images.load(alpha_path)
-                            #    node_alpha.image.colorspace_settings.is_data = True
-                            #    links.new(node_alpha.outputs['Color'], node_dif.inputs['Alpha'])
+                            else:
+                                print("WARN: Alpha Texture differs from diffuse image path. Not supported.")
 
                         # Subsurface Texture
-                        print("Subsurface Texture: %s" % plantmat.subsurfaceTexture)
                         print("Subsurface Color: " + str(plantmat.subsurfaceColor))
-                        print("Subsurface Depth: %f" % plantmat.subsurfaceDepth)
                         if plantmat.subsurfaceColor:
                             node_dif.inputs['Subsurface Color'].default_value = plantmat.subsurfaceColor + (1.0,)
-                            node_dif.inputs['Subsurface'].default_value = plantmat.subsurfaceDepth
 
+                        print("Subsurface Texture: %s" % plantmat.subsurfaceTexture)
                         sub_path = plantmat.subsurfaceTexture
                         if sub_path != '':
-                            if not plantmat.subsurfaceColor:
-                                print("ERROR: no subsurfaceColor with a subsurfaceImage")
                             node_sub = nodes.new(type = 'ShaderNodeTexImage')
                             node_sub.location = 0, NH
                             node_sub.image = bpy.data.images.load(sub_path)
 
+                            # Laubwerk models only support subsurface as a translucency effect,
+                            # indicated by a subsurfaceDepth of 0.0.
+                            print("Subsurface Depth: %f" % plantmat.subsurfaceDepth)
                             if plantmat.subsurfaceDepth == 0.0:
                                 node_sub.image.colorspace_settings.is_data = True
                                 links.new(node_sub.outputs['Color'], node_dif.inputs['Transmission'])
                             else:
-                                links.new(node_sub.outputs['Color'], node_dif.inputs['Subsurface Color'])
+                                print("WARN: Subsurface Depth > 0. Not supported.")
 
                         # Bump Texture
                         print("Bump Texture: %s" % plantmat.getFront().bumpTexture)
@@ -235,7 +228,7 @@ class LBWImportDialog(bpy.types.Operator):
                             node_bumpimg.image.colorspace_settings.is_data = True
                             node_bump = nodes.new(type = 'ShaderNodeBump')
                             node_bump.location = NW, 0
-                            # TODO: Calibrate strength and distance
+                            # TODO: Make the Distance configurable to tune for each render engine
                             print("Bump Strength: %f" % plantmat.getFront().bumpStrength)
                             node_bump.inputs['Strength'].default_value = plantmat.getFront().bumpStrength
                             node_bump.inputs['Distance'].default_value = 0.02
@@ -253,14 +246,10 @@ class LBWImportDialog(bpy.types.Operator):
             MatIndex = me.materials.find(plantmat.name)
             if MatIndex != -1:
                 me.polygons[i].material_index = MatIndex
-                #print('PolygonID: %d, MaterialIndex: %d' % (me.polygons[i].material_index, MatIndex))
             else:
                 print('Material %s not found' % plantmat.name)
 
             i += 1
-        print("Processed %d polygon material IDs" % i)
-        print("Created %d blender materials" % len(me.materials))
-        print("...from %d plant materials" % len(materials))
 
         print("finished importing: %r in %.4f sec." % (filepath, (time.time() - time_main)))
         return {'FINISHED'}
