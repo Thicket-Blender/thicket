@@ -29,6 +29,7 @@ Note, This loads mesh objects and materials.
 import time
 import bpy
 
+
 def lbw_to_bl_mat(plant, mat_id, is_proxy=False, model_season=None):
     NW = 300
     NH = 300
@@ -160,7 +161,6 @@ class LBWImportDialog(bpy.types.Operator):
         # mesh arrays
         verts_list = []    # the vertex array of the tree
         polygon_list = []  # the face array of the tree
-        uv_list = []       # the uv array of the tree
         materials = []     # the material array of the tree
         scalefac = 0.01    # TODO: Add this to the importer UI
 
@@ -224,18 +224,14 @@ class LBWImportDialog(bpy.types.Operator):
             object.select_set(True)
         bpy.ops.object.shade_smooth()
 
-        # FIXME: we should be able to reduce this from 2N to N
         # create a UV Map Layer for the tree
-        mesh.uv_layers.new()
-        for uv in mesh_laubwerk.uvs:
-            uvmap = (uv[0] * -1, uv[1] * -1)
-            uv_list.append(uvmap)
-
         # add uvs to laubwerktree
-        x = 0
-        for i in mesh.uv_layers[0].data:
-            i.uv = uv_list[x]
-            x += 1
+        mesh.uv_layers.new()
+        i = 0
+        for d in mesh.uv_layers[0].data:
+            uv = mesh_laubwerk.uvs[i]
+            d.uv = (uv[0] * -1, uv[1] * -1)
+            i += 1
 
         # read matids and materialnames and create and add materials to the laubwerktree
         i = 0
