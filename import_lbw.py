@@ -30,6 +30,76 @@ import time
 import bpy
 
 
+def lbw_to_bl_obj(plant, model_id, is_proxy, model_season, lod_max_level, lod_min_thick,
+                  leaf_amount, leaf_density, lod_subdiv):
+    """ Generate the Blender Object, with mesh and materials, using the settings from the importer ui """
+
+    verts_list = []    # the vertex array of the tree
+    polygon_list = []  # the face array of the tree
+    materials = []     # the material array of the tree
+    scalefac = 0.01    # TODO: Add this to the importer UI
+
+    model = plant.models[model_id]
+
+    mesh_laubwerk = None
+
+    if is_proxy:
+        mesh_laubwerk = model.get_proxy(model_season)
+    else:
+        mesh_laubwerk = model.getMesh(qualifierName=model_season, maxBranchLevel=lod_max_level,
+                                      minThickness=lod_min_thick, leafAmount=leaf_amount / 100.0,
+                                      leafDensity=leaf_density / 100.0, maxSubDivLevel=lod_subdiv)
+
+    # write vertices
+    for point in mesh_laubwerk.points:
+        vert = (point[0] * scalefac, point[2] * scalefac, point[1] * scalefac)
+        verts_list.append(vert)
+
+    # write polygons
+    for polygon in zip(mesh_laubwerk.polygons):
+        for idx in zip(polygon):
+            face = idx[0]
+            polygon_list.append(face)
+
+    # create mesh and object
+    name = "Laubwerk_" + plant.name + "_" + str(model.labels['en'])
+    mesh = bpy.data.meshes.new(name)
+    mesh.from_pydata(verts_list, [], polygon_list)
+    mesh.update(calc_edges=True)
+
+    # create the UV Map Layer
+    mesh.uv_layers.new()
+    i = 0
+    for d in mesh.uv_layers[0].data:
+        uv = mesh_laubwerk.uvs[i]
+        d.uv = (uv[0] * -1, uv[1] * -1)
+        i += 1
+
+    obj = bpy.data.objects.new(name, mesh)
+
+    # read matids and materialnames and create and add materials to the laubwerktree
+    i = 0
+    for matID in zip(mesh_laubwerk.matids):
+        mat_id = matID[0]
+        plantmat = plant.materials[mat_id]
+        if matID[0] not in materials:
+            materials.append(mat_id)
+            mat = bpy.data.materials.get(plantmat.name)
+            if mat is None:
+                mat = lbw_to_bl_mat(plant, mat_id, is_proxy, model_season)
+            obj.data.materials.append(mat)
+
+        mat_index = obj.data.materials.find(plantmat.name)
+        if mat_index != -1:
+            obj.data.polygons[i].material_index = mat_index
+        else:
+            print('Material %s not found' % plantmat.name)
+
+        i += 1
+
+    return obj
+
+
 def lbw_to_bl_mat(plant, mat_id, is_proxy=False, model_season=None):
     NW = 300
     NH = 300
@@ -151,107 +221,38 @@ class LBWImportDialog(bpy.types.Operator):
         Called by the user interface or another script.
         """
         print('\nimporting lbw %r' % filepath)
+        print("viewport mode is %s" % viewport_mode)
 
         time_main = time.time()
 
-        is_proxy = False
-        if viewport_mode == "PROXY":
-            is_proxy = True
+        obj = lbw_to_bl_obj(plant, model_id, viewport_mode == "PROXY", model_season, lod_max_level, lod_min_thick,
+                            leaf_amount, leaf_density, lod_subdiv)
 
-        # mesh arrays
-        verts_list = []    # the vertex array of the tree
-        polygon_list = []  # the face array of the tree
-        materials = []     # the material array of the tree
-        scalefac = 0.01    # TODO: Add this to the importer UI
+        # set object location
+        obj.location = bpy.context.scene.cursor.location
+        bpy.context.scene.collection.objects.link(obj)
 
-        # pick the model in the plant file.
-        model = plant.models[model_id]
-
-        # generate the actual model geometry with the settings from the importer ui
-        print("viewport mode is %s" % viewport_mode)
-        mesh_laubwerk = None
-
-        if is_proxy:
-            mesh_laubwerk = model.get_proxy(model_season)
-        else:
-            mesh_laubwerk = model.getMesh(qualifierName=model_season, maxBranchLevel=lod_max_level,
-                                          minThickness=lod_min_thick, leafAmount=leaf_amount / 100.0,
-                                          leafDensity=leaf_density / 100.0, maxSubDivLevel=lod_subdiv)
-
-        # write vertices
-        for point in mesh_laubwerk.points:
-            vert = (point[0] * scalefac, point[2] * scalefac, point[1] * scalefac)
-            verts_list.append(vert)
-
-        # write polygons
-        for polygon in zip(mesh_laubwerk.polygons):
-            for idx in zip(polygon):
-                face = idx[0]
-                polygon_list.append(face)
-
-        # create mesh and object
-        modelname = str(model.labels['en'])
-        mesh = bpy.data.meshes.new("Laubwerk_" + plant.name + "_" + modelname)
-        object = bpy.data.objects.new("Laubwerk_" + plant.name + "_" + modelname, mesh)
-
-        # set custom properties to show in properties tab
-        object["lbw_path"] = filepath
-        object["model_type"] = model_type
-        object["model_season"] = model_season
-        object["render_mode"] = render_mode
-        object["viewport_mode"] = viewport_mode
-        object["lod_cull_thick"] = lod_cull_thick
-        object["lod_min_thick"] = lod_min_thick
-        object["lod_cull_level"] = lod_cull_level
-        object["lod_max_level"] = lod_max_level
-        object["lod_subdiv"] = lod_subdiv
-        object["leaf_density"] = leaf_density
-        object["leaf_amount"] = leaf_amount
-
-        # set mesh location
-        object.location = bpy.context.scene.cursor.location
-        bpy.context.scene.collection.objects.link(object)
-
-        # create mesh from python data
-        mesh.from_pydata(verts_list, [], polygon_list)
-        mesh.update(calc_edges=True)
-        me = object.data
-
-        # set created tree to active object
+        # set to active object
         bpy.ops.object.select_all(action='DESELECT')
-        bpy.context.view_layer.objects.active = bpy.data.objects[object.name]
-        if not object.select_get():
-            object.select_set(True)
+        bpy.context.view_layer.objects.active = bpy.data.objects[obj.name]
+        if not obj.select_get():
+            obj.select_set(True)
+
         bpy.ops.object.shade_smooth()
 
-        # create a UV Map Layer for the tree
-        # add uvs to laubwerktree
-        mesh.uv_layers.new()
-        i = 0
-        for d in mesh.uv_layers[0].data:
-            uv = mesh_laubwerk.uvs[i]
-            d.uv = (uv[0] * -1, uv[1] * -1)
-            i += 1
-
-        # read matids and materialnames and create and add materials to the laubwerktree
-        i = 0
-        for matID in zip(mesh_laubwerk.matids):
-            mat_id = matID[0]
-            plantmat = plant.materials[mat_id]
-            if matID[0] not in materials:
-                materials.append(mat_id)
-                mat = bpy.data.materials.get(plantmat.name)
-                if mat is None:
-                    mat = lbw_to_bl_mat(plant, mat_id, is_proxy, model_season)
-                me.materials.append(mat)
-
-            mat_index = me.materials.find(plantmat.name)
-            if mat_index != -1:
-                me.polygons[i].material_index = mat_index
-            else:
-                print('Material %s not found' % plantmat.name)
-
-            i += 1
+        # set custom properties to show in properties tab
+        obj["lbw_path"] = filepath
+        obj["model_type"] = model_type
+        obj["model_season"] = model_season
+        obj["render_mode"] = render_mode
+        obj["viewport_mode"] = viewport_mode
+        obj["lod_cull_thick"] = lod_cull_thick
+        obj["lod_min_thick"] = lod_min_thick
+        obj["lod_cull_level"] = lod_cull_level
+        obj["lod_max_level"] = lod_max_level
+        obj["lod_subdiv"] = lod_subdiv
+        obj["leaf_density"] = leaf_density
+        obj["leaf_amount"] = leaf_amount
 
         print("finished importing: %r in %.4f sec." % (filepath, (time.time() - time_main)))
         return {'FINISHED'}
