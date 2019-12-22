@@ -77,7 +77,6 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
     filter_glob: StringProperty(default="*.lbw;*.lbw.gz", options={'HIDDEN'})
     filepath: StringProperty(name="File Path", maxlen=1024, default="")
 
-#    directory = StringProperty(name="Directory", subtype='DIR_PATH', default="D:\\Program Files\\Laubwerk\\Plants", options={'HIDDEN', 'SKIP_SAVE'})
     leaf_density: FloatProperty(name="Leaf density",
                                 description="The density of the leafs of the plant.",
                                 default=100.0, min=0.01, max=100.0, subtype='PERCENTAGE')
@@ -160,7 +159,8 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
 
         # reset property defaults
         props = context.object.bl_rna.properties
-        for prop in ["leaf_density", "render_mode", "viewport_mode", "lod_cull_thick", "lod_min_thick", "lod_cull_level", "lod_max_level", "leaf_amount", "lod_subdiv"]:
+        for prop in ["leaf_density", "render_mode", "viewport_mode", "lod_cull_thick", "lod_min_thick",
+                     "lod_cull_level", "lod_max_level", "leaf_amount", "lod_subdiv"]:
             self.__setattr__(prop, props[prop].default)
 
     def draw(self, context):
@@ -320,7 +320,8 @@ def register():
     bpy.types.Object.lod_max_level = IntProperty(name="Maximum Level", default=3, min=0, max=10, step=1)
     bpy.types.Object.lod_subdiv = IntProperty(name="Subdivision", default=1, min=0, max=5, step=1)
     bpy.types.Object.leaf_amount = FloatProperty(name="Leaf amount", description="The amount of leafs of the plant.",
-                                                 default=100.0, min=0.01, max=100.0, subtype='PERCENTAGE', options={'HIDDEN'})
+                                                 default=100.0, min=0.01, max=100.0, subtype='PERCENTAGE',
+                                                 options={'HIDDEN'})
 
     bpy.utils.register_class(ImportLBW)
     bpy.types.TOPBAR_MT_file_import.append(menu_func_import)
