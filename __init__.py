@@ -18,6 +18,22 @@
 
 # <pep8-80 compliant>
 
+import os.path
+import threading
+import time
+
+import bpy
+from bpy.props import (BoolProperty,
+                       FloatProperty,
+                       IntProperty,
+                       StringProperty,
+                       EnumProperty,
+                       )
+from bpy_extras.io_utils import ImportHelper
+
+import laubwerk
+from io_import_laubwerk import import_lbw
+
 bl_info = {
     "name": "Laubwerk lbw.gz format importer",
     "author": "Fabian Quosdorf",
@@ -30,28 +46,6 @@ bl_info = {
     "category": "Import"
 }
 
-import sys
-import os.path
-import threading
-import time
-
-import bpy
-import laubwerk
-
-from bpy.props import (BoolProperty,
-                       FloatProperty,
-                       IntProperty,
-                       StringProperty,
-                       EnumProperty,
-                       RemoveProperty
-                       )
-from bpy_extras.io_utils import (ImportHelper,
-                                 path_reference_mode
-                                 )
-
-
-from io_import_laubwerk import import_lbw
-
 # A global variable for the plant.
 plant = None
 current_path = ""
@@ -61,16 +55,17 @@ s_items = []
 plant = None
 locale = "en"
 alt_locale = "en_US"
-mt_loaded = False # Indicates if all model types have been loaded.
-ms_loaded = False # Indicates if all model seasons have been loaded.
-#TODO get the locale from the current blender installation via bpy.app.translations.locale. This can be void.
+mt_loaded = False  # Indicates if all model types have been loaded.
+ms_loaded = False  # Indicates if all model seasons have been loaded.
+
+# TODO get the locale from the current blender installation via bpy.app.translations.locale. This can be void.
 
 
 class ImportLBW(bpy.types.Operator, ImportHelper):
     """Load a Laubwerk LBW.GZ File"""
     bl_idname = "import_object.lbw"
     bl_label = "Import Laubwerk plant"
-    #bl_options = {'PRESET', 'UNDO'}
+    # bl_options = {'PRESET', 'UNDO'}
 
     filename_ext = ".lbw.gz"
     short_ext = ".lbw"
@@ -79,28 +74,27 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
     is_running = False
     restart_thread = False
 
-    filter_glob: StringProperty(default = "*.lbw;*.lbw.gz", options = {'HIDDEN'})
-    filepath: StringProperty(name = "File Path", maxlen = 1024, default = "")
+    filter_glob: StringProperty(default="*.lbw;*.lbw.gz", options={'HIDDEN'})
+    filepath: StringProperty(name="File Path", maxlen=1024, default="")
 
-#    directory = StringProperty(name = "Directory", subtype = 'DIR_PATH', default = "D:\\Program Files\\Laubwerk\\Plants", options = {'HIDDEN', 'SKIP_SAVE'})
-    leaf_density: FloatProperty(name = "Leaf density",
-        description = "The density of the leafs of the plant.",
-        default = 100.0, min = 0.01, max = 100.0, subtype = 'PERCENTAGE')
+    leaf_density: FloatProperty(name="Leaf density",
+                                description="The density of the leafs of the plant.",
+                                default=100.0, min=0.01, max=100.0, subtype='PERCENTAGE')
     model_id = 0
-    render_mode: EnumProperty(items = [("PROXY", "Convex Hull", ""), ("FULL", "Full Geometry", "")], name = "Render")
-    viewport_mode: EnumProperty(items = [("PROXY", "Convex Hull", ""), ("FULL", "Full Geometry", "")], name = "Viewport")
-    lod_cull_thick: BoolProperty(name = "Cull by Thickness", default = False)
-    lod_min_thick: FloatProperty(name = "Min. Thickness", default = 0.1, min = 0.1, max = 10000.0, step = 1.0)
-    lod_cull_level: BoolProperty(name = "Cull by Level", default = False)
-    lod_max_level: IntProperty(name = "Maximum Level", default = 3, min = 0, max = 10, step = 1)
-    lod_subdiv: IntProperty(name = "Subdivision", default = 1, min = 0, max = 5, step = 1)
-    leaf_amount: FloatProperty(name = "Leaf amount",
-        description = "The amount of leafs of the plant.",
-        default = 100.0, min = 0.01, max = 100.0, subtype = 'PERCENTAGE')
+    render_mode: EnumProperty(items=[("PROXY", "Convex Hull", ""), ("FULL", "Full Geometry", "")], name="Render")
+    viewport_mode: EnumProperty(items=[("PROXY", "Convex Hull", ""), ("FULL", "Full Geometry", "")], name="Viewport")
+    lod_cull_thick: BoolProperty(name="Cull by Thickness", default=False)
+    lod_min_thick: FloatProperty(name="Min. Thickness", default=0.1, min=0.1, max=10000.0, step=1.0)
+    lod_cull_level: BoolProperty(name="Cull by Level", default=False)
+    lod_max_level: IntProperty(name="Maximum Level", default=3, min=0, max=10, step=1)
+    lod_subdiv: IntProperty(name="Subdivision", default=1, min=0, max=5, step=1)
+    leaf_amount: FloatProperty(name="Leaf amount",
+                               description="The amount of leafs of the plant.",
+                               default=100.0, min=0.01, max=100.0, subtype='PERCENTAGE')
 
     def update_seasons(self, context):
         global locale, alt_locale, s_items, plant
-        print ("updating seasons")
+        print("updating seasons")
         s_items = []
         for qualifier in plant.models[self["model_type"]].qualifiers:
             qualab = plant.models[self["model_type"]].qualifierLabels[qualifier]
@@ -125,8 +119,8 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
 #        else:
 #            return [("Loading...", "Loading...", "")]
 
-    model_type: EnumProperty(items = model_type_callback, name = "Model", update = update_seasons)
-    model_season: EnumProperty(items = model_season_callback, name = "Season")
+    model_type: EnumProperty(items=model_type_callback, name="Model", update=update_seasons)
+    model_season: EnumProperty(items=model_season_callback, name="Season")
 
     def execute(self, context):
         global plant
@@ -135,14 +129,14 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
         # Set the model_id to the currently selected model type.
         self.model_id = models.index(self.model_type)
         # Use this dictionary to store additional parameters like season and so on.
-        keywords = self.as_keywords(ignore = ("filter_glob", "oldpath", "is_running", "restart_thread", "watch_thread"))
+        keywords = self.as_keywords(ignore=("filter_glob", "oldpath", "is_running", "restart_thread", "watch_thread"))
         keywords["model_id"] = self.model_id
         keywords["plant"] = plant
         return import_lbw.LBWImportDialog.load(self, context, **keywords)
 
     def invoke(self, context, event):
         global mt_loaded, ms_loaded
-        print ('invoked')
+        print('invoked')
         self.oldpath = self.filepath
         self.restart_thread = False
         self.is_running = True
@@ -165,7 +159,8 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
 
         # reset property defaults
         props = context.object.bl_rna.properties
-        for prop in ["leaf_density", "render_mode", "viewport_mode", "lod_cull_thick", "lod_min_thick", "lod_cull_level", "lod_max_level", "leaf_amount", "lod_subdiv"]:
+        for prop in ["leaf_density", "render_mode", "viewport_mode", "lod_cull_thick", "lod_min_thick",
+                     "lod_cull_level", "lod_max_level", "leaf_amount", "lod_subdiv"]:
             self.__setattr__(prop, props[prop].default)
 
     def draw(self, context):
@@ -184,50 +179,50 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
             elif alt_locale in plant.labels:
                 pname = plant.labels[alt_locale][0]
             # Create the UI entries.
-            layout.label(text = "%s(%s)" % (pname, plant.name))
+            layout.label(text="%s(%s)" % (pname, plant.name))
             if mt_loaded is False:
-                layout.label(text = "Loading...")
+                layout.label(text="Loading...")
             sub = layout.column()
-            sub.active = mt_loaded == True
+            sub.active = mt_loaded
             sub.prop(self, "model_type")
             sub.prop(self, "model_season")
             row = layout.row()
             box = row.box()
-            box.label(text = "Display settings")
+            box.label(text="Display settings")
             box.prop(self, "render_mode")
             box.prop(self, "viewport_mode")
             row = layout.row()
             box2 = row.box()
-            box2.label(text = "Level of Detail")
+            box2.label(text="Level of Detail")
             box2.prop(self, "leaf_density")
             box = box2.box()
             box.prop(self, "lod_cull_thick")
             subrow = box.row()
-            subrow.active = self.lod_cull_thick == True
+            subrow.active = self.lod_cull_thick
             subrow.prop(self, "lod_min_thick")
             box = box2.box()
             box.prop(self, "lod_cull_level")
             subrow = box.row()
-            subrow.active = self.lod_cull_level == True
+            subrow.active = self.lod_cull_level
             subrow.prop(self, "lod_max_level")
             box2.prop(self, "lod_subdiv")
             box2.prop(self, "leaf_amount")
         else:
-            layout.label(text = "Choose a Laubwerk file.")
+            layout.label(text="Choose a Laubwerk file.")
 
 
 class lbw_watch(threading.Thread):
 
     def __init__(self, clob):
         threading.Thread.__init__(self)
-        self.daemon = True # so Blender can quit cleanly
+        self.daemon = True  # so Blender can quit cleanly
         self.name = 'lbw_watch'
-        self.clob = clob # The calling class instance.
+        self.clob = clob  # The calling class instance.
 
     def run(self):
         global models, plant, m_items, s_items, locale, mt_loaded
         while self.clob.is_running:
-            time.sleep(0.1) # sleep 100 Milliseconds.
+            time.sleep(0.1)  # sleep 100 Milliseconds.
             try:
                 if self.clob.restart_thread:
                     # Recreate the m_types and m_items
@@ -253,12 +248,12 @@ class lbw_watch(threading.Thread):
                 print("lbw watch exception:", detail)
 
 
-class lbwPanel(bpy.types.Panel):     # panel to display laubwerk plant specific properties.
-    bl_space_type = "PROPERTIES"       # show up in: properties view
-    bl_region_type = "WINDOW"           # show up in: object context
-    bl_label = "Laubwerk Plant"           # name of the new panel
+class lbwPanel(bpy.types.Panel):  # panel to display laubwerk plant specific properties.
+    bl_space_type = "PROPERTIES"  # show up in: properties view
+    bl_region_type = "WINDOW"     # show up in: object context
+    bl_label = "Laubwerk Plant"   # name of the new panel
     bl_context = "object"
-    bl_rna = None # FIXME: why do I need this? dvhart
+    bl_rna = None  # FIXME: why do I need this? dvhart
     tr = None
 
     @classmethod
@@ -270,7 +265,6 @@ class lbwPanel(bpy.types.Panel):     # panel to display laubwerk plant specific 
                 plant = laubwerk.load(current_path)
                 self.object = context.object
             return True
-
 
     def draw(self, context):
         # display value of Laubwerk plant, of the active object
@@ -296,36 +290,38 @@ class lbwPanel(bpy.types.Panel):     # panel to display laubwerk plant specific 
             box = box2.box()
             box.prop(context.object, "lod_cull_thick")
             subrow = box.row()
-            subrow.active = context.object.lod_cull_thick == True
+            subrow.active = context.object.lod_cull_thick
             subrow.prop(context.object, "lod_min_thick")
             box = box2.box()
             box.prop(context.object, "lod_cull_level")
             subrow = box.row()
-            subrow.active = context.object.lod_cull_level == True
+            subrow.active = context.object.lod_cull_level
             subrow.prop(context.object, "lod_max_level")
             box2.prop(context.object, "lod_subdiv")
             box2.prop(context.object, "leaf_amount")
 
 
 def menu_func_import(self, context):
-    self.layout.operator(ImportLBW.bl_idname, text = "Laubwerk plant (.lbw.gz)")
+    self.layout.operator(ImportLBW.bl_idname, text="Laubwerk plant (.lbw.gz)")
 
 
 def register():
     # create LBW Settings
-    bpy.types.Object.leaf_density = FloatProperty(name = "Leaf density",
-        description = "The density of the leafs of the plant.",
-        default = 100.0, min = 0.01, max = 100.0, subtype = 'PERCENTAGE')
-    bpy.types.Object.render_mode = EnumProperty(items = [("PROXY", "Convex Hull", ""), ("FULL", "Full Geometry", "")], name = "Render", options = {'HIDDEN'})
-    bpy.types.Object.viewport_mode = EnumProperty(items = [("PROXY", "Convex Hull", ""), ("FULL", "Full Geometry", "")], name = "Viewport", options = {'HIDDEN'})
-    bpy.types.Object.lod_cull_thick = BoolProperty(name = "Cull by Thickness", default = False)
-    bpy.types.Object.lod_min_thick = FloatProperty(name = "Min. Thickness", default = 0.1, min = 0.1, max = 10000.0, step = 1.0)
-    bpy.types.Object.lod_cull_level = BoolProperty(name = "Cull by Level", default = False)
-    bpy.types.Object.lod_max_level = IntProperty(name = "Maximum Level", default = 3, min = 0, max = 10, step = 1)
-    bpy.types.Object.lod_subdiv = IntProperty(name = "Subdivision", default = 1, min = 0, max = 5, step = 1)
-    bpy.types.Object.leaf_amount = FloatProperty(name = "Leaf amount",
-        description = "The amount of leafs of the plant.",
-        default = 100.0, min = 0.01, max = 100.0, subtype = 'PERCENTAGE', options = {'HIDDEN'})
+    bpy.types.Object.leaf_density = FloatProperty(name="Leaf density",
+                                                  description="The density of the leafs of the plant.",
+                                                  default=100.0, min=0.01, max=100.0, subtype='PERCENTAGE')
+    bpy.types.Object.render_mode = EnumProperty(items=[("PROXY", "Convex Hull", ""), ("FULL", "Full Geometry", "")],
+                                                name="Render", options={'HIDDEN'})
+    bpy.types.Object.viewport_mode = EnumProperty(items=[("PROXY", "Convex Hull", ""), ("FULL", "Full Geometry", "")],
+                                                  name="Viewport", options={'HIDDEN'})
+    bpy.types.Object.lod_cull_thick = BoolProperty(name="Cull by Thickness", default=False)
+    bpy.types.Object.lod_min_thick = FloatProperty(name="Min. Thickness", default=0.1, min=0.1, max=10000.0, step=1.0)
+    bpy.types.Object.lod_cull_level = BoolProperty(name="Cull by Level", default=False)
+    bpy.types.Object.lod_max_level = IntProperty(name="Maximum Level", default=3, min=0, max=10, step=1)
+    bpy.types.Object.lod_subdiv = IntProperty(name="Subdivision", default=1, min=0, max=5, step=1)
+    bpy.types.Object.leaf_amount = FloatProperty(name="Leaf amount", description="The amount of leafs of the plant.",
+                                                 default=100.0, min=0.01, max=100.0, subtype='PERCENTAGE',
+                                                 options={'HIDDEN'})
 
     bpy.utils.register_class(ImportLBW)
     bpy.types.TOPBAR_MT_file_import.append(menu_func_import)
@@ -334,6 +330,7 @@ def register():
 def unregister():
     bpy.utils.unregister_class(ImportLBW)
     bpy.types.TOPBAR_MT_file_import.remove(menu_func_import)
+
 
 if __name__ == "__main__":
     register()

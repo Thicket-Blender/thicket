@@ -26,8 +26,9 @@ Run this script from "File->Import" menu and then load the desired Laubwerk file
 Note, This loads mesh objects and materials.
 
 """
-import bpy, laubwerk, bmesh, os, time
-from bpy.props import *
+import time
+import bpy
+
 
 class LBWImportDialog(bpy.types.Operator):
     """ This will be the Laubwerk Player window for browsing and importing trees from the library."""
@@ -37,17 +38,14 @@ class LBWImportDialog(bpy.types.Operator):
     def execute(self, context):
         return {'FINISHED'}
 
-
     def draw(self, context):
         pass
-
 
     def invoke(self, context, event):
         return context.window_manager.invoke_props_dialog(self)
 
-
-    def load(self, context, filepath, leaf_density, model_type, model_id, model_season, render_mode, 
-            viewport_mode, lod_cull_thick, lod_min_thick, lod_cull_level, lod_max_level, lod_subdiv, leaf_amount, plant):
+    def load(self, context, filepath, leaf_density, model_type, model_id, model_season, render_mode, viewport_mode,
+             lod_cull_thick, lod_min_thick, lod_cull_level, lod_max_level, lod_subdiv, leaf_amount, plant):
         """
         Called by the user interface or another script.
         """
@@ -55,11 +53,11 @@ class LBWImportDialog(bpy.types.Operator):
 
         time_main = time.time()
         # mesh arrays
-        verts_list = []  # the vertex array of the tree
+        verts_list = []    # the vertex array of the tree
         polygon_list = []  # the face array of the tree
-        uv_list = [] # the uv array of the tree
-        materials = [] # the material array of the tree
-        scalefac = 0.01 # TODO: Add this to the importer UI
+        uv_list = []       # the uv array of the tree
+        materials = []     # the material array of the tree
+        scalefac = 0.01    # TODO: Add this to the importer UI
 
         # pick the model in the plant file.
         model = plant.models[model_id]
@@ -68,11 +66,12 @@ class LBWImportDialog(bpy.types.Operator):
         print("viewport mode is %s" % viewport_mode)
         mesh_laubwerk = None
         if viewport_mode == "PROXY":
-            #mesh_laubwerk = model.getProxy(model.qualifiers[model.qualifiers.index(model_season)])
+            # mesh_laubwerk = model.getProxy(model.qualifiers[model.qualifiers.index(model_season)])
             mesh_laubwerk = model.get_proxy(model_season)
         else:
-            mesh_laubwerk = model.getMesh(qualifierName = model_season, maxBranchLevel = lod_max_level, minThickness = lod_min_thick,
-            leafAmount = leaf_amount / 100.0, leafDensity = leaf_density / 100.0, maxSubDivLevel = lod_subdiv)
+            mesh_laubwerk = model.getMesh(qualifierName=model_season, maxBranchLevel=lod_max_level,
+                                          minThickness=lod_min_thick, leafAmount=leaf_amount / 100.0,
+                                          leafDensity=leaf_density / 100.0, maxSubDivLevel=lod_subdiv)
 
         # write vertices
         for point in mesh_laubwerk.points:
@@ -85,12 +84,12 @@ class LBWImportDialog(bpy.types.Operator):
                 face = idx[0]
                 polygon_list.append(face)
 
-        #create mesh and object
+        # create mesh and object
         modelname = str(model.labels['en'])
         mesh = bpy.data.meshes.new("Laubwerk_" + plant.name + "_" + modelname)
         object = bpy.data.objects.new("Laubwerk_" + plant.name + "_" + modelname, mesh)
 
-        #set custom properties to show in properties tab
+        # set custom properties to show in properties tab
         object["lbw_path"] = filepath
         object["model_type"] = model_type
         object["model_season"] = model_season
@@ -104,37 +103,36 @@ class LBWImportDialog(bpy.types.Operator):
         object["leaf_density"] = leaf_density
         object["leaf_amount"] = leaf_amount
 
-        #set mesh location
+        # set mesh location
         object.location = bpy.context.scene.cursor.location
         bpy.context.scene.collection.objects.link(object)
 
-        #create mesh from python data
+        # create mesh from python data
         mesh.from_pydata(verts_list, [], polygon_list)
-        mesh.update(calc_edges = True)
+        mesh.update(calc_edges=True)
         me = object.data
 
-        #set created tree to active object
-        bpy.ops.object.select_all(action= 'DESELECT')
+        # set created tree to active object
+        bpy.ops.object.select_all(action='DESELECT')
         bpy.context.view_layer.objects.active = bpy.data.objects[object.name]
         if not object.select_get():
             object.select_set(True)
-        #set shadingmode to smooth
+        # set shadingmode to smooth
         bpy.ops.object.shade_smooth()
 
-        #create a UV Map Layer for the tree
+        # create a UV Map Layer for the tree
         mesh.uv_layers.new()
 
-        #write uvs
+        # write uvs
         for uv in mesh_laubwerk.uvs:
-             uvmap = (uv[0] * -1, uv[1] * -1)
-             uv_list.append(uvmap)
+            uvmap = (uv[0] * -1, uv[1] * -1)
+            uv_list.append(uvmap)
 
         # add uvs to laubwerktree
         x = 0
         for i in mesh.uv_layers[0].data:
             i.uv = uv_list[x]
             x += 1
-
 
         # read matids and materialnames and create and add materials to the laubwerktree
         i = 0
@@ -148,16 +146,16 @@ class LBWImportDialog(bpy.types.Operator):
                     bpy.data.materials.new(plantmat.name)
                     mat = bpy.data.materials.get(plantmat.name)
 
-                    NW=300
-                    NH=300
+                    NW = 300
+                    NH = 300
                     mat.use_nodes = True
                     nodes = mat.node_tree.nodes
                     nodes.clear()
                     # create Principled BSDF node (primary multi-layer mixer node)
-                    node_dif = nodes.new(type = 'ShaderNodeBsdfPrincipled')
+                    node_dif = nodes.new(type='ShaderNodeBsdfPrincipled')
                     node_dif.location = 2 * NW, 2 * NH
                     # create output node
-                    node_out = nodes.new(type = 'ShaderNodeOutputMaterial')
+                    node_out = nodes.new(type='ShaderNodeOutputMaterial')
                     node_out.location = 3 * NW, 2 * NH
                     # link nodes
                     links = mat.node_tree.links
@@ -177,7 +175,7 @@ class LBWImportDialog(bpy.types.Operator):
                         # Diffuse Texture (FIXME: Assumes one sided)
                         print("Diffuse Texture: %s" % plantmat.getFront().diffuseTexture)
                         img_path = plantmat.getFront().diffuseTexture
-                        node_img = nodes.new(type = 'ShaderNodeTexImage')
+                        node_img = nodes.new(type='ShaderNodeTexImage')
                         node_img.location = 0, 2 * NH
                         node_img.image = bpy.data.images.load(img_path)
                         node_dif.inputs[0].default_value = mat.diffuse_color
@@ -205,7 +203,7 @@ class LBWImportDialog(bpy.types.Operator):
                         print("Subsurface Texture: %s" % plantmat.subsurfaceTexture)
                         sub_path = plantmat.subsurfaceTexture
                         if sub_path != '':
-                            node_sub = nodes.new(type = 'ShaderNodeTexImage')
+                            node_sub = nodes.new(type='ShaderNodeTexImage')
                             node_sub.location = 0, NH
                             node_sub.image = bpy.data.images.load(sub_path)
 
@@ -222,11 +220,11 @@ class LBWImportDialog(bpy.types.Operator):
                         print("Bump Texture: %s" % plantmat.getFront().bumpTexture)
                         bump_path = plantmat.getFront().bumpTexture
                         if bump_path != '':
-                            node_bumpimg = nodes.new(type = 'ShaderNodeTexImage')
+                            node_bumpimg = nodes.new(type='ShaderNodeTexImage')
                             node_bumpimg.location = 0, 0
                             node_bumpimg.image = bpy.data.images.load(bump_path)
                             node_bumpimg.image.colorspace_settings.is_data = True
-                            node_bump = nodes.new(type = 'ShaderNodeBump')
+                            node_bump = nodes.new(type='ShaderNodeBump')
                             node_bump.location = NW, 0
                             # TODO: Make the Distance configurable to tune for each render engine
                             print("Bump Strength: %f" % plantmat.getFront().bumpStrength)
@@ -234,7 +232,6 @@ class LBWImportDialog(bpy.types.Operator):
                             node_bump.inputs['Distance'].default_value = 0.02
                             links.new(node_bumpimg.outputs['Color'], node_bump.inputs['Height'])
                             links.new(node_bump.outputs['Normal'], node_dif.inputs['Normal'])
-
 
                         print("Displacement Texture: %s" % plantmat.displacementTexture)
                         print("Normal Texture: %s" % plantmat.getFront().normalTexture)
@@ -258,8 +255,9 @@ class LBWImportDialog(bpy.types.Operator):
 def register():
     bpy.utils.register_class(LBWImportDialog)   # register dialog
 
+
 def unregister():
-    bpy.utils.uregister_class(LBWImportDialog)   # unregister dialog
+    bpy.utils.uregister_class(LBWImportDialog)  # unregister dialog
 
 
 if __name__ == "__main__":
