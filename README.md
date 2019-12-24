@@ -14,8 +14,9 @@ This project is an updated fork of https://bitbucket.org/laubwerk/lbwbl.
 
 ### Prerequisites
 
-* You will need to have the Laubwerk Player Plugin (which is part of every Laubwerk Plants Kit) installed, so the Laubwerk Python Extension is available. If you do not have Laubwerk Plants already installed, you can grab the Plants Kit Freebie [from the Laubwerk website](http://www.laubwerk.com/store/plants-kit-freebie).
-* A current version of [Blender](http://www.blender.org/). The plugin is known to run with [Blender 2.80](http://www.blender.org/features/past-releases/2-80/).
+* [Blender](http://www.blender.org/) 2.80 or later. The plugin is known to run with [Blender 2.81a](http://www.blender.org/features/past-releases/2-81/).
+* Laubwerk Player Plugin, which includes the Python SDK, available in all Laubwerk Plant Kits, including the Plants Kit Freebie [from the Laubwerk website](http://www.laubwerk.com/store/plants-kit-freebie).
+  * NOTE: The Python 3 version of the SDK is required. This is currently under development and is not included in the plant kits. For now, you can email Laubwerk requesting access (see the footer at [laubwerk.com](http://laubwerk.com) for contact information.
 
 ### Installation
 * Ensure the Laubwerk python module is in your PYTHONPATH
