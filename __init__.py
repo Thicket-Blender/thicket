@@ -81,8 +81,7 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
                                 description="The density of the leafs of the plant.",
                                 default=100.0, min=0.01, max=100.0, subtype='PERCENTAGE')
     model_id = 0
-    render_mode: EnumProperty(items=[("PROXY", "Convex Hull", ""), ("FULL", "Full Geometry", "")], name="Render")
-    viewport_mode: EnumProperty(items=[("PROXY", "Convex Hull", ""), ("FULL", "Full Geometry", "")], name="Viewport")
+    viewport_proxy: BoolProperty(name="Viewport Proxy", default=True)
     lod_cull_thick: BoolProperty(name="Cull by Thickness", default=False)
     lod_min_thick: FloatProperty(name="Min. Thickness", default=0.1, min=0.1, max=10000.0, step=1.0)
     lod_cull_level: BoolProperty(name="Cull by Level", default=False)
@@ -159,7 +158,7 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
 
         # reset property defaults
         props = context.object.bl_rna.properties
-        for prop in ["leaf_density", "render_mode", "viewport_mode", "lod_cull_thick", "lod_min_thick",
+        for prop in ["leaf_density", "viewport_proxy", "lod_cull_thick", "lod_min_thick",
                      "lod_cull_level", "lod_max_level", "leaf_amount", "lod_subdiv"]:
             self.__setattr__(prop, props[prop].default)
 
@@ -189,8 +188,7 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
             row = layout.row()
             box = row.box()
             box.label(text="Display settings")
-            box.prop(self, "render_mode")
-            box.prop(self, "viewport_mode")
+            box.prop(self, "viewport_proxy")
             row = layout.row()
             box2 = row.box()
             box2.label(text="Level of Detail")
@@ -281,8 +279,7 @@ class lbwPanel(bpy.types.Panel):  # panel to display laubwerk plant specific pro
             row = layout.row()
             box = row.box()
             box.label("Display settings")
-            box.prop(context.object, "render_mode")
-            box.prop(context.object, "viewport_mode")
+            box.prop(context.object, "viewport_proxy")
             row = layout.row()
             box2 = row.box()
             box2.label("Level of Detail")
@@ -310,10 +307,7 @@ def register():
     bpy.types.Object.leaf_density = FloatProperty(name="Leaf density",
                                                   description="The density of the leafs of the plant.",
                                                   default=100.0, min=0.01, max=100.0, subtype='PERCENTAGE')
-    bpy.types.Object.render_mode = EnumProperty(items=[("PROXY", "Convex Hull", ""), ("FULL", "Full Geometry", "")],
-                                                name="Render", options={'HIDDEN'})
-    bpy.types.Object.viewport_mode = EnumProperty(items=[("PROXY", "Convex Hull", ""), ("FULL", "Full Geometry", "")],
-                                                  name="Viewport", options={'HIDDEN'})
+    bpy.types.Object.viewport_proxy = BoolProperty(name="Viewport Proxy", default=True)
     bpy.types.Object.lod_cull_thick = BoolProperty(name="Cull by Thickness", default=False)
     bpy.types.Object.lod_min_thick = FloatProperty(name="Min. Thickness", default=0.1, min=0.1, max=10000.0, step=1.0)
     bpy.types.Object.lod_cull_level = BoolProperty(name="Cull by Level", default=False)

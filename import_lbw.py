@@ -39,16 +39,20 @@ def lbw_to_bl_obj(plant, model_id, is_proxy, model_season, lod_max_level, lod_mi
     materials = []     # the material array of the tree
     scalefac = 0.01    # TODO: Add this to the importer UI
 
-    model = plant.models[model_id]
-
     mesh_laubwerk = None
+
+    model = plant.models[model_id]
 
     if is_proxy:
         mesh_laubwerk = model.get_proxy(model_season)
+        name = "proxy"
+        obj_name = "Laubwerk_" + plant.name + "_" + str(model.labels['en'])
     else:
         mesh_laubwerk = model.getMesh(qualifierName=model_season, maxBranchLevel=lod_max_level,
                                       minThickness=lod_min_thick, leafAmount=leaf_amount / 100.0,
                                       leafDensity=leaf_density / 100.0, maxSubDivLevel=lod_subdiv)
+        name = "full"
+        obj_name = name
 
     # write vertices
     for point in mesh_laubwerk.points:
@@ -62,10 +66,14 @@ def lbw_to_bl_obj(plant, model_id, is_proxy, model_season, lod_max_level, lod_mi
             polygon_list.append(face)
 
     # create mesh and object
-    name = "Laubwerk_" + plant.name + "_" + str(model.labels['en'])
     mesh = bpy.data.meshes.new(name)
     mesh.from_pydata(verts_list, [], polygon_list)
     mesh.update(calc_edges=True)
+
+    # Use smooth shading
+    # FIXME: gotta be a non O(N) way to do this???
+    for face in mesh.polygons:
+        face.use_smooth = True
 
     # create the UV Map Layer
     mesh.uv_layers.new()
@@ -75,7 +83,7 @@ def lbw_to_bl_obj(plant, model_id, is_proxy, model_season, lod_max_level, lod_mi
         d.uv = (uv[0] * -1, uv[1] * -1)
         i += 1
 
-    obj = bpy.data.objects.new(name, mesh)
+    obj = bpy.data.objects.new(obj_name, mesh)
 
     # read matids and materialnames and create and add materials to the laubwerktree
     i = 0
@@ -215,44 +223,53 @@ class LBWImportDialog(bpy.types.Operator):
     def invoke(self, context, event):
         return context.window_manager.invoke_props_dialog(self)
 
-    def load(self, context, filepath, leaf_density, model_type, model_id, model_season, render_mode, viewport_mode,
+    def load(self, context, filepath, leaf_density, model_type, model_id, model_season, viewport_proxy,
              lod_cull_thick, lod_min_thick, lod_cull_level, lod_max_level, lod_subdiv, leaf_amount, plant):
         """
         Called by the user interface or another script.
         """
         print('\nimporting lbw %r' % filepath)
-        print("viewport mode is %s" % viewport_mode)
+        print("Viewport Proxy: %s" % viewport_proxy)
 
         time_main = time.time()
 
-        obj = lbw_to_bl_obj(plant, model_id, viewport_mode == "PROXY", model_season, lod_max_level, lod_min_thick,
+        # Create the low res proxy object
+        obj_proxy = lbw_to_bl_obj(plant, model_id, True, model_season, lod_max_level, lod_min_thick,
+                                  leaf_amount, leaf_density, lod_subdiv)
+        bpy.context.collection.objects.link(obj_proxy)
+        obj_proxy.hide_render = True
+        obj_proxy.show_name = True
+        # TODO: enable if using BOUNDS in high res viewport mode
+        #obj_proxy.display_bounds_type = "CAPSULE" # CUBE, CYLINDER
+
+        # Create the high resolution model
+        obj_high = lbw_to_bl_obj(plant, model_id, False, model_season, lod_max_level, lod_min_thick,
                             leaf_amount, leaf_density, lod_subdiv)
+        bpy.context.collection.objects.link(obj_high)
+        obj_high.parent = obj_proxy
+        obj_high.hide_select = True
 
-        # set object location
-        obj.location = bpy.context.scene.cursor.location
-        bpy.context.scene.collection.objects.link(obj)
-
-        # set to active object
-        bpy.ops.object.select_all(action='DESELECT')
-        bpy.context.view_layer.objects.active = bpy.data.objects[obj.name]
-        if not obj.select_get():
-            obj.select_set(True)
-
-        bpy.ops.object.shade_smooth()
+        # Configure viewport model visibility
+        if viewport_proxy:
+            obj_high.hide_viewport = True
+        else:
+            # TODO: decide between wireframe or bounds when viewing the high res
+            # model in the viewport
+            #obj_proxy.display_type = "BOUNDS"
+            obj_proxy.display_type = "WIRE"
 
         # set custom properties to show in properties tab
-        obj["lbw_path"] = filepath
-        obj["model_type"] = model_type
-        obj["model_season"] = model_season
-        obj["render_mode"] = render_mode
-        obj["viewport_mode"] = viewport_mode
-        obj["lod_cull_thick"] = lod_cull_thick
-        obj["lod_min_thick"] = lod_min_thick
-        obj["lod_cull_level"] = lod_cull_level
-        obj["lod_max_level"] = lod_max_level
-        obj["lod_subdiv"] = lod_subdiv
-        obj["leaf_density"] = leaf_density
-        obj["leaf_amount"] = leaf_amount
+        obj_proxy["lbw_path"] = filepath
+        obj_proxy["model_type"] = model_type
+        obj_proxy["model_season"] = model_season
+        obj_proxy["viewport_proxy"] = viewport_proxy
+        obj_proxy["lod_cull_thick"] = lod_cull_thick
+        obj_proxy["lod_min_thick"] = lod_min_thick
+        obj_proxy["lod_cull_level"] = lod_cull_level
+        obj_proxy["lod_max_level"] = lod_max_level
+        obj_proxy["lod_subdiv"] = lod_subdiv
+        obj_proxy["leaf_density"] = leaf_density
+        obj_proxy["leaf_amount"] = leaf_amount
 
         print("finished importing: %r in %.4f sec." % (filepath, (time.time() - time_main)))
         return {'FINISHED'}
