@@ -42,11 +42,12 @@ def lbw_to_bl_obj(plant, model_id, is_proxy, model_season, lod_max_level, lod_mi
     mesh_laubwerk = None
 
     model = plant.models[model_id]
+    plant_name = plant.name.replace(' ', '_')
 
     if is_proxy:
         mesh_laubwerk = model.get_proxy(model_season)
         name = "proxy"
-        obj_name = "Laubwerk_" + plant.name + "_" + str(model.labels['en'])
+        obj_name = "Laubwerk_" + plant_name + "_" + str(model.labels['en'])
     else:
         mesh_laubwerk = model.getMesh(qualifierName=model_season, maxBranchLevel=lod_max_level,
                                       minThickness=lod_min_thick, leafAmount=leaf_amount / 100.0,
@@ -93,9 +94,12 @@ def lbw_to_bl_obj(plant, model_id, is_proxy, model_season, lod_max_level, lod_mi
 
         mat_name = plantmat.name
         if is_proxy:
-            mat_name = mat_name + "_proxy"
+            if mat_id == -1:
+                mat_name = plant_name + "_foliage_color"
+            else:
+                mat_name = plant_name + "_wood_color"
 
-        if matID[0] not in materials:
+        if mat_id not in materials:
             materials.append(mat_id)
             mat = bpy.data.materials.get(mat_name)
             if mat is None:
@@ -133,9 +137,8 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, is_proxy=False, model_season=None):
     links = mat.node_tree.links
     links.new(node_dif.outputs[0], node_out.inputs[0])
 
-    # dvhart: FIXME: this surely isn't correct since the UI suggests we may have both models...
     if is_proxy:
-        print("PROXY ID and model season: %d %s" % (mat_id, model_season))
+        print("Proxy Texture: %s" % (mat_name))
         if mat_id == -1:
             mat.diffuse_color = plant.getFoliageColor(model_season)
             node_dif.inputs[0].default_value = mat.diffuse_color
