@@ -90,30 +90,35 @@ def lbw_to_bl_obj(plant, model_id, is_proxy, model_season, lod_max_level, lod_mi
     for matID in zip(mesh_laubwerk.matids):
         mat_id = matID[0]
         plantmat = plant.materials[mat_id]
+
+        mat_name = plantmat.name
+        if is_proxy:
+            mat_name = mat_name + "_proxy"
+
         if matID[0] not in materials:
             materials.append(mat_id)
-            mat = bpy.data.materials.get(plantmat.name)
+            mat = bpy.data.materials.get(mat_name)
             if mat is None:
-                mat = lbw_to_bl_mat(plant, mat_id, is_proxy, model_season)
+                mat = lbw_to_bl_mat(plant, mat_id, mat_name, is_proxy, model_season)
             obj.data.materials.append(mat)
 
-        mat_index = obj.data.materials.find(plantmat.name)
+        mat_index = obj.data.materials.find(mat_name)
         if mat_index != -1:
             obj.data.polygons[i].material_index = mat_index
         else:
-            print('Material %s not found' % plantmat.name)
+            print('Material %s not found' % mat_name)
 
         i += 1
 
     return obj
 
 
-def lbw_to_bl_mat(plant, mat_id, is_proxy=False, model_season=None):
+def lbw_to_bl_mat(plant, mat_id, mat_name, is_proxy=False, model_season=None):
     NW = 300
     NH = 300
 
     plantmat = plant.materials[mat_id]
-    mat = bpy.data.materials.new(plantmat.name)
+    mat = bpy.data.materials.new(mat_name)
 
     mat.use_nodes = True
     nodes = mat.node_tree.nodes
