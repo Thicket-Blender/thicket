@@ -85,8 +85,8 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
     lod_cull_thick: BoolProperty(name="Cull by Thickness", default=False)
     lod_min_thick: FloatProperty(name="Min. Thickness", default=0.1, min=0.1, max=10000.0, step=1.0)
     lod_cull_level: BoolProperty(name="Cull by Level", default=False)
-    lod_max_level: IntProperty(name="Maximum Level", default=3, min=0, max=10, step=1)
-    lod_subdiv: IntProperty(name="Subdivision", default=1, min=0, max=5, step=1)
+    lod_max_level: IntProperty(name="Maximum Level", default=5, min=0, max=10, step=1)
+    lod_subdiv: IntProperty(name="Subdivision", default=3, min=0, max=5, step=1)
     leaf_amount: FloatProperty(name="Leaf amount",
                                description="The amount of leafs of the plant.",
                                default=100.0, min=0.01, max=100.0, subtype='PERCENTAGE')
@@ -311,8 +311,8 @@ def register():
     bpy.types.Object.lod_cull_thick = BoolProperty(name="Cull by Thickness", default=False)
     bpy.types.Object.lod_min_thick = FloatProperty(name="Min. Thickness", default=0.1, min=0.1, max=10000.0, step=1.0)
     bpy.types.Object.lod_cull_level = BoolProperty(name="Cull by Level", default=False)
-    bpy.types.Object.lod_max_level = IntProperty(name="Maximum Level", default=3, min=0, max=10, step=1)
-    bpy.types.Object.lod_subdiv = IntProperty(name="Subdivision", default=1, min=0, max=5, step=1)
+    bpy.types.Object.lod_max_level = IntProperty(name="Maximum Level", default=5, min=0, max=10, step=1)
+    bpy.types.Object.lod_subdiv = IntProperty(name="Subdivision", default=3, min=0, max=5, step=1)
     bpy.types.Object.leaf_amount = FloatProperty(name="Leaf amount", description="The amount of leafs of the plant.",
                                                  default=100.0, min=0.01, max=100.0, subtype='PERCENTAGE',
                                                  options={'HIDDEN'})
