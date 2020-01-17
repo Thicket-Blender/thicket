@@ -68,6 +68,12 @@ def lbw_to_bl_obj(plant, name, mesh_lbw, model_season, proxy):
         i += 1
     obj = bpy.data.objects.new(name, mesh)
 
+    # String operations are expensive, do them here outside the material loop
+    wood_mat_name = plant.name + " wood"
+    wood_color = plant.getWoodColor()
+    foliage_mat_name = plant.name + " foliage"
+    foliage_color = plant.getFoliageColor()
+
     # read matids and materialnames and create and add materials to the laubwerktree
     i = 0
     for matID in zip(mesh_lbw.matids):
@@ -76,9 +82,13 @@ def lbw_to_bl_obj(plant, name, mesh_lbw, model_season, proxy):
         mat_name = plantmat.name
         proxy_color = None
 
-        if (proxy):
-            mat_name = "%s %s" % (plant.name, "foliage" if mat_id == -1 else "wood")
-            proxy_color = plant.getFoliageColor() if mat_id == -1 else plant.getWoodColor()
+        if proxy:
+            if mat_id == -1:
+                mat_name = foliage_mat_name
+                proxy_color = foliage_color
+            else:
+                mat_name = wood_mat_name
+                proxy_color = wood_color
 
         if mat_id not in materials:
             materials.append(mat_id)
