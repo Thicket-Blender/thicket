@@ -91,7 +91,7 @@ def lbw_to_bl_obj(plant, name, mesh_lbw, model_season, proxy):
         if mat_index != -1:
             obj.data.polygons[i].material_index = mat_index
         else:
-            print('Material %s not found' % mat_name)
+            print('WARN: Material %s not found' % mat_name)
 
         i += 1
 
@@ -124,7 +124,7 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, model_season=None, proxy_color=None):
         return mat
 
     # Diffuse Texture (FIXME: Assumes one sided)
-    print("Diffuse Texture: %s" % plantmat.getFront().diffuseTexture)
+    #print("Diffuse Texture: %s" % plantmat.getFront().diffuseTexture)
     img_path = plantmat.getFront().diffuseTexture
     node_img = nodes.new(type='ShaderNodeTexImage')
     node_img.location = 0, 2 * NH
@@ -135,7 +135,7 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, model_season=None, proxy_color=None):
     # Blender render engines support using the diffuse map alpha channel. We
     # assume this rather than a separate alpha image.
     alpha_path = plantmat.alphaTexture
-    print("Alpha Texture: %s" % plantmat.alphaTexture)
+    #print("Alpha Texture: %s" % plantmat.alphaTexture)
     if alpha_path != '':
         # Enable leaf clipping in Eevee
         mat.blend_method = 'CLIP'
@@ -146,11 +146,11 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, model_season=None, proxy_color=None):
             print("WARN: Alpha Texture differs from diffuse image path. Not supported.")
 
     # Subsurface Texture
-    print("Subsurface Color: " + str(plantmat.subsurfaceColor))
+    #print("Subsurface Color: " + str(plantmat.subsurfaceColor))
     if plantmat.subsurfaceColor:
         node_dif.inputs['Subsurface Color'].default_value = plantmat.subsurfaceColor + (1.0,)
 
-    print("Subsurface Texture: %s" % plantmat.subsurfaceTexture)
+    #print("Subsurface Texture: %s" % plantmat.subsurfaceTexture)
     sub_path = plantmat.subsurfaceTexture
     if sub_path != '':
         node_sub = nodes.new(type='ShaderNodeTexImage')
@@ -159,7 +159,7 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, model_season=None, proxy_color=None):
 
         # Laubwerk models only support subsurface as a translucency effect,
         # indicated by a subsurfaceDepth of 0.0.
-        print("Subsurface Depth: %f" % plantmat.subsurfaceDepth)
+        #print("Subsurface Depth: %f" % plantmat.subsurfaceDepth)
         if plantmat.subsurfaceDepth == 0.0:
             node_sub.image.colorspace_settings.is_data = True
             links.new(node_sub.outputs['Color'], node_dif.inputs['Transmission'])
@@ -167,7 +167,7 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, model_season=None, proxy_color=None):
             print("WARN: Subsurface Depth > 0. Not supported.")
 
     # Bump Texture
-    print("Bump Texture: %s" % plantmat.getFront().bumpTexture)
+    #print("Bump Texture: %s" % plantmat.getFront().bumpTexture)
     bump_path = plantmat.getFront().bumpTexture
     if bump_path != '':
         node_bumpimg = nodes.new(type='ShaderNodeTexImage')
@@ -177,16 +177,16 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, model_season=None, proxy_color=None):
         node_bump = nodes.new(type='ShaderNodeBump')
         node_bump.location = NW, 0
         # TODO: Make the Distance configurable to tune for each render engine
-        print("Bump Strength: %f" % plantmat.getFront().bumpStrength)
+        #print("Bump Strength: %f" % plantmat.getFront().bumpStrength)
         node_bump.inputs['Strength'].default_value = plantmat.getFront().bumpStrength
         node_bump.inputs['Distance'].default_value = 0.02
         links.new(node_bumpimg.outputs['Color'], node_bump.inputs['Height'])
         links.new(node_bump.outputs['Normal'], node_dif.inputs['Normal'])
 
-    print("Displacement Texture: %s" % plantmat.displacementTexture)
-    print("Normal Texture: %s" % plantmat.getFront().normalTexture)
-    print("Specular Texture: %s" % plantmat.getFront().specularTexture)
-    print("--------------------")
+    #print("Displacement Texture: %s" % plantmat.displacementTexture)
+    #print("Normal Texture: %s" % plantmat.getFront().normalTexture)
+    #print("Specular Texture: %s" % plantmat.getFront().specularTexture)
+    #print("--------------------")
 
     return mat
 
@@ -210,13 +210,14 @@ class LBWImportDialog(bpy.types.Operator):
         """
         Called by the user interface or another script.
         """
-        print('\nimporting lbw %r' % filepath)
+        print('importing laubwerk plant %s from %r' % (plant.name, filepath))
 
         time_main = time.time()
 
         model = plant.models[model_id]
 
         # Create the viewport object (low detail)
+        time_local = time.time()
         if viewport_proxy:
             mesh_lbw = model.getProxy()
         else:
@@ -228,8 +229,10 @@ class LBWImportDialog(bpy.types.Operator):
         bpy.context.collection.objects.link(obj_viewport)
         obj_viewport.hide_render = True
         obj_viewport.show_name = True
+        print("\tgenerated low resolution viewport object in %.4f sec." % (time.time() - time_local))
 
         # Create the render object (high detail)
+        time_local = time.time()
         mesh_lbw = model.getMesh(qualifierName=model_season, maxBranchLevel=lod_max_level,
                                  minThickness=lod_min_thick, leafAmount=leaf_amount / 100.0,
                                  leafDensity=leaf_density / 100.0, maxSubDivLevel=lod_subdiv)
@@ -238,6 +241,7 @@ class LBWImportDialog(bpy.types.Operator):
         obj_render.parent = obj_viewport
         obj_render.hide_viewport = True
         obj_render.hide_select = True
+        print("\tgenerated high resolution render object in %.4f sec." % (time.time() - time_local))
 
         # set custom properties to show in properties tab
         obj_viewport["lbw_path"] = filepath
@@ -252,7 +256,7 @@ class LBWImportDialog(bpy.types.Operator):
         obj_viewport["leaf_density"] = leaf_density
         obj_viewport["leaf_amount"] = leaf_amount
 
-        print("\tfinished importing: %r in %.4f sec." % (filepath, (time.time() - time_main)))
+        print("\tfinished importing %s in %.4f sec." % (plant.name, (time.time() - time_main)))
         return {'FINISHED'}
 
 
