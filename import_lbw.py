@@ -28,7 +28,7 @@ Note, This loads mesh objects and materials.
 """
 import time
 import bpy
-
+import laubwerk
 
 def lbw_to_bl_obj(plant, name, mesh_lbw, model_season, proxy):
     """ Generate the Blender Object from the Laubwerk mesh and materials """
@@ -216,14 +216,14 @@ class LBWImportDialog(bpy.types.Operator):
         return context.window_manager.invoke_props_dialog(self)
 
     def load(self, context, filepath, leaf_density, model_type, model_id, model_season, viewport_proxy,
-             lod_cull_thick, lod_min_thick, lod_cull_level, lod_max_level, lod_subdiv, leaf_amount, plant):
+             lod_cull_thick, lod_min_thick, lod_cull_level, lod_max_level, lod_subdiv, leaf_amount):
         """
         Called by the user interface or another script.
         """
-        print('importing laubwerk plant %s from %r' % (plant.name, filepath))
+        print('importing laubwerk plant from %r' % (filepath))
 
         time_main = time.time()
-
+        plant = laubwerk.load(filepath)
         model = plant.models[model_id]
 
         # Create the viewport object (low detail)
