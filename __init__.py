@@ -18,11 +18,14 @@
 
 # <pep8-80 compliant>
 
+import json
 import os.path
-import threading
 import time
 
 import bpy
+from bpy.types import (AddonPreferences,
+                       Operator,
+                       )
 from bpy.props import (BoolProperty,
                        FloatProperty,
                        IntProperty,
@@ -31,7 +34,7 @@ from bpy.props import (BoolProperty,
                        )
 from bpy_extras.io_utils import ImportHelper
 
-import laubwerk
+from io_import_laubwerk import lbwdb
 from io_import_laubwerk import import_lbw
 
 bl_info = {
@@ -42,45 +45,97 @@ bl_info = {
     "location": "File > Import",
     "description": "Import LBW.GZ, Import Laubwerk mesh, UV's, materials and textures",
     "warning": "",
-    "wiki_url": "",
+    'wiki_url': 'https://github.com/dvhart/lbwbl/blob/master/README.md',
+    'tracker_url': 'https://github.com/dvhart/lbwbl/issues',
+    'link': 'https://github.com/dvhart/lbwbl',
     "category": "Import"
 }
 
 # A global variable for the plant.
+db = None
 plant = None
 current_path = ""
 models = []
 m_items = []
 s_items = []
-plant = None
 locale = "en"
 alt_locale = "en_US"
-mt_loaded = False  # Indicates if all model types have been loaded.
-ms_loaded = False  # Indicates if all model seasons have been loaded.
 
 # TODO get the locale from the current blender installation via bpy.app.translations.locale. This can be void.
+
+# Update Database Operator (called from AddonPreferences)
+class LBWBL_OT_update_db(Operator):
+    bl_idname = "lbwbl.update_db"
+    bl_label = "Update Database"
+    bl_description = "Process Laubwerk Plants library and update the database (may take several minutes)"
+    bl_options = {'REGISTER', 'INTERNAL'}
+
+    def update_db(self, context):
+        global db
+        addon_name = __name__.split('.')[0]
+        prefs = context.preferences.addons[addon_name].preferences
+        lbw_path = prefs.laubwerk_path
+        print("Updating Laubwerk database from %s, this may take several minutes..." % lbw_path)
+        t0 = time.time()
+        lbwdb.lbwdb_write("lbwdb.json", lbw_path)
+        db = lbwdb.LaubwerkDB("lbwdb.json")
+        self.report({'INFO'}, "Updated Laubwerk database with %d plants in %0.2fs" %
+                    (db.plant_count(), time.time()-t0))
+
+    def invoke(self, context, event):
+        addon_name = __name__.split('.')[0]
+        lbw_path = context.preferences.addons[addon_name].preferences.laubwerk_path
+        if lbw_path == '':
+            self.report({'ERROR'}, "You must setup the Laubwerk Plants installation path in addon preferences")
+        return context.window_manager.invoke_confirm(self, event)
+
+    def execute(self, context):
+        self.update_db(context)
+        context.area.tag_redraw()
+        return {'FINISHED'}
+
+
+# Addon Preferences
+class LBWBL_Pref(AddonPreferences):
+    bl_idname = __name__
+    laubwerk_path: StringProperty(
+        name="Laubwerk Path",
+        subtype="DIR_PATH",
+        description="absolute path to Laubwerk installation",
+        default=""
+        )
+
+    def draw(self, context):
+        global db
+        layout = self.layout
+        box = layout.box()
+        box.label(text="Plants Library")
+
+        row = box.row()
+        row.prop(self, "laubwerk_path")
+
+        row = box.row()
+        # TODO: this should be inactive until a laubwerk_path is configured
+        row.operator("lbwbl.update_db", icon="FILE_REFRESH")
+        # TODO: how do we make this label expand and align left?
+        row.label(text="Database contains %d plants" % db.plant_count())
 
 
 class ImportLBW(bpy.types.Operator, ImportHelper):
     """Load a Laubwerk LBW.GZ File"""
+    global db
     bl_idname = "import_object.lbw"
-    bl_label = "Import Laubwerk plant"
-    # bl_options = {'PRESET', 'UNDO'}
+    bl_label = "Import Laubwerk Plant"
 
     filename_ext = ".lbw.gz"
     short_ext = ".lbw"
     oldpath = ""
-    watch_thread = None
-    is_running = False
-    restart_thread = False
+    model_id = 0
+    db = lbwdb.LaubwerkDB("lbwdb.json")
 
     filter_glob: StringProperty(default="*.lbw;*.lbw.gz", options={'HIDDEN'})
     filepath: StringProperty(name="File Path", maxlen=1024, default="")
 
-    leaf_density: FloatProperty(name="Leaf density",
-                                description="The density of the leafs of the plant.",
-                                default=100.0, min=0.01, max=100.0, subtype='PERCENTAGE')
-    model_id = 0
     viewport_proxy: BoolProperty(name="Viewport Proxy", default=True)
     lod_cull_thick: BoolProperty(name="Cull by Thickness", default=False)
     lod_min_thick: FloatProperty(name="Min. Thickness", default=0.1, min=0.1, max=10000.0, step=1.0)
@@ -90,160 +145,102 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
     leaf_amount: FloatProperty(name="Leaf amount",
                                description="The amount of leafs of the plant.",
                                default=100.0, min=0.01, max=100.0, subtype='PERCENTAGE')
+    leaf_density: FloatProperty(name="Leaf density",
+                                description="The density of the leafs of the plant.",
+                                default=100.0, min=0.01, max=100.0, subtype='PERCENTAGE')
 
     def update_seasons(self, context):
-        global locale, alt_locale, s_items, plant
-        print("updating seasons")
+        global locale, alt_locale, s_items, plant, db
         s_items = []
-        for qualifier in plant.models[self["model_type"]].qualifiers:
-            qualab = plant.models[self["model_type"]].qualifierLabels[qualifier]
-            qlabel = qualab[min(qualab)][0]
-            if locale in qualab:
-                qlabel = qualab[locale][0]
-            elif alt_locale in qualab:
-                qlabel = qualab[alt_locale][0]
-            s_items.append((qualifier, qlabel, ""))
-        self["model_season"] = plant.defaultModel.defaultQualifier
+        for qualifier in plant["models"][models[self["model_type"]]]["qualifiers"]:
+            s_items.append((qualifier, db.get_label(qualifier), ""))
+        self["model_season"] = plant["models"][plant["default_model"]]["default_qualifier"]
 
     def model_type_callback(self, context):
-        global m_items, mt_loaded
-        """ Queries the plant object for available models and creates a dropdown list """
+        global m_items
         return m_items
 
     def model_season_callback(self, context):
-        global s_items, ms_loaded
+        global s_items
         return s_items
-#        if ms_loaded:
-#            return s_items
-#        else:
-#            return [("Loading...", "Loading...", "")]
 
     model_type: EnumProperty(items=model_type_callback, name="Model", update=update_seasons)
     model_season: EnumProperty(items=model_season_callback, name="Season")
 
     def execute(self, context):
-        global plant
-        # Stop the thread
-        self.is_running = False
         # Set the model_id to the currently selected model type.
         self.model_id = models.index(self.model_type)
         # Use this dictionary to store additional parameters like season and so on.
-        keywords = self.as_keywords(ignore=("filter_glob", "oldpath", "is_running", "restart_thread", "watch_thread"))
+        keywords = self.as_keywords(ignore=("filter_glob", "oldpath"))
         keywords["model_id"] = self.model_id
-        keywords["plant"] = plant
         return import_lbw.LBWImportDialog.load(self, context, **keywords)
 
     def invoke(self, context, event):
-        global mt_loaded, ms_loaded
-        print('invoked')
         self.oldpath = self.filepath
-        self.restart_thread = False
-        self.is_running = True
-        mt_loaded = False
-        ms_loaded = False
-        self.watch_thread = lbw_watch(self)
-        self.watch_thread.start()
         context.window_manager.fileselect_add(self)
-        # This would be the right spot to change the directory.
         return {'RUNNING_MODAL'}
 
-    def reinit_values(self, context):
-        """
-        Called when a new file is selected. Resets the values of the import parameters to default.
-        """
-        global mt_loaded, ms_loaded
-        ms_loaded = False
-        mt_loaded = False
-        self.restart_thread = True
-
-        # reset property defaults
-        props = context.object.bl_rna.properties
-        for prop in ["leaf_density", "viewport_proxy", "lod_cull_thick", "lod_min_thick",
-                     "lod_cull_level", "lod_max_level", "leaf_amount", "lod_subdiv"]:
-            self.__setattr__(prop, props[prop].default)
-
     def draw(self, context):
-        global locale, alt_locale, plant
+        global locale, alt_locale, plant, db
+
         layout = self.layout
+        if not os.path.isfile(self.filepath):
+            # Path is most likely a directory
+            layout.label(text="Choose a Laubwerk file.")
+            return
+
         if not self.filepath == self.oldpath:
             self.oldpath = self.filepath
             plant = None
             if os.path.isfile(self.filepath):
-                self.reinit_values(context)
+                plant = db.get_plant(self.filepath)
+                if plant:
+                    for model in plant["models"].items():
+                        m_items.append((model[0], db.get_label(model[0]), ""))
+                        models.append(model[0])
+                    self.model_type = plant["default_model"]
+                    self.model_id = models.index(self.model_type)
 
-        if plant:
-            pname = plant.labels[min(plant.labels)][0]
-            if locale in plant.labels:
-                pname = plant.labels[locale][0]
-            elif alt_locale in plant.labels:
-                pname = plant.labels[alt_locale][0]
-            # Create the UI entries.
-            layout.label(text="%s(%s)" % (pname, plant.name))
-            if mt_loaded is False:
-                layout.label(text="Loading...")
-            sub = layout.column()
-            sub.active = mt_loaded
-            sub.prop(self, "model_type")
-            sub.prop(self, "model_season")
-            row = layout.row()
-            box = row.box()
-            box.label(text="Display settings")
-            box.prop(self, "viewport_proxy")
-            row = layout.row()
-            box2 = row.box()
-            box2.label(text="Level of Detail")
-            box2.prop(self, "leaf_density")
-            box = box2.box()
-            box.prop(self, "lod_cull_thick")
-            subrow = box.row()
-            subrow.active = self.lod_cull_thick
-            subrow.prop(self, "lod_min_thick")
-            box = box2.box()
-            box.prop(self, "lod_cull_level")
-            subrow = box.row()
-            subrow.active = self.lod_cull_level
-            subrow.prop(self, "lod_max_level")
-            box2.prop(self, "lod_subdiv")
-            box2.prop(self, "leaf_amount")
-        else:
-            layout.label(text="Choose a Laubwerk file.")
+        if not plant:
+            layout.label(text="Plant not found in database.", icon='ERROR')
+            layout.label(text="Update the database")
+            layout.label(text="in the %s" % __name__)
+            layout.label(text="Addon Preferences.")
+            return
 
+        # reset property defaults
+        # TODO: do we need to do this?
+        #props = context.object.bl_rna.properties
+        #for prop in ["leaf_density", "viewport_proxy", "lod_cull_thick", "lod_min_thick",
+        #             "lod_cull_level", "lod_max_level", "leaf_amount", "lod_subdiv"]:
+        #    self.__setattr__(prop, props[prop].default)
 
-class lbw_watch(threading.Thread):
+        # Create the UI entries.
+        layout.label(text="%s" % db.get_label(plant["name"]))
+        layout.label(text="(%s)" % plant["name"])
+        layout.prop(self, "model_type")
+        layout.prop(self, "model_season")
 
-    def __init__(self, clob):
-        threading.Thread.__init__(self)
-        self.daemon = True  # so Blender can quit cleanly
-        self.name = 'lbw_watch'
-        self.clob = clob  # The calling class instance.
+        box = layout.box()
+        box.label(text="Viewport Settings")
+        box.prop(self, "viewport_proxy", text="Display Proxy")
 
-    def run(self):
-        global models, plant, m_items, s_items, locale, mt_loaded
-        while self.clob.is_running:
-            time.sleep(0.1)  # sleep 100 Milliseconds.
-            try:
-                if self.clob.restart_thread:
-                    # Recreate the m_types and m_items
-                    m_items = []
-                    s_items = []
-                    mt_loaded = False
-                    plant = laubwerk.load(self.clob.filepath)
-                    if plant:
-                        self.clob.restart_thread = False
-                        for model in plant.models:
-                            time.sleep(0.05)
-                            if self.clob.restart_thread:
-                                break
-                            label = model.labels[min(model.labels)]
-                            if locale in model.labels:
-                                label = model.labels[locale]
-                            m_items.append((str(model.name), str(label), ""))
-                            models.append(str(model.name))
-                        self.clob.model_type = plant.defaultModel.name
-                        self.clob.model_id = models.index(self.clob.model_type)
-                        mt_loaded = True
-            except Exception as detail:
-                print("lbw watch exception:", detail)
+        box2 = layout.box()
+        box2.label(text="Render Settings")
+        box2.prop(self, "lod_subdiv")
+        box2.prop(self, "leaf_density")
+        box2.prop(self, "leaf_amount")
+
+        box = box2.box()
+        box.prop(self, "lod_cull_thick")
+        subrow = box.row()
+        subrow.active = self.lod_cull_thick
+        subrow.prop(self, "lod_min_thick")
+        box = box2.box()
+        box.prop(self, "lod_cull_level")
+        subrow = box.row()
+        subrow.active = self.lod_cull_level
+        subrow.prop(self, "lod_max_level")
 
 
 class lbwPanel(bpy.types.Panel):  # panel to display laubwerk plant specific properties.
@@ -256,11 +253,11 @@ class lbwPanel(bpy.types.Panel):  # panel to display laubwerk plant specific pro
 
     @classmethod
     def poll(self, context):
-        global plant, current_path
+        global plant, current_path, db
         if context.object and "lbw_path" in context.object:
             if not context.object["lbw_path"] == current_path:
                 current_path = context.object["lbw_path"]
-                plant = laubwerk.load(current_path)
+                plant = db.get_plant(current_path)
                 self.object = context.object
             return True
 
@@ -270,12 +267,8 @@ class lbwPanel(bpy.types.Panel):  # panel to display laubwerk plant specific pro
         layout = self.layout
 
         if plant:
-            pname = plant.labels[min(plant.labels)][0]
-            if locale in plant.labels:
-                pname = plant.labels[locale][0]
-            elif alt_locale in plant.labels:
-                pname = plant.labels[alt_locale][0]
-            layout.label("%s(%s)" % (pname, plant.name))
+            pname = plant["name"]
+            layout.label("%s(%s)" % (pname, pname))
             row = layout.row()
             box = row.box()
             box.label("Display settings")
@@ -318,11 +311,15 @@ def register():
                                                  options={'HIDDEN'})
 
     bpy.utils.register_class(ImportLBW)
+    bpy.utils.register_class(LBWBL_Pref)
+    bpy.utils.register_class(LBWBL_OT_update_db)
     bpy.types.TOPBAR_MT_file_import.append(menu_func_import)
 
 
 def unregister():
     bpy.utils.unregister_class(ImportLBW)
+    bpy.utils.unregister_class(LBWBL_Pref)
+    bpy.utils.unregister_class(LBWBL_OT_update_db)
     bpy.types.TOPBAR_MT_file_import.remove(menu_func_import)
 
 
