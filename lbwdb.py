@@ -1,0 +1,141 @@
+# Copyright (c) 2020, Darren Hart
+# SPDX-License-Identifier: GPL-2.0-only
+
+import argparse
+import glob
+import json
+import subprocess
+import sys
+import time
+import laubwerk as lbw
+
+
+class LaubwerkDB:
+    """ Laubwerk Database Interface """
+    def __init__(self, db_filename, python=sys.executable):
+        self.db_filename = db_filename
+        self.python = python
+        try:
+            with open(db_filename, 'r', encoding='utf-8') as f:
+                self.db = json.load(f)
+        except FileNotFoundError:
+            # if failed, create, and initialize
+            self.initialize()
+            self.save()
+
+    def initialize(self):
+        self.db = {}
+        self.db["info"] = {}
+        self.db["labels"] = {}
+        self.db["plants"] = {}
+
+        self.db["info"]["sdk_version"] = lbw.version
+        self.db["info"]["sdk_major"] = lbw.version_info.major
+        self.db["info"]["sdk_minor"] = lbw.version_info.minor
+        self.db["info"]["sdk_micro"] = lbw.version_info.micro
+
+    def save(self):
+        with open(self.db_filename, 'w', encoding='utf-8') as f:
+            json.dump(self.db, f, ensure_ascii=False, indent=4)
+
+    def print_info(self):
+        info = self.db["info"]
+        print("Laubwerk Version: %s" % info["sdk_version"])
+        print("\tmajor: %s" % info["sdk_major"])
+        print("\tminor: %s" % info["sdk_minor"])
+        print("\tmicro: %s" % info["sdk_micro"])
+        print("Loaded %d plants:" % self.plant_count())
+
+    def update_labels(self, labels):
+        self.db["labels"].update(labels)
+
+    def get_label(self, key, lang="en-US", alt_lang="en"):
+        try:
+            if lang in self.db["labels"][key]:
+                return self.db["labels"][key][lang]
+            elif alt_lang in self.db["labels"][key]:
+                return self.db["labels"][key][alt_lang]
+            return key
+        except KeyError:
+            return key
+
+    def get_plant(self, plant_filename):
+        try:
+            return self.db["plants"][plant_filename]
+        except KeyError:
+            return None
+
+    def add_plant_record(self, plant_filename, plant_record):
+        self.db["plants"][plant_filename] = plant_record
+
+    def import_plant(self, plant_filename):
+        sub = subprocess.Popen([self.python, "./lbwdb_plant.py", plant_filename],
+                               stdout=subprocess.PIPE)
+        outs, errs = sub.communicate()
+        p_rec = json.loads(outs)
+        self.add_plant_record(plant_filename, p_rec["plant"])
+        self.update_labels(p_rec["labels"])
+
+    def plant_count(self):
+        return len(self.db["plants"])
+
+
+def lbwdb_write(db_filename, plants_dir, python=sys.executable):
+    db = LaubwerkDB(db_filename, python)
+    db.initialize()
+
+    # FIXME: .gz is optional
+    plant_files = glob.glob(plants_dir + "/*/*.lbw.gz")
+
+    subs = []
+    for f in plant_files:
+        subs.append(subprocess.Popen([db.python, "./lbwdb_plant.py", f], stdout=subprocess.PIPE))
+
+    while len(subs) > 0:
+        for sub in subs:
+            if sub.poll() is not None:
+                outs, errs = sub.communicate()
+                subs.remove(sub)
+                p_rec = json.loads(outs)
+                db.add_plant_record(sub.args[2], p_rec["plant"])
+                db.update_labels(p_rec["labels"])
+        print("Processed %d/%d plants" % (db.plant_count(), len(plant_files)), end='\r')
+        time.sleep(1)
+
+    db.save()
+
+
+def lbwdb_read(db_filename):
+    db = LaubwerkDB(db_filename)
+
+    db.print_info()
+
+    for p_rec in db.db["plants"].items():
+        f = p_rec[0]
+        plant = p_rec[1]
+        print("%s (%s)" % (plant["name"], db.get_label(plant["name"], "ja")))
+        print("\tfile: %s" % f)
+        print("\tmd5: %s" % plant['md5'])
+        print("\tdefault_model: %s (%s)" % (plant["default_model"], db.get_label(plant["default_model"], "en")))
+        print("\tmodels:")
+        for m_rec in plant["models"].items():
+            print("\t\t%s (%s) %s" % (m_rec[0], db.get_label(m_rec[1]["default_qualifier"], "en"),
+                  str(m_rec[1]["qualifiers"])))
+
+
+def main():
+    argParse = argparse.ArgumentParser(description='Laubwerk Database Tool')
+    argParse.add_argument('cmd', help='read or write')
+    argParse.add_argument('db', help='database filename')
+
+    args = argParse.parse_args()
+
+    cmd = args.cmd
+    if cmd == 'read':
+        lbwdb_read(args.db)
+    elif cmd == 'write':
+        lbwdb_write(args.db, "/Users/dvhart/source/laubwerk/Plants")
+
+
+if __name__ == "__main__":
+    main()
