@@ -18,7 +18,6 @@
 
 # <pep8-80 compliant>
 
-import json
 import os.path
 import time
 
@@ -136,18 +135,19 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
     filter_glob: StringProperty(default="*.lbw;*.lbw.gz", options={'HIDDEN'})
     filepath: StringProperty(name="File Path", maxlen=1024, default="")
 
-    viewport_proxy: BoolProperty(name="Viewport Proxy", default=True)
-    lod_cull_thick: BoolProperty(name="Cull by Thickness", default=False)
-    lod_min_thick: FloatProperty(name="Min. Thickness", default=0.1, min=0.1, max=10000.0, step=1.0)
-    lod_cull_level: BoolProperty(name="Cull by Level", default=False)
-    lod_max_level: IntProperty(name="Maximum Level", default=5, min=0, max=10, step=1)
+    # Viewport Settings
+    viewport_proxy: BoolProperty(name="Display Proxy", default=True)
+
+    # Render Settings
     lod_subdiv: IntProperty(name="Subdivision", default=3, min=0, max=5, step=1)
-    leaf_amount: FloatProperty(name="Leaf amount",
-                               description="The amount of leafs of the plant.",
-                               default=100.0, min=0.01, max=100.0, subtype='PERCENTAGE')
     leaf_density: FloatProperty(name="Leaf density",
                                 description="The density of the leafs of the plant.",
                                 default=100.0, min=0.01, max=100.0, subtype='PERCENTAGE')
+    leaf_amount: FloatProperty(name="Leaf amount",
+                               description="The amount of leafs of the plant.",
+                               default=100.0, min=0.01, max=100.0, subtype='PERCENTAGE')
+    lod_max_level: IntProperty(name="Maximum Level", default=5, min=0, max=10, step=1)
+    lod_min_thick: FloatProperty(name="Minimum Thickness", default=0.1, min=0.1, max=10000.0, step=1.0)
 
     def update_seasons(self, context):
         global locale, alt_locale, s_items, plant, db
@@ -208,13 +208,6 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
             layout.label(text="Addon Preferences.")
             return
 
-        # reset property defaults
-        # TODO: do we need to do this?
-        #props = context.object.bl_rna.properties
-        #for prop in ["leaf_density", "viewport_proxy", "lod_cull_thick", "lod_min_thick",
-        #             "lod_cull_level", "lod_max_level", "leaf_amount", "lod_subdiv"]:
-        #    self.__setattr__(prop, props[prop].default)
-
         # Create the UI entries.
         layout.label(text="%s" % db.get_label(plant["name"]))
         layout.label(text="(%s)" % plant["name"])
@@ -223,72 +216,15 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
 
         box = layout.box()
         box.label(text="Viewport Settings")
-        box.prop(self, "viewport_proxy", text="Display Proxy")
+        box.prop(self, "viewport_proxy")
 
-        box2 = layout.box()
-        box2.label(text="Render Settings")
-        box2.prop(self, "lod_subdiv")
-        box2.prop(self, "leaf_density")
-        box2.prop(self, "leaf_amount")
-
-        box = box2.box()
-        box.prop(self, "lod_cull_thick")
-        subrow = box.row()
-        subrow.active = self.lod_cull_thick
-        subrow.prop(self, "lod_min_thick")
-        box = box2.box()
-        box.prop(self, "lod_cull_level")
-        subrow = box.row()
-        subrow.active = self.lod_cull_level
-        subrow.prop(self, "lod_max_level")
-
-
-class lbwPanel(bpy.types.Panel):  # panel to display laubwerk plant specific properties.
-    bl_space_type = "PROPERTIES"  # show up in: properties view
-    bl_region_type = "WINDOW"     # show up in: object context
-    bl_label = "Laubwerk Plant"   # name of the new panel
-    bl_context = "object"
-    bl_rna = None  # FIXME: why do I need this? dvhart
-    tr = None
-
-    @classmethod
-    def poll(self, context):
-        global plant, current_path, db
-        if context.object and "lbw_path" in context.object:
-            if not context.object["lbw_path"] == current_path:
-                current_path = context.object["lbw_path"]
-                plant = db.get_plant(current_path)
-                self.object = context.object
-            return True
-
-    def draw(self, context):
-        # display value of Laubwerk plant, of the active object
-        global plant, locale, alt_locale, current_path
-        layout = self.layout
-
-        if plant:
-            pname = plant["name"]
-            layout.label("%s(%s)" % (pname, pname))
-            row = layout.row()
-            box = row.box()
-            box.label("Display settings")
-            box.prop(context.object, "viewport_proxy")
-            row = layout.row()
-            box2 = row.box()
-            box2.label("Level of Detail")
-            box2.prop(context.object, "leaf_density")
-            box = box2.box()
-            box.prop(context.object, "lod_cull_thick")
-            subrow = box.row()
-            subrow.active = context.object.lod_cull_thick
-            subrow.prop(context.object, "lod_min_thick")
-            box = box2.box()
-            box.prop(context.object, "lod_cull_level")
-            subrow = box.row()
-            subrow.active = context.object.lod_cull_level
-            subrow.prop(context.object, "lod_max_level")
-            box2.prop(context.object, "lod_subdiv")
-            box2.prop(context.object, "leaf_amount")
+        box = layout.box()
+        box.label(text="Render Settings")
+        box.prop(self, "lod_subdiv")
+        box.prop(self, "leaf_density")
+        box.prop(self, "leaf_amount")
+        box.prop(self, "lod_max_level")
+        box.prop(self, "lod_min_thick")
 
 
 def menu_func_import(self, context):
