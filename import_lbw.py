@@ -216,7 +216,7 @@ class LBWImportDialog(bpy.types.Operator):
         return context.window_manager.invoke_props_dialog(self)
 
     def load(self, context, filepath, leaf_density, model_type, model_id, model_season, viewport_proxy,
-             lod_cull_thick, lod_min_thick, lod_cull_level, lod_max_level, lod_subdiv, leaf_amount):
+             lod_min_thick, lod_max_level, lod_subdiv, leaf_amount):
         """
         Called by the user interface or another script.
         """
@@ -258,13 +258,11 @@ class LBWImportDialog(bpy.types.Operator):
         obj_viewport["model_type"] = model_type
         obj_viewport["model_season"] = model_season
         obj_viewport["viewport_proxy"] = viewport_proxy
-        obj_viewport["lod_cull_thick"] = lod_cull_thick
-        obj_viewport["lod_min_thick"] = lod_min_thick
-        obj_viewport["lod_cull_level"] = lod_cull_level
-        obj_viewport["lod_max_level"] = lod_max_level
         obj_viewport["lod_subdiv"] = lod_subdiv
         obj_viewport["leaf_density"] = leaf_density
         obj_viewport["leaf_amount"] = leaf_amount
+        obj_viewport["lod_max_level"] = lod_max_level
+        obj_viewport["lod_min_thick"] = lod_min_thick
 
         print("\tfinished importing %s in %.4f sec." % (plant.name, (time.time() - time_main)))
         return {'FINISHED'}
