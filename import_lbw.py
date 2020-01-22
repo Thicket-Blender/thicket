@@ -30,6 +30,7 @@ import time
 import bpy
 import laubwerk
 
+
 def lbw_to_bl_obj(plant, name, mesh_lbw, model_season, proxy):
     """ Generate the Blender Object from the Laubwerk mesh and materials """
 
@@ -134,7 +135,7 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, model_season=None, proxy_color=None):
         return mat
 
     # Diffuse Texture (FIXME: Assumes one sided)
-    #print("Diffuse Texture: %s" % plantmat.getFront().diffuseTexture)
+    # print("Diffuse Texture: %s" % plantmat.getFront().diffuseTexture)
     img_path = plantmat.getFront().diffuseTexture
     node_img = nodes.new(type='ShaderNodeTexImage')
     node_img.location = 0, 2 * NH
@@ -145,7 +146,7 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, model_season=None, proxy_color=None):
     # Blender render engines support using the diffuse map alpha channel. We
     # assume this rather than a separate alpha image.
     alpha_path = plantmat.alphaTexture
-    #print("Alpha Texture: %s" % plantmat.alphaTexture)
+    # print("Alpha Texture: %s" % plantmat.alphaTexture)
     if alpha_path != '':
         # Enable leaf clipping in Eevee
         mat.blend_method = 'CLIP'
@@ -156,11 +157,11 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, model_season=None, proxy_color=None):
             print("WARN: Alpha Texture differs from diffuse image path. Not supported.")
 
     # Subsurface Texture
-    #print("Subsurface Color: " + str(plantmat.subsurfaceColor))
+    # print("Subsurface Color: " + str(plantmat.subsurfaceColor))
     if plantmat.subsurfaceColor:
         node_dif.inputs['Subsurface Color'].default_value = plantmat.subsurfaceColor + (1.0,)
 
-    #print("Subsurface Texture: %s" % plantmat.subsurfaceTexture)
+    # print("Subsurface Texture: %s" % plantmat.subsurfaceTexture)
     sub_path = plantmat.subsurfaceTexture
     if sub_path != '':
         node_sub = nodes.new(type='ShaderNodeTexImage')
@@ -169,7 +170,7 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, model_season=None, proxy_color=None):
 
         # Laubwerk models only support subsurface as a translucency effect,
         # indicated by a subsurfaceDepth of 0.0.
-        #print("Subsurface Depth: %f" % plantmat.subsurfaceDepth)
+        # print("Subsurface Depth: %f" % plantmat.subsurfaceDepth)
         if plantmat.subsurfaceDepth == 0.0:
             node_sub.image.colorspace_settings.is_data = True
             links.new(node_sub.outputs['Color'], node_dif.inputs['Transmission'])
@@ -177,7 +178,7 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, model_season=None, proxy_color=None):
             print("WARN: Subsurface Depth > 0. Not supported.")
 
     # Bump Texture
-    #print("Bump Texture: %s" % plantmat.getFront().bumpTexture)
+    # print("Bump Texture: %s" % plantmat.getFront().bumpTexture)
     bump_path = plantmat.getFront().bumpTexture
     if bump_path != '':
         node_bumpimg = nodes.new(type='ShaderNodeTexImage')
@@ -187,16 +188,16 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, model_season=None, proxy_color=None):
         node_bump = nodes.new(type='ShaderNodeBump')
         node_bump.location = NW, 0
         # TODO: Make the Distance configurable to tune for each render engine
-        #print("Bump Strength: %f" % plantmat.getFront().bumpStrength)
+        # print("Bump Strength: %f" % plantmat.getFront().bumpStrength)
         node_bump.inputs['Strength'].default_value = plantmat.getFront().bumpStrength
         node_bump.inputs['Distance'].default_value = 0.02
         links.new(node_bumpimg.outputs['Color'], node_bump.inputs['Height'])
         links.new(node_bump.outputs['Normal'], node_dif.inputs['Normal'])
 
-    #print("Displacement Texture: %s" % plantmat.displacementTexture)
-    #print("Normal Texture: %s" % plantmat.getFront().normalTexture)
-    #print("Specular Texture: %s" % plantmat.getFront().specularTexture)
-    #print("--------------------")
+    # print("Displacement Texture: %s" % plantmat.displacementTexture)
+    # print("Normal Texture: %s" % plantmat.getFront().normalTexture)
+    # print("Specular Texture: %s" % plantmat.getFront().specularTexture)
+    # print("--------------------")
 
     return mat
 
