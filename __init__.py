@@ -62,6 +62,7 @@ alt_locale = "en_US"
 
 # TODO get the locale from the current blender installation via bpy.app.translations.locale. This can be void.
 
+
 # Update Database Operator (called from AddonPreferences)
 class LBWBL_OT_update_db(Operator):
     bl_idname = "lbwbl.update_db"
@@ -73,7 +74,6 @@ class LBWBL_OT_update_db(Operator):
 
     def update_db(self, context):
         global db
-        addon_name = __name__.split('.')[0]
         print("Updating Laubwerk database from %s, this may take several minutes..." % self.plants_path)
         t0 = time.time()
         lbwdb.lbwdb_write("lbwdb.json", self.plants_path, bpy.app.binary_path_python)
@@ -88,6 +88,7 @@ class LBWBL_OT_update_db(Operator):
         self.update_db(context)
         context.area.tag_redraw()
         return {'FINISHED'}
+
 
 # Import Plant Operator (called from Import File Dialog)
 class LBWBL_OT_import_plant_db(Operator):
@@ -113,6 +114,7 @@ class LBWBL_OT_import_plant_db(Operator):
         self.import_plant_db()
         context.area.tag_redraw()
         return {'FINISHED'}
+
 
 # Addon Preferences
 class LBWBL_Pref(AddonPreferences):
