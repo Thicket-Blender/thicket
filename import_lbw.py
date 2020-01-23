@@ -216,7 +216,7 @@ class LBWImportDialog(bpy.types.Operator):
     def invoke(self, context, event):
         return context.window_manager.invoke_props_dialog(self)
 
-    def load(self, context, filepath, leaf_density, model_type, model_id, model_season, viewport_proxy,
+    def load(self, context, filepath, leaf_density, model_id, model_season, viewport_proxy,
              lod_min_thick, lod_max_level, lod_subdiv, leaf_amount):
         """
         Called by the user interface or another script.
@@ -256,7 +256,7 @@ class LBWImportDialog(bpy.types.Operator):
 
         # set custom properties to show in properties tab
         obj_viewport["lbw_path"] = filepath
-        obj_viewport["model_type"] = model_type
+        obj_viewport["model_type"] = model.name
         obj_viewport["model_season"] = model_season
         obj_viewport["viewport_proxy"] = viewport_proxy
         obj_viewport["lod_subdiv"] = lod_subdiv
