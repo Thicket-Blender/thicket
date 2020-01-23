@@ -184,7 +184,8 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
         global locale, alt_locale, db, plant
         items = []
         for model in plant["models"].keys():
-            items.append((model, db.get_label(model), ""))
+            index = plant["models"][model]["index"]
+            items.append((model, db.get_label(model), "", index))
         return items
 
     def model_season_callback(self, context):
