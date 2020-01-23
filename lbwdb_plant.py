@@ -31,6 +31,7 @@ def main(filename):
     labels[p.name] = p_labels
 
     models = {}
+    i = 0
     for m in p.models:
         m_rec = {}
         seasons = []
@@ -41,6 +42,7 @@ def main(filename):
             for q_lang in m.qualifierLabels[q].items():
                 q_labels[q][q_lang[0]] = q_lang[1][0]
         labels.update(q_labels)
+        m_rec["index"] = i
         m_rec["qualifiers"] = seasons
         m_rec["default_qualifier"] = m.defaultQualifier
         models[m.name] = m_rec
@@ -49,6 +51,7 @@ def main(filename):
         for l in m.labels.items():
             m_labels[l[0]] = l[1][0]
         labels[m.name] = m_labels
+        i = i + 1
     plant["models"] = models
 
     p_rec["plant"] = plant
