@@ -52,11 +52,11 @@ bl_info = {
 
 # A global variable for the plant.
 db = None
-plant = None
+db_path = os.path.join(bpy.utils.user_resource('SCRIPTS', "addons", True), __name__, "laubwerk.db")
+plants_path = ""
+sdk_path = ""
 current_path = ""
-models = []
-m_items = []
-s_items = []
+plant = None
 locale = "en"
 alt_locale = "en_US"
 
@@ -64,20 +64,20 @@ alt_locale = "en_US"
 
 
 # Update Database Operator (called from AddonPreferences)
-class LBWBL_OT_update_db(Operator):
-    bl_idname = "lbwbl.update_db"
-    bl_label = "Update Database"
+class LBWBL_OT_rebuild_db(Operator):
+    bl_idname = "lbwbl.rebuild_db"
+    bl_label = "Rebuild Database"
     bl_description = "Process Laubwerk Plants library and update the database (may take several minutes)"
     bl_options = {'REGISTER', 'INTERNAL'}
 
-    plants_path: bpy.props.StringProperty(subtype="FILE_PATH")
-
-    def update_db(self, context):
-        global db
-        print("Updating Laubwerk database from %s, this may take several minutes..." % self.plants_path)
+    def rebuild_db(self, context):
+        global db, db_path, plants_path
+        print("Rebuilding Laubwerk database, this may take several minutes...")
+        print("  Plants Library: %s" % plants_path)
+        print("  Database: %s" % db_path)
         t0 = time.time()
-        lbwdb.lbwdb_write("lbwdb.json", self.plants_path, bpy.app.binary_path_python)
-        db = lbwdb.LaubwerkDB("lbwdb.json", bpy.app.binary_path_python)
+        lbwdb.lbwdb_write(db_path, plants_path, bpy.app.binary_path_python)
+        db = lbwdb.LaubwerkDB(db_path, bpy.app.binary_path_python)
         self.report({'INFO'}, "Updated Laubwerk database with %d plants in %0.2fs" %
                     (db.plant_count(), time.time()-t0))
 
@@ -85,7 +85,7 @@ class LBWBL_OT_update_db(Operator):
         return context.window_manager.invoke_confirm(self, event)
 
     def execute(self, context):
-        self.update_db(context)
+        self.rebuild_db(context)
         context.area.tag_redraw()
         return {'FINISHED'}
 
@@ -127,43 +127,44 @@ class LBWBL_Pref(AddonPreferences):
         )
 
     def draw(self, context):
-        global db
+        global db, db_path, plants_path, sdk_path
 
-        plants_path = os.path.join(self.lbw_path, "Plants")
-        sdk_path = os.path.join(self.lbw_path, "Python")
-        show_update_db = False
-        if os.path.isdir(plants_path) and os.path.isdir(sdk_path):
-            show_update_db = True
+        # If the global db is not loaded and the db_path is not a directory,
+        # initialize the database
+        if not db:
+            db = lbwdb.LaubwerkDB(db_path, bpy.app.binary_path_python)
+
+        # Test for a valid Laubwerk installation path
+        # It should contain both a Plants and a Python directory
+        plants_path = os.path.join(self.lbw_path, "Plants/")
+        sdk_path = os.path.join(self.lbw_path, "Python/")
+        valid_lbw_path = os.path.isdir(plants_path) and os.path.isdir(sdk_path)
 
         layout = self.layout
         box = layout.box()
         box.label(text="Laubwerk Plants Library")
         row = box.row()
-        row.alert = not show_update_db
+        row.alert = not valid_lbw_path
         row.prop(self, "lbw_path")
 
         row = box.row()
-        row.enabled = show_update_db
-        op = row.operator("lbwbl.update_db", icon="FILE_REFRESH")
-        op.plants_path = plants_path
-        # TODO: how do we make this label expand and align left?
+        row.enabled = valid_lbw_path
+        row.operator("lbwbl.rebuild_db", icon="FILE_REFRESH")
+
         row.label(text="Database contains %d plants" % db.plant_count())
 
 
 class ImportLBW(bpy.types.Operator, ImportHelper):
     """Load a Laubwerk LBW.GZ File"""
-    global db
     bl_idname = "import_object.lbw"
     bl_label = "Import Laubwerk Plant"
 
     filename_ext = ".lbw.gz"
     short_ext = ".lbw"
-    oldpath = ""
-    model_id = 0
-    db = lbwdb.LaubwerkDB("lbwdb.json", bpy.app.binary_path_python)
 
     filter_glob: StringProperty(default="*.lbw;*.lbw.gz", options={'HIDDEN'})
-    filepath: StringProperty(name="File Path", maxlen=1024, default="")
+    filepath: StringProperty(name="File Path", subtype="FILE_PATH")
+    oldpath = None
 
     # Viewport Settings
     viewport_proxy: BoolProperty(name="Display Proxy", default=True)
@@ -179,40 +180,41 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
     lod_max_level: IntProperty(name="Maximum Level", default=5, min=0, max=10, step=1)
     lod_min_thick: FloatProperty(name="Minimum Thickness", default=0.1, min=0.1, max=10000.0, step=1.0)
 
-    def update_seasons(self, context):
-        global locale, alt_locale, s_items, plant, db
-        s_items = []
-        for qualifier in plant["models"][models[self["model_type"]]]["qualifiers"]:
-            s_items.append((qualifier, db.get_label(qualifier), ""))
-        self["model_season"] = plant["models"][plant["default_model"]]["default_qualifier"]
-
-    def model_type_callback(self, context):
-        global m_items
-        return m_items
+    def model_id_callback(self, context):
+        global locale, alt_locale, db, plant
+        items = []
+        for model in plant["models"].keys():
+            items.append((model, db.get_label(model), ""))
+        return items
 
     def model_season_callback(self, context):
-        global s_items
-        return s_items
+        global locale, alt_locale, db, plant
+        items = []
+        for qualifier in plant["models"][self.model_id]["qualifiers"]:
+            items.append((qualifier, db.get_label(qualifier), ""))
+        return items
 
-    model_type: EnumProperty(items=model_type_callback, name="Model", update=update_seasons)
+    model_id: EnumProperty(items=model_id_callback, name="Model")
     model_season: EnumProperty(items=model_season_callback, name="Season")
 
     def execute(self, context):
-        # Set the model_id to the currently selected model type.
-        self.model_id = models.index(self.model_type)
-        # Use this dictionary to store additional parameters like season and so on.
-        keywords = self.as_keywords(ignore=("filter_glob", "oldpath"))
-        keywords["model_id"] = self.model_id
+        global plant
+        keywords = self.as_keywords(ignore=("filter_glob",))
+        keywords["model_id"] = self.properties["model_id"]
         return import_lbw.LBWImportDialog.load(self, context, **keywords)
 
     def invoke(self, context, event):
-        self.oldpath = self.filepath
         context.window_manager.fileselect_add(self)
         return {'RUNNING_MODAL'}
 
     def draw(self, context):
-        global locale, alt_locale, plant, db
+        global locale, alt_locale, db, plant
         layout = self.layout
+        new_file = False
+
+        if not self.oldpath == self.filepath:
+            self.oldpath = self.filepath
+            new_file = True
 
         if not os.path.isfile(self.filepath):
             # Path is most likely a directory
@@ -222,7 +224,7 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
         plant = db.get_plant(self.filepath)
         if not plant:
             layout.label(text="Plant not found in database.", icon='ERROR')
-            layout.label(text="Update the database")
+            layout.label(text="Rebuild the database")
             layout.label(text="in the %s" % __name__)
             layout.label(text="Addon Preferences.")
             layout.separator()
@@ -231,16 +233,14 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
             op.filepath = self.filepath
             return
 
-        for model in plant["models"].items():
-            m_items.append((model[0], db.get_label(model[0]), ""))
-            models.append(model[0])
-        self.model_type = plant["default_model"]
-        self.model_id = models.index(self.model_type)
+        if new_file:
+            self.model_id = plant["default_model"]
+            self.model_season = plant["models"][self.model_id]["default_qualifier"]
 
         # Create the UI entries.
         layout.label(text="%s" % db.get_label(plant["name"]))
         layout.label(text="(%s)" % plant["name"])
-        layout.prop(self, "model_type")
+        layout.prop(self, "model_id")
         layout.prop(self, "model_season")
 
         box = layout.box()
@@ -257,10 +257,13 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
 
 
 def menu_func_import(self, context):
-    self.layout.operator(ImportLBW.bl_idname, text="Laubwerk plant (.lbw.gz)")
+    global plants_path
+    op = self.layout.operator(ImportLBW.bl_idname, text="Laubwerk plant (.lbw.gz)")
+    op.filepath = plants_path
 
 
 def register():
+    global db, db_path, plants_path, sdk_path
     # create LBW Settings
     bpy.types.Object.leaf_density = FloatProperty(name="Leaf density",
                                                   description="The density of the leafs of the plant.",
@@ -277,15 +280,26 @@ def register():
 
     bpy.utils.register_class(ImportLBW)
     bpy.utils.register_class(LBWBL_Pref)
-    bpy.utils.register_class(LBWBL_OT_update_db)
+    bpy.utils.register_class(LBWBL_OT_rebuild_db)
     bpy.utils.register_class(LBWBL_OT_import_plant_db)
     bpy.types.TOPBAR_MT_file_import.append(menu_func_import)
+
+    # Initial global plants_path and sdk_path
+    # TODO: These might be better as AddonPreferences but I cannot get them to
+    #       save without drawing and interacting with them.
+    plants_path = os.path.join(bpy.context.preferences.addons[__name__].preferences.lbw_path, "Plants/")
+    sdk_path = os.path.join(bpy.context.preferences.addons[__name__].preferences.lbw_path, "Python/")
+
+    # Create the user database if it does not exist
+    if not os.path.exists(db_path):
+        os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    db = lbwdb.LaubwerkDB(db_path, bpy.app.binary_path_python)
 
 
 def unregister():
     bpy.utils.unregister_class(ImportLBW)
     bpy.utils.unregister_class(LBWBL_Pref)
-    bpy.utils.unregister_class(LBWBL_OT_update_db)
+    bpy.utils.unregister_class(LBWBL_OT_rebuild_db)
     bpy.utils.unregister_class(LBWBL_OT_import_plant_db)
     bpy.types.TOPBAR_MT_file_import.remove(menu_func_import)
 
