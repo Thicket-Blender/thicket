@@ -19,6 +19,7 @@
 # <pep8-80 compliant>
 
 import os.path
+import sys
 import time
 
 import bpy
@@ -32,9 +33,6 @@ from bpy.props import (BoolProperty,
                        EnumProperty,
                        )
 from bpy_extras.io_utils import ImportHelper
-
-from io_import_laubwerk import lbwdb
-from io_import_laubwerk import import_lbw
 
 bl_info = {
     "name": "Laubwerk lbw.gz format importer",
@@ -76,8 +74,8 @@ class LBWBL_OT_rebuild_db(Operator):
         print("  Plants Library: %s" % plants_path)
         print("  Database: %s" % db_path)
         t0 = time.time()
-        lbwdb.lbwdb_write(db_path, plants_path, bpy.app.binary_path_python)
-        db = lbwdb.LaubwerkDB(db_path, bpy.app.binary_path_python)
+        lbwdb.lbwdb_write(db_path, plants_path, bpy.app.binary_path_python)  # noqa: F821
+        db = lbwdb.LaubwerkDB(db_path, bpy.app.binary_path_python)  # noqa: F821
         self.report({'INFO'}, "Updated Laubwerk database with %d plants in %0.2fs" %
                     (db.plant_count(), time.time()-t0))
 
@@ -119,6 +117,7 @@ class LBWBL_OT_import_plant_db(Operator):
 # Addon Preferences
 class LBWBL_Pref(AddonPreferences):
     bl_idname = __name__
+
     lbw_path: StringProperty(
         name="Install Path",
         subtype="DIR_PATH",
@@ -129,19 +128,21 @@ class LBWBL_Pref(AddonPreferences):
     def draw(self, context):
         global db, db_path, plants_path, sdk_path
 
-        # If the global db is not loaded and the db_path is not a directory,
-        # initialize the database
-        if not db:
-            db = lbwdb.LaubwerkDB(db_path, bpy.app.binary_path_python)
-
         # Test for a valid Laubwerk installation path
         # It should contain both a Plants and a Python directory
-        plants_path = os.path.join(self.lbw_path, "Plants/")
-        sdk_path = os.path.join(self.lbw_path, "Python/")
-        valid_lbw_path = os.path.isdir(plants_path) and os.path.isdir(sdk_path)
+        valid_lbw_path = False
+        if os.path.isdir(self.lbw_path):
+            plants_path = os.path.join(self.lbw_path, "Plants" + os.sep)
+            sdk_path = os.path.join(self.lbw_path, "Python" + os.sep)
+            valid_lbw_path = os.path.isdir(plants_path) and os.path.isdir(sdk_path)
 
-        layout = self.layout
-        box = layout.box()
+        if valid_lbw_path and "lbwdb" not in sys.modules:
+            if sdk_path not in sys.path:
+                sys.path.append(sdk_path)
+            from io_import_laubwerk import lbwdb
+            db = lbwdb.LaubwerkDB(db_path, bpy.app.binary_path_python)
+
+        box = self.layout.box()
         box.label(text="Laubwerk Plants Library")
         row = box.row()
         row.alert = not valid_lbw_path
@@ -151,7 +152,8 @@ class LBWBL_Pref(AddonPreferences):
         row.enabled = valid_lbw_path
         row.operator("lbwbl.rebuild_db", icon="FILE_REFRESH")
 
-        row.label(text="Database contains %d plants" % db.plant_count())
+        if db:
+            row.label(text="Database contains %d plants" % db.plant_count())
 
 
 class ImportLBW(bpy.types.Operator, ImportHelper):
@@ -199,10 +201,11 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
     model_season: EnumProperty(items=model_season_callback, name="Season")
 
     def execute(self, context):
+        from io_import_laubwerk import import_lbw
         global plant
         keywords = self.as_keywords(ignore=("filter_glob",))
         keywords["model_id"] = self.properties["model_id"]
-        return import_lbw.LBWImportDialog.load(self, context, **keywords)
+        return import_lbw.LBWImportDialog.load(self, context, **keywords)  # noqa: F821
 
     def invoke(self, context, event):
         context.window_manager.fileselect_add(self)
@@ -225,8 +228,7 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
         plant = db.get_plant(self.filepath)
         if not plant:
             layout.label(text="Plant not found in database.", icon='ERROR')
-            layout.label(text="Rebuild the database")
-            layout.label(text="in the %s" % __name__)
+            layout.label(text="Rebuild the database in")
             layout.label(text="Addon Preferences.")
             layout.separator()
             layout.label(text="You may also import only this plant.")
@@ -258,26 +260,30 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
 
 
 def menu_func_import(self, context):
-    global plants_path
+    global plants_path, db
+
+    if not db:
+        self.layout.label(text="Laubwerk plant (not configured)")
+        return
+
     op = self.layout.operator(ImportLBW.bl_idname, text="Laubwerk plant (.lbw.gz)")
     op.filepath = plants_path
 
 
 def register():
     global db, db_path, plants_path, sdk_path
-    # create LBW Settings
+
+    # create Laubwerk Plant object properties
+    bpy.types.Object.viewport_proxy = BoolProperty(name="Viewport Proxy", default=True)
+    bpy.types.Object.lod_subdiv = IntProperty(name="Subdivision", default=3, min=0, max=5, step=1)
     bpy.types.Object.leaf_density = FloatProperty(name="Leaf density",
                                                   description="The density of the leafs of the plant.",
                                                   default=100.0, min=0.01, max=100.0, subtype='PERCENTAGE')
-    bpy.types.Object.viewport_proxy = BoolProperty(name="Viewport Proxy", default=True)
-    bpy.types.Object.lod_cull_thick = BoolProperty(name="Cull by Thickness", default=False)
-    bpy.types.Object.lod_min_thick = FloatProperty(name="Min. Thickness", default=0.1, min=0.1, max=10000.0, step=1.0)
-    bpy.types.Object.lod_cull_level = BoolProperty(name="Cull by Level", default=False)
-    bpy.types.Object.lod_max_level = IntProperty(name="Maximum Level", default=5, min=0, max=10, step=1)
-    bpy.types.Object.lod_subdiv = IntProperty(name="Subdivision", default=3, min=0, max=5, step=1)
     bpy.types.Object.leaf_amount = FloatProperty(name="Leaf amount", description="The amount of leafs of the plant.",
                                                  default=100.0, min=0.01, max=100.0, subtype='PERCENTAGE',
                                                  options={'HIDDEN'})
+    bpy.types.Object.lod_min_thick = FloatProperty(name="Min. Thickness", default=0.1, min=0.1, max=10000.0, step=1.0)
+    bpy.types.Object.lod_max_level = IntProperty(name="Maximum Level", default=5, min=0, max=10, step=1)
 
     bpy.utils.register_class(ImportLBW)
     bpy.utils.register_class(LBWBL_Pref)
@@ -285,15 +291,25 @@ def register():
     bpy.utils.register_class(LBWBL_OT_import_plant_db)
     bpy.types.TOPBAR_MT_file_import.append(menu_func_import)
 
-    # Initial global plants_path and sdk_path
-    # TODO: These might be better as AddonPreferences but I cannot get them to
-    #       save without drawing and interacting with them.
-    plants_path = os.path.join(bpy.context.preferences.addons[__name__].preferences.lbw_path, "Plants/")
-    sdk_path = os.path.join(bpy.context.preferences.addons[__name__].preferences.lbw_path, "Python/")
-
-    # Create the user database if it does not exist
+    # Create the database path if it does not exist
     if not os.path.exists(db_path):
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
+
+    # Initial global plants_path and sdk_path
+    lbw_path = bpy.context.preferences.addons[__name__].preferences.lbw_path
+    if lbw_path and os.path.isdir(lbw_path):
+        plants_path = os.path.join(lbw_path, "Plants" + os.sep)
+        sdk_path = os.path.join(lbw_path, "Python" + os.sep)
+
+    # Dynamically add the sdk_path to the sys.path
+    if not sdk_path or not os.path.isdir(sdk_path):
+        print("%s: Please configure Laubwerk Install Path in Addon Preferences" % __name__)
+        return
+
+    if sdk_path not in sys.path:
+        sys.path.append(sdk_path)
+
+    from io_import_laubwerk import lbwdb
     db = lbwdb.LaubwerkDB(db_path, bpy.app.binary_path_python)
 
 
