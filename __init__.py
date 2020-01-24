@@ -56,8 +56,6 @@ db = None
 db_path = os.path.join(bpy.utils.user_resource('SCRIPTS', "addons", True), __name__, "laubwerk.db")
 plants_path = ""
 sdk_path = ""
-current_path = ""
-plant = None
 
 # TODO get the locale from the current blender installation via bpy.app.translations.locale.
 locale = "en_US"
@@ -170,7 +168,7 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
 
     filter_glob: StringProperty(default="*.lbw;*.lbw.gz", options={'HIDDEN'})
     filepath: StringProperty(name="File Path", subtype="FILE_PATH")
-    oldpath = None
+    oldpath: StringProperty(name="Old Path", subtype="FILE_PATH")
 
     # Viewport Settings
     viewport_proxy: BoolProperty(name="Display Proxy", default=True)
@@ -186,18 +184,21 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
     lod_max_level: IntProperty(name="Maximum Level", default=5, min=0, max=10, step=1)
     lod_min_thick: FloatProperty(name="Minimum Thickness", default=0.1, min=0.1, max=10000.0, step=1.0)
 
+    # Class variable
+    plant = None
+
     def model_id_callback(self, context):
-        global locale, alt_locale, db, plant
+        global locale, alt_locale, db
         items = []
-        for model in plant["models"].keys():
-            index = plant["models"][model]["index"]
+        for model in ImportLBW.plant["models"].keys():
+            index = ImportLBW.plant["models"][model]["index"]
             items.append((model, db.get_label(model, locale, alt_locale), "", index))
         return items
 
     def model_season_callback(self, context):
-        global locale, alt_locale, db, plant
+        global locale, alt_locale, db
         items = []
-        for qualifier in plant["models"][self.model_id]["qualifiers"]:
+        for qualifier in ImportLBW.plant["models"][self.model_id]["qualifiers"]:
             items.append((qualifier, db.get_label(qualifier, locale, alt_locale), ""))
         return items
 
@@ -206,7 +207,6 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
 
     def execute(self, context):
         from io_import_laubwerk import import_lbw
-        global plant
         keywords = self.as_keywords(ignore=("filter_glob",))
         keywords["model_id"] = self.properties["model_id"]
         return import_lbw.LBWImportDialog.load(self, context, **keywords)  # noqa: F821
@@ -216,7 +216,7 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
         return {'RUNNING_MODAL'}
 
     def draw(self, context):
-        global locale, alt_locale, db, plant
+        global locale, alt_locale, db
         layout = self.layout
         new_file = False
 
@@ -229,8 +229,8 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
             layout.label(text="Choose a Laubwerk file.")
             return
 
-        plant = db.get_plant(self.filepath)
-        if not plant:
+        ImportLBW.plant = db.get_plant(self.filepath)
+        if not ImportLBW.plant:
             layout.label(text="Plant not found in database.", icon='ERROR')
             layout.label(text="Rebuild the database in")
             layout.label(text="Addon Preferences.")
@@ -241,12 +241,12 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
             return
 
         if new_file:
-            self.model_id = plant["default_model"]
-            self.model_season = plant["models"][self.model_id]["default_qualifier"]
+            self.model_id = ImportLBW.plant["default_model"]
+            self.model_season = ImportLBW.plant["models"][self.model_id]["default_qualifier"]
 
         # Create the UI entries.
-        layout.label(text="%s" % db.get_label(plant["name"], locale, alt_locale))
-        layout.label(text="(%s)" % plant["name"])
+        layout.label(text="%s" % db.get_label(ImportLBW.plant["name"], locale, alt_locale))
+        layout.label(text="(%s)" % ImportLBW.plant["name"])
         layout.prop(self, "model_id")
         layout.prop(self, "model_season")
 
