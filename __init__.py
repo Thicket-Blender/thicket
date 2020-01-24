@@ -35,12 +35,12 @@ from bpy.props import (BoolProperty,
 from bpy_extras.io_utils import ImportHelper
 
 bl_info = {
-    "name": "Laubwerk lbw.gz format importer",
-    "author": "Fabian Quosdorf",
-    "version": (0, 1, 0),
+    "name": "Laubwerk Plants Importer",
+    "author": "Darren Hart",
+    "version": (0, 1, 9),
     "blender": (2, 80, 0),
     "location": "File > Import",
-    "description": "Import LBW.GZ, Import Laubwerk mesh, UV's, materials and textures",
+    "description": "Import Laubwerk Plant files (lbw.gz)",
     "warning": "",
     'wiki_url': 'https://github.com/dvhart/lbwbl/blob/master/README.md',
     'tracker_url': 'https://github.com/dvhart/lbwbl/issues',
