@@ -102,7 +102,7 @@ def lbw_to_bl_obj(plant, name, mesh_lbw, model_season, proxy):
         if mat_index != -1:
             obj.data.polygons[i].material_index = mat_index
         else:
-            print('WARN: Material %s not found' % mat_name)
+            print('%s: WARN: Material %s not found' % (__name__, mat_name))
 
         i += 1
 
@@ -154,7 +154,8 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, model_season=None, proxy_color=None):
         if alpha_path == img_path:
             links.new(node_img.outputs['Alpha'], node_dif.inputs['Alpha'])
         else:
-            print("WARN: Alpha Texture differs from diffuse image path. Not supported.")
+            # TODO: This affects 'Fagus sylvatica'
+            print("%s: WARN: Alpha Texture differs from diffuse image path. Not supported.", __name__)
 
     # Subsurface Texture
     # print("Subsurface Color: " + str(plantmat.subsurfaceColor))
@@ -175,7 +176,7 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, model_season=None, proxy_color=None):
             node_sub.image.colorspace_settings.is_data = True
             links.new(node_sub.outputs['Color'], node_dif.inputs['Transmission'])
         else:
-            print("WARN: Subsurface Depth > 0. Not supported.")
+            print("%s: WARN: Subsurface Depth > 0. Not supported." % __name__)
 
     # Bump Texture
     # print("Bump Texture: %s" % plantmat.getFront().bumpTexture)
@@ -221,7 +222,7 @@ class LBWImportDialog(bpy.types.Operator):
         """
         Called by the user interface or another script.
         """
-        print('importing laubwerk plant from %r' % (filepath))
+        print('%s: Importing Laubwerk Plant from %r' % (__name__, filepath))
 
         time_main = time.time()
         plant = laubwerk.load(filepath)
@@ -240,7 +241,7 @@ class LBWImportDialog(bpy.types.Operator):
         bpy.context.collection.objects.link(obj_viewport)
         obj_viewport.hide_render = True
         obj_viewport.show_name = True
-        print("\tgenerated low resolution viewport object in %.4f sec." % (time.time() - time_local))
+        print("\tgenerated low resolution viewport object in %.4fs" % (time.time() - time_local))
 
         # Create the render object (high detail)
         time_local = time.time()
@@ -252,7 +253,7 @@ class LBWImportDialog(bpy.types.Operator):
         obj_render.parent = obj_viewport
         obj_render.hide_viewport = True
         obj_render.hide_select = True
-        print("\tgenerated high resolution render object in %.4f sec." % (time.time() - time_local))
+        print("\tgenerated high resolution render object in %.4fs" % (time.time() - time_local))
 
         # set custom properties to show in properties tab
         obj_viewport["lbw_path"] = filepath
@@ -265,16 +266,16 @@ class LBWImportDialog(bpy.types.Operator):
         obj_viewport["lod_max_level"] = lod_max_level
         obj_viewport["lod_min_thick"] = lod_min_thick
 
-        print("\tfinished importing %s in %.4f sec." % (plant.name, (time.time() - time_main)))
+        print("\tfinished importing %s in %.4fs" % (plant.name, (time.time() - time_main)))
         return {'FINISHED'}
 
 
 def register():
-    bpy.utils.register_class(LBWImportDialog)   # register dialog
+    bpy.utils.register_class(LBWImportDialog)
 
 
 def unregister():
-    bpy.utils.uregister_class(LBWImportDialog)  # unregister dialog
+    bpy.utils.uregister_class(LBWImportDialog)
 
 
 if __name__ == "__main__":
