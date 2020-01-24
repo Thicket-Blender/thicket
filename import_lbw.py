@@ -12,8 +12,11 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
 # General Public License for more details.
 #
+# This project was forked from and inspired by:
+#   https://bitbucket.org/laubwerk/lbwbl
+#
 # Copyright (C) 2015 Fabian Quosdorf <fabian@faqgames.net>
-# Copyright (C) 2019 Darren Hart <dvhart@infradead.org>
+# Copyright (C) 2019-2020 Darren Hart <dvhart@infradead.org>
 
 
 # <pep8 compliant>
