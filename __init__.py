@@ -70,14 +70,14 @@ class LBWBL_OT_rebuild_db(Operator):
 
     def rebuild_db(self, context):
         global db, db_path, plants_path
-        print("Rebuilding Laubwerk database, this may take several minutes...")
+        print("%s: Rebuilding Laubwerk database, this may take several minutes..." % __name__)
         print("  Plants Library: %s" % plants_path)
         print("  Database: %s" % db_path)
         t0 = time.time()
         lbwdb.lbwdb_write(db_path, plants_path, bpy.app.binary_path_python)  # noqa: F821
         db = lbwdb.LaubwerkDB(db_path, bpy.app.binary_path_python)  # noqa: F821
-        self.report({'INFO'}, "Updated Laubwerk database with %d plants in %0.2fs" %
-                    (db.plant_count(), time.time()-t0))
+        self.report({'INFO'}, "%s: Updated Laubwerk database with %d plants in %0.2fs" %
+                    (__name__, db.plant_count(), time.time()-t0))
 
     def invoke(self, context, event):
         return context.window_manager.invoke_confirm(self, event)
@@ -99,11 +99,12 @@ class LBWBL_OT_import_plant_db(Operator):
 
     def import_plant_db(self):
         global db
-        print("Importing Laubwerk Plant into database from %s..." % self.filepath)
+        print("%s: Importing Laubwerk Plant into database from %s" % (__name__, self.filepath))
         t0 = time.time()
         db.import_plant(self.filepath)
         db.save()
-        self.report({'INFO'}, "Imported Laubwerk Plant into database in %0.2fs" % (time.time()-t0))
+        self.report({'INFO'}, "%s: Imported Laubwerk Plant into database in %0.2fs" %
+                    (__name__, time.time()-t0))
 
     def invoke(self, context, event):
         return context.window_manager.invoke_confirm(self, event)
