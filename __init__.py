@@ -55,10 +55,10 @@ plants_path = ""
 sdk_path = ""
 current_path = ""
 plant = None
-locale = "en"
-alt_locale = "en_US"
 
-# TODO get the locale from the current blender installation via bpy.app.translations.locale. This can be void.
+# TODO get the locale from the current blender installation via bpy.app.translations.locale.
+locale = "en_US"
+alt_locale = "en"
 
 
 # Update Database Operator (called from AddonPreferences)
@@ -188,14 +188,14 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
         items = []
         for model in plant["models"].keys():
             index = plant["models"][model]["index"]
-            items.append((model, db.get_label(model), "", index))
+            items.append((model, db.get_label(model, locale, alt_locale), "", index))
         return items
 
     def model_season_callback(self, context):
         global locale, alt_locale, db, plant
         items = []
         for qualifier in plant["models"][self.model_id]["qualifiers"]:
-            items.append((qualifier, db.get_label(qualifier), ""))
+            items.append((qualifier, db.get_label(qualifier, locale, alt_locale), ""))
         return items
 
     model_id: EnumProperty(items=model_id_callback, name="Model")
@@ -242,7 +242,7 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
             self.model_season = plant["models"][self.model_id]["default_qualifier"]
 
         # Create the UI entries.
-        layout.label(text="%s" % db.get_label(plant["name"]))
+        layout.label(text="%s" % db.get_label(plant["name"], locale, alt_locale))
         layout.label(text="(%s)" % plant["name"])
         layout.prop(self, "model_id")
         layout.prop(self, "model_season")
