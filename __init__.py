@@ -163,9 +163,6 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
     bl_idname = "import_object.lbw"
     bl_label = "Import Laubwerk Plant"
 
-    filename_ext = ".lbw.gz"
-    short_ext = ".lbw"
-
     filter_glob: StringProperty(default="*.lbw;*.lbw.gz", options={'HIDDEN'})
     filepath: StringProperty(name="File Path", subtype="FILE_PATH")
     oldpath: StringProperty(name="Old Path", subtype="FILE_PATH")
@@ -207,7 +204,7 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
 
     def execute(self, context):
         from io_import_laubwerk import import_lbw
-        keywords = self.as_keywords(ignore=("filter_glob",))
+        keywords = self.as_keywords(ignore=("filter_glob", "oldpath"))
         keywords["model_id"] = self.properties["model_id"]
         return import_lbw.LBWImportDialog.load(self, context, **keywords)  # noqa: F821
 
