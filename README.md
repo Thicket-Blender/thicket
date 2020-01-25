@@ -3,6 +3,11 @@ Laubwerk Plants Add-on for Blender is a [Blender](http://www.blender.org) Add-on
 
 ![doc/acerp-cycles.png](doc/acerp-cycles.png)
 
+The Add-on generates separate viewport and render models, supprint various levels of detail for each. The viewport can display a low poly proxy (convex hull) or a low detail model in any of the Blender viewport modes (Solid, Look Dev, and Rendered shown below). The rendered model geometry is generated using various parameters including subdivision, branching level, leaf density, and minimum branch thickness (maximum detail is shown in the last frames below).
+![doc/01-acer-lod.png](doc/01-acer-lod.png)
+The close up images below illustrate the differences between the viewport and render models.
+![doc/02-acer-lod.png](doc/02-acer-lod.png)
+
 ## How do I get set up?
 ### Prerequisites
 * [Blender](http://www.blender.org/) 2.80 or later. The plugin is known to run with [Blender 2.81a](http://www.blender.org/features/past-releases/2-81/).
