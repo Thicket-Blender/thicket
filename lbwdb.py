@@ -12,8 +12,9 @@ import laubwerk as lbw
 
 class LaubwerkDB:
     """ Laubwerk Database Interface """
-    def __init__(self, db_filename, python=sys.executable):
+    def __init__(self, db_filename, locale="en-US", python=sys.executable):
         self.db_filename = db_filename
+        self.locale = locale.replace('_', '-')
         self.python = python
         try:
             with open(db_filename, 'r', encoding='utf-8') as f:
@@ -49,12 +50,17 @@ class LaubwerkDB:
     def update_labels(self, labels):
         self.db["labels"].update(labels)
 
-    def get_label(self, key, lang="en-US", alt_lang="en"):
+    def get_label(self, key, locale=None):
+        if locale:
+            locale = locale.replace('_', '-')
+        else:
+            locale = self.locale
+
         try:
-            if lang in self.db["labels"][key]:
-                return self.db["labels"][key][lang]
-            elif alt_lang in self.db["labels"][key]:
-                return self.db["labels"][key][alt_lang]
+            if locale in self.db["labels"][key]:
+                return self.db["labels"][key][locale]
+            elif locale[:2] in self.db["labels"][key]:
+                return self.db["labels"][key][locale[:2]]
             return key
         except KeyError:
             return key
