@@ -38,12 +38,12 @@ from bpy.props import (BoolProperty,
 from bpy_extras.io_utils import ImportHelper
 
 bl_info = {
-    "name": "Laubwerk Plants Importer",
+    "name": "Laubwerk Plants Add-on for Blender",
     "author": "Darren Hart",
     "version": (0, 1, 9),
     "blender": (2, 80, 0),
     "location": "File > Import",
-    "description": "Import Laubwerk Plant files (lbw.gz)",
+    "description": "Import Laubwerk Plants (lbw.gz)",
     "warning": "",
     'wiki_url': 'https://github.com/dvhart/lbwbl/blob/master/README.md',
     'tracker_url': 'https://github.com/dvhart/lbwbl/issues',
