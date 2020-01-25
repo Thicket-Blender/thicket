@@ -1,5 +1,5 @@
-# Laubwerk Plants for Blender
-Laubwerk Plants for Blender is a [Blender](http://www.blender.org) Add-on to import [Laubwerk Plants](http://www.laubwerk.com) high resolution plant and tree models.
+# Laubwerk Plants Add-on for Blender
+Laubwerk Plants Add-on for Blender is a [Blender](http://www.blender.org) Add-on to import [Laubwerk Plants](http://www.laubwerk.com) high resolution plant and tree models.
 
 ![doc/acerp-cycles.png](doc/acerp-cycles.png)
 
