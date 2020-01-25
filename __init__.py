@@ -36,6 +36,7 @@ from bpy.props import (BoolProperty,
                        EnumProperty,
                        )
 from bpy_extras.io_utils import ImportHelper
+from bpy.app.translations import locale
 
 bl_info = {
     "name": "Laubwerk Plants Add-on for Blender",
@@ -57,10 +58,6 @@ db_path = os.path.join(bpy.utils.user_resource('SCRIPTS', "addons", True), __nam
 plants_path = ""
 sdk_path = ""
 
-# TODO get the locale from the current blender installation via bpy.app.translations.locale.
-locale = "en_US"
-alt_locale = "en"
-
 
 # Update Database Operator (called from AddonPreferences)
 class LBWBL_OT_rebuild_db(Operator):
@@ -76,7 +73,7 @@ class LBWBL_OT_rebuild_db(Operator):
         print("  Database: %s" % db_path)
         t0 = time.time()
         lbwdb.lbwdb_write(db_path, plants_path, bpy.app.binary_path_python)  # noqa: F821
-        db = lbwdb.LaubwerkDB(db_path, bpy.app.binary_path_python)  # noqa: F821
+        db = lbwdb.LaubwerkDB(db_path, locale, bpy.app.binary_path_python)  # noqa: F821
         self.report({'INFO'}, "%s: Updated Laubwerk database with %d plants in %0.2fs" %
                     (__name__, db.plant_count(), time.time()-t0))
 
@@ -142,7 +139,7 @@ class LBWBL_Pref(AddonPreferences):
             if sdk_path not in sys.path:
                 sys.path.append(sdk_path)
             from io_import_laubwerk import lbwdb
-            db = lbwdb.LaubwerkDB(db_path, bpy.app.binary_path_python)
+            db = lbwdb.LaubwerkDB(db_path, locale, bpy.app.binary_path_python)
 
         box = self.layout.box()
         box.label(text="Laubwerk Plants Library")
@@ -185,18 +182,18 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
     plant = None
 
     def model_id_callback(self, context):
-        global locale, alt_locale, db
+        global db
         items = []
         for model in ImportLBW.plant["models"].keys():
             index = ImportLBW.plant["models"][model]["index"]
-            items.append((model, db.get_label(model, locale, alt_locale), "", index))
+            items.append((model, db.get_label(model), "", index))
         return items
 
     def model_season_callback(self, context):
-        global locale, alt_locale, db
+        global db
         items = []
         for qualifier in ImportLBW.plant["models"][self.model_id]["qualifiers"]:
-            items.append((qualifier, db.get_label(qualifier, locale, alt_locale), ""))
+            items.append((qualifier, db.get_label(qualifier), ""))
         return items
 
     model_id: EnumProperty(items=model_id_callback, name="Model")
@@ -213,7 +210,7 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
         return {'RUNNING_MODAL'}
 
     def draw(self, context):
-        global locale, alt_locale, db
+        global db
         layout = self.layout
         new_file = False
 
@@ -242,7 +239,7 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
             self.model_season = ImportLBW.plant["models"][self.model_id]["default_qualifier"]
 
         # Create the UI entries.
-        layout.label(text="%s" % db.get_label(ImportLBW.plant["name"], locale, alt_locale))
+        layout.label(text="%s" % db.get_label(ImportLBW.plant["name"]))
         layout.label(text="(%s)" % ImportLBW.plant["name"])
         layout.prop(self, "model_id")
         layout.prop(self, "model_season")
@@ -311,7 +308,7 @@ def register():
         sys.path.append(sdk_path)
 
     from io_import_laubwerk import lbwdb
-    db = lbwdb.LaubwerkDB(db_path, bpy.app.binary_path_python)
+    db = lbwdb.LaubwerkDB(db_path, locale, bpy.app.binary_path_python)
 
 
 def unregister():
