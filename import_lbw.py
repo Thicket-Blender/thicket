@@ -293,6 +293,12 @@ class LBWImportDialog(bpy.types.Operator):
         obj_inst.show_name = True
         context.collection.objects.link(obj_inst)
 
+        # Make the instance the active selected object
+        for o in bpy.context.selected_objects:
+            o.select_set(False)
+        obj_inst.select_set(True)
+        bpy.context.view_layer.objects.active = obj_inst
+
         print("\tfinished importing %s in %.4fs" % (plant.name, (time.time() - time_main)))
         return {'FINISHED'}
 
