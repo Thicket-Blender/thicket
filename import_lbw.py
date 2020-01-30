@@ -34,6 +34,17 @@ import bpy
 import laubwerk
 
 
+def new_collection(name, parent=bpy.context.scene.collection, singleton=False, exclude=False):
+
+    if singleton and name in bpy.data.collections:
+        return bpy.data.collections[name]
+    col = bpy.data.collections.new(name)
+    parent.children.link(col)
+    if exclude:
+        bpy.context.view_layer.layer_collection.children[col.name].exclude = True
+    return col
+
+
 def lbw_to_bl_obj(plant, name, mesh_lbw, model_season, proxy):
     """ Generate the Blender Object from the Laubwerk mesh and materials """
 
@@ -241,7 +252,6 @@ class LBWImportDialog(bpy.types.Operator):
                                      leafDensity=0.3 * (leaf_density / 100.0),
                                      maxSubDivLevel=0)
         obj_viewport = lbw_to_bl_obj(plant, plant.name, mesh_lbw, model_season, viewport_proxy)
-        bpy.context.collection.objects.link(obj_viewport)
         obj_viewport.hide_render = True
         obj_viewport.show_name = True
         print("\tgenerated low resolution viewport object in %.4fs" % (time.time() - time_local))
@@ -252,7 +262,6 @@ class LBWImportDialog(bpy.types.Operator):
                                  minThickness=lod_min_thick, leafAmount=leaf_amount / 100.0,
                                  leafDensity=leaf_density / 100.0, maxSubDivLevel=lod_subdiv)
         obj_render = lbw_to_bl_obj(plant, plant.name + " (render)", mesh_lbw, model_season, False)
-        bpy.context.collection.objects.link(obj_render)
         obj_render.parent = obj_viewport
         obj_render.hide_viewport = True
         obj_render.hide_select = True
@@ -268,6 +277,21 @@ class LBWImportDialog(bpy.types.Operator):
         obj_viewport["leaf_amount"] = leaf_amount
         obj_viewport["lod_max_level"] = lod_max_level
         obj_viewport["lod_min_thick"] = lod_min_thick
+
+        # Setup collection hierarchy
+        lbw_col = new_collection("Laubwerk", singleton=True, exclude=True)
+        plant_col = new_collection(obj_viewport.name, lbw_col)
+
+        # Add objects to the plant collection
+        plant_col.objects.link(obj_viewport)
+        plant_col.objects.link(obj_render)
+
+        # Create an instance of the plant collection in the active collection
+        obj_inst = bpy.data.objects.new(name=obj_viewport.name, object_data=None)
+        obj_inst.instance_collection = plant_col
+        obj_inst.instance_type = 'COLLECTION'
+        obj_inst.show_name = True
+        context.collection.objects.link(obj_inst)
 
         print("\tfinished importing %s in %.4fs" % (plant.name, (time.time() - time_main)))
         return {'FINISHED'}
