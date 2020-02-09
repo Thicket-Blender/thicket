@@ -51,12 +51,12 @@ def lbw_to_bl_obj(plant, name, mesh_lbw, model_season, proxy):
     verts_list = []
     polygon_list = []
     materials = []
-    scalefac = 0.01    # TODO: Add this to the importer UI
 
     # write vertices
+    # Laubwerk Mesh uses cm units. Blender units *appear* to be meters
+    # regardless of scene units.
     for point in mesh_lbw.points:
-        vert = (point[0] * scalefac, point[2] * scalefac, point[1] * scalefac)
-        verts_list.append(vert)
+        verts_list.append((.01*point[0], .01*point[2], .01*point[1]))
 
     # write polygons
     for polygon in zip(mesh_lbw.polygons):
@@ -70,7 +70,6 @@ def lbw_to_bl_obj(plant, name, mesh_lbw, model_season, proxy):
     mesh.update(calc_edges=True)
 
     # Use smooth shading
-    # FIXME: gotta be a non O(N) way to do this???
     for face in mesh.polygons:
         face.use_smooth = True
 
