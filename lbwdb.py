@@ -87,7 +87,7 @@ class LaubwerkDB:
 
 
 def lbwdb_write(db_filename, plants_dir, python=sys.executable):
-    db = LaubwerkDB(db_filename, python)
+    db = LaubwerkDB(db_filename, python=python)
     db.initialize()
 
     # FIXME: .gz is optional
