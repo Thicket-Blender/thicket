@@ -1,29 +1,112 @@
-# Laubwerk Plants Add-on for Blender
-Laubwerk Plants Add-on for Blender is a [Blender](http://www.blender.org) Add-on to import [Laubwerk Plants](http://www.laubwerk.com) high resolution plant and tree models.
+# Thicket
+## Laubwerk Plants Add-on for Blender
+Thicket is a [Blender](http://www.blender.org) Add-on to import [Laubwerk Plants](http://www.laubwerk.com) high resolution plant and tree models.
 
-**NOTE: This Add-on is under active development and is dependent on the future release of the [Laubwerk](https://www.laubwerk.com) Python 3 SDK. Once published, this project will start making packaged releases to ease installation. Until then, this Add-on will not work. See [Issue #9](https://github.com/dvhart/lbwbl/issues/9) for details.**
+Thicket is a community project developed using the Laubwerk Python3 SDK. While not affiliated with or officially supported by Laubwerk GmbH, this project would not be possible without Laubwerk's efforts to answer questions and address issues during the development of Thicket.
+
+Using Laubwerk's level of detail controls, Thicket keeps the Blender viewport responsive and renderings photo-realistic, like this shot of a Japanese Maple (Acer Palmatum).
 
 ![doc/acerp-cycles.png](doc/acerp-cycles.png)
 
-The Add-on generates separate viewport and render models, supprint various levels of detail for each. The viewport can display a low poly proxy (convex hull) or a low detail model in any of the Blender viewport modes (Solid, Look Dev, and Rendered shown below). The rendered model geometry is generated using various parameters including subdivision, branching level, leaf density, and minimum branch thickness (maximum detail is shown in the last frames below).
-![doc/01-acer-lod.png](doc/01-acer-lod.png)
-The close up images below illustrate the differences between the viewport and render models.
-![doc/02-acer-lod.png](doc/02-acer-lod.png)
+## Features
+Thicket generates separate viewport and render models, supporting various levels of detail for each. The viewport can display a low poly proxy (convex hull) or a low detail model in any of Blender's viewport modes. The rendered model geometry is generated using various level of detail controls.
 
-## How do I get set up?
-### Prerequisites
-* [Blender](http://www.blender.org/) 2.80 or later. The plugin is known to run with [Blender 2.81a](http://www.blender.org/features/past-releases/2-81/).
-* Laubwerk Player Plugin, which includes the Python SDK, available in all Laubwerk Plant Kits, including the [Plants Kit Freebie](http://www.laubwerk.com/store/plants-kit-freebie).
+* Separate viewport and render models
+* Collection instancing
+* Material Nodes
+* Viewport model level of detail
+  * Proxy (Convex Hull)
+  * Low poly model
+* Render model level of detail
+  * Subdivision
+  * Branching level
+  * Leaf density
+  * Branch thickness
 
-### Installation
-* After Blender has been started at least once the addon folder will have been created. Clone the git repository into that folder and change the name of the repository folder to `io_import_laubwerk`.
-  * Mac: `~/Library/Blender/2.80/scripts/addons`
-  * Windows: `%AppData%/Blender Foundation/2.80/scripts/addons` (TODO: verify)
-* When restarting Blender, it will see the plugin, but it will be disabled by default. Choose `Edit -> Preferences...` to bring up the Preferences window. Select the `Add-ons` tab and look for `Import: Laubwerk Plants Importer` in the list (search for `laubwerk`). Check the box to enable the add-on.
-* Click the twisty to expand the addon preferences. Enter the Laubwerk install path and click `Rebuild Database`. This will take a few minutes depending on your computer to scan your Laubwerk Plants files and populate the database.
-![doc/lbwbl-prefs.png](doc/lbwbl-prefs.png)
-* After you did this, the Laubwerk Add-on is available through `File -> Import -> Laubwerk Plant (.lbw.gz)`.
-* See the Blender Wiki for more general information about [Blender Add-ons](https://wiki.blender.org/wiki/Process/Addons).
+![doc/thicket-banner-2048.png](doc/thicket-banner-2048.png)
 
-### Who do I talk to? ###
+## Install
+Thicket is in active development toward the initial 1.0 release, which will
+include installers for download. Until then, please follow these steps to try it
+out.
+
+* Download and install the prerequisites
+  * [Blender](http://www.blender.org/) 2.80 or later. The plugin is known to run with [Blender 2.81a](http://www.blender.org/features/past-releases/2-81/).
+  * Laubwerk Python3 SDK 1.0.32 or later, provided by all Laubwerk Plant Kits, including the [Plants Kit Freebie](http://www.laubwerk.com/store/plants-kit-freebie).
+* Exit Blender
+* Clone the `thicket` git repository into the Blender `addons` folder:
+  * Mac: `~/Library/Blender/2.80/scripts/addons/thicket`
+  * Windows: `%AppData%/Blender Foundation/2.80/scripts/addons/thicket` (TODO: verify)
+* Start Blender
+* Configure Thicket
+  * Choose `Edit -> Preferences...`
+  * Select the `Add-ons` tab and search for `thicket`.
+  * Check the box to enable the row `Import: Thicket: Laubwerk Plants Add-on for
+    Blender`
+  * Click the arrow to expand the add-on preferences.
+  * Enter the Laubwerk install path. The box will be red until a valid path is
+    entered, then the Laubwerk SDK version will be displayed below the path.
+  * Click `Rebuild Database`. This will take a few minutes depending on your computer and the number of Laubwerk Plants Kits installed.
+  * When it completes, the number of plants in the database is displayed.
+* Thicket is now ready to use (see Usage)
+
+![doc/thicket-prefs-half.png](doc/thicket-prefs-half.png)
+
+## Usage
+Thicket will eventually present a searchable plat library using thumbnail images. Until then, you can import plant models using `File -> Import -> Laubwerk Plant (.lbw.gz)`.
+
+![doc/thicket-import-menu-full-half.png](doc/thicket-import-menu-full-half.png)
+
+The file dialog will default to the Laubwerk Plants installation path, presenting you with a listing of plant names as directories. Open a plant directory, and select the similarly named lbw.gz file, such as `Acer_palmatum.lbw.gz`.
+
+![doc/thicket-filebrowser-half.png](doc/thicket-filebrowser-half.png)
+
+You can configure the plant variant, age, season, and level of detail using the Viewport and Render settings in
+the lower left of the dialog.
+
+Import Laubwerk Plant
+* Model: Select variant and age. There are typically 3 variants of each plant,
+  as well as 3 ages for each variant.
+* Season: Affect plant's foliage, color, and flowers.
+
+Viewport Settings
+* Display Proxy: Control the model displayed in the viewport
+  * True: low poly proxy (convex hull)
+  * False: low detail full geometry model
+
+Render Settings
+* Subdivision: Control the number of edges in a branch cross-section (0 is square)
+* Leaf Density: Control how full the foliage appears
+* Leaf Amount: Control the number of leaves used to reach the specified density
+  (fewer leaves results in larger individual leaves)
+* Maximum Level: Limit the number of branching levels off the trunk
+* Minimum Thickness: Eliminate branches smaller than this value
+
+For example. Importing Acer Palmatum with `Display Proxy` checked, loads the
+convex hull into the viewport:
+![doc/thicket-import-proxy-half.png](doc/thicket-import-proxy-half.png)
+
+Importing the same plant with `Display Proxy` unchecked loads a low detail
+version of the full geometry into the viewport:
+![doc/thicket-import-noproxy-half.png](doc/thicket-import-noproxy-half.png)
+
+The rendered model would be the same for each, resulting in the following
+rendered image:
+![doc/thicket-import-render-half.png](doc/thicket-import-render-half.png)
+
+## Collections and Instancing
+Thicket organizes each import into a top level collection named "Thicket" which is excluded from the View Layer by default. Each plant is a collection consisting of the viewport object and the render object as a child of the viewport object. Object visibility settings specify which object is visible in the viewport, and which is visible for rendering. At import time, a Collection Instance of the plant collection is added to the main scene collection. This is the object that is visible after import.
+
+The collection model is shown in the image below by checking the Thicket
+collection and expanding the plant collection and object hierarchy:
+![doc/thicket-collections-half.png](doc/thicket-collections-half.png)
+
+The collection instance can be duplicated `Shift+D` to add a second identical plant to the scene, without doubling the memory used. Because Collection Instances are displayed in the viewport, modifying the original collection in the Thicket collection will be reflected in all the instances.
+
+In short, leave the Thicket collection unchecked and duplicate the Collection Instance in the scene to make memory efficient copies of plants.
+
+## Report an Issue
+If you think you have found a problem or a bug with Thicket, please [Check Existing Issues](/../../issues) to see if someone has already reported it. If not, please [Create a New Issue](/../../issues/new/choose), providing as much detail as possible to help us recreate the problem.
+
+## Contributing ##
 See [CONTRIBUTING](CONTRIBUTING.md) for more information.

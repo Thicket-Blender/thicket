@@ -39,7 +39,7 @@ from bpy_extras.io_utils import ImportHelper
 from bpy.app.translations import locale
 
 bl_info = {
-    "name": "Laubwerk Plants Add-on for Blender",
+    "name": "Thicket: Laubwerk Plants Add-on for Blender",
     "author": "Darren Hart",
     "version": (0, 1, 9),
     "blender": (2, 80, 0),
