@@ -21,7 +21,7 @@ def main(filename):
     plant = {}
     plant["name"] = p.name
     plant["md5"] = md5sum(filename)
-    plant["default_model"] = p.defaultModel.name
+    plant["default_model"] = p.default_model.name
 
     labels = {}
     p_labels = {}
@@ -39,12 +39,12 @@ def main(filename):
         for q in m.qualifiers:
             seasons.append(q)
             q_labels[q] = {}
-            for q_lang in m.qualifierLabels[q].items():
+            for q_lang in m.qualifier_labels[q].items():
                 q_labels[q][q_lang[0]] = q_lang[1][0]
         labels.update(q_labels)
         m_rec["index"] = i
         m_rec["qualifiers"] = seasons
-        m_rec["default_qualifier"] = m.defaultQualifier
+        m_rec["default_qualifier"] = m.default_qualifier
         models[m.name] = m_rec
         m_labels = {}
         # FIXME: highly redundant

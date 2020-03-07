@@ -84,9 +84,9 @@ def lbw_to_bl_obj(plant, name, mesh_lbw, model_season, proxy):
 
     # String operations are expensive, do them here outside the material loop
     wood_mat_name = plant.name + " wood"
-    wood_color = plant.getWoodColor()
+    wood_color = plant.get_wood_color()
     foliage_mat_name = plant.name + " foliage"
-    foliage_color = plant.getFoliageColor()
+    foliage_color = plant.get_foliage_color()
 
     # read matids and materialnames and create and add materials to the laubwerktree
     i = 0
@@ -142,14 +142,14 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, model_season=None, proxy_color=None):
     links = mat.node_tree.links
     links.new(node_dif.outputs[0], node_out.inputs[0])
 
-    mat.diffuse_color = proxy_color or plantmat.getFront().diffuseColor + (1.0,)
+    mat.diffuse_color = proxy_color or plantmat.get_front().diffuse_color + (1.0,)
     node_dif.inputs[0].default_value = mat.diffuse_color
     if proxy_color:
         return mat
 
     # Diffuse Texture (FIXME: Assumes one sided)
-    # print("Diffuse Texture: %s" % plantmat.getFront().diffuseTexture)
-    img_path = plantmat.getFront().diffuseTexture
+    # print("Diffuse Texture: %s" % plantmat.get_front().diffuse_texture)
+    img_path = plantmat.get_front().diffuse_texture
     node_img = nodes.new(type='ShaderNodeTexImage')
     node_img.location = 0, 2 * NH
     node_img.image = bpy.data.images.load(img_path)
@@ -158,8 +158,8 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, model_season=None, proxy_color=None):
     # Alpha Texture
     # Blender render engines support using the diffuse map alpha channel. We
     # assume this rather than a separate alpha image.
-    alpha_path = plantmat.alphaTexture
-    # print("Alpha Texture: %s" % plantmat.alphaTexture)
+    alpha_path = plantmat.alpha_texture
+    # print("Alpha Texture: %s" % plantmat.alpha_texture)
     if alpha_path != '':
         # Enable leaf clipping in Eevee
         mat.blend_method = 'CLIP'
@@ -171,29 +171,29 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, model_season=None, proxy_color=None):
             print("%s: WARN: Alpha Texture differs from diffuse image path. Not supported.", __name__)
 
     # Subsurface Texture
-    # print("Subsurface Color: " + str(plantmat.subsurfaceColor))
-    if plantmat.subsurfaceColor:
-        node_dif.inputs['Subsurface Color'].default_value = plantmat.subsurfaceColor + (1.0,)
+    # print("Subsurface Color: " + str(plantmat.subsurface_color))
+    if plantmat.subsurface_color:
+        node_dif.inputs['Subsurface Color'].default_value = plantmat.subsurface_color + (1.0,)
 
-    # print("Subsurface Texture: %s" % plantmat.subsurfaceTexture)
-    sub_path = plantmat.subsurfaceTexture
+    # print("Subsurface Texture: %s" % plantmat.subsurface_texture)
+    sub_path = plantmat.subsurface_texture
     if sub_path != '':
         node_sub = nodes.new(type='ShaderNodeTexImage')
         node_sub.location = 0, NH
         node_sub.image = bpy.data.images.load(sub_path)
 
         # Laubwerk models only support subsurface as a translucency effect,
-        # indicated by a subsurfaceDepth of 0.0.
-        # print("Subsurface Depth: %f" % plantmat.subsurfaceDepth)
-        if plantmat.subsurfaceDepth == 0.0:
+        # indicated by a subsurface_depth of 0.0.
+        # print("Subsurface Depth: %f" % plantmat.subsurface_depth)
+        if plantmat.subsurface_depth == 0.0:
             node_sub.image.colorspace_settings.is_data = True
             links.new(node_sub.outputs['Color'], node_dif.inputs['Transmission'])
         else:
             print("%s: WARN: Subsurface Depth > 0. Not supported." % __name__)
 
     # Bump Texture
-    # print("Bump Texture: %s" % plantmat.getFront().bumpTexture)
-    bump_path = plantmat.getFront().bumpTexture
+    # print("Bump Texture: %s" % plantmat.get_front().bump_texture)
+    bump_path = plantmat.get_front().bump_texture
     if bump_path != '':
         node_bumpimg = nodes.new(type='ShaderNodeTexImage')
         node_bumpimg.location = 0, 0
@@ -202,15 +202,15 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, model_season=None, proxy_color=None):
         node_bump = nodes.new(type='ShaderNodeBump')
         node_bump.location = NW, 0
         # TODO: Make the Distance configurable to tune for each render engine
-        # print("Bump Strength: %f" % plantmat.getFront().bumpStrength)
-        node_bump.inputs['Strength'].default_value = plantmat.getFront().bumpStrength
+        # print("Bump Strength: %f" % plantmat.get_front().bump_strength)
+        node_bump.inputs['Strength'].default_value = plantmat.get_front().bump_strength
         node_bump.inputs['Distance'].default_value = 0.02
         links.new(node_bumpimg.outputs['Color'], node_bump.inputs['Height'])
         links.new(node_bump.outputs['Normal'], node_dif.inputs['Normal'])
 
-    # print("Displacement Texture: %s" % plantmat.displacementTexture)
-    # print("Normal Texture: %s" % plantmat.getFront().normalTexture)
-    # print("Specular Texture: %s" % plantmat.getFront().specularTexture)
+    # print("Displacement Texture: %s" % plantmat.displacement_texture)
+    # print("Normal Texture: %s" % plantmat.get_front().normal_texture)
+    # print("Specular Texture: %s" % plantmat.get_front().specular_texture)
     # print("--------------------")
 
     return mat
@@ -244,12 +244,12 @@ class LBWImportDialog(bpy.types.Operator):
         # Create the viewport object (low detail)
         time_local = time.time()
         if viewport_proxy:
-            mesh_lbw = model.getProxy()
+            mesh_lbw = model.get_proxy()
         else:
-            mesh_lbw = model.getMesh(qualifierName=model_season, maxBranchLevel=3, minThickness=0.6,
-                                     leafAmount=leaf_amount / 100.0,
-                                     leafDensity=0.3 * (leaf_density / 100.0),
-                                     maxSubDivLevel=0)
+            mesh_lbw = model.get_mesh(qualifier_name=model_season, max_branch_level=3, min_thickness=0.6,
+                                     leaf_amount=leaf_amount / 100.0,
+                                     leaf_density=0.3 * (leaf_density / 100.0),
+                                     max_subdiv_level=0)
         obj_viewport = lbw_to_bl_obj(plant, plant.name, mesh_lbw, model_season, viewport_proxy)
         obj_viewport.hide_render = True
         obj_viewport.show_name = True
@@ -257,9 +257,9 @@ class LBWImportDialog(bpy.types.Operator):
 
         # Create the render object (high detail)
         time_local = time.time()
-        mesh_lbw = model.getMesh(qualifierName=model_season, maxBranchLevel=lod_max_level,
-                                 minThickness=lod_min_thick, leafAmount=leaf_amount / 100.0,
-                                 leafDensity=leaf_density / 100.0, maxSubDivLevel=lod_subdiv)
+        mesh_lbw = model.get_mesh(qualifier_name=model_season, max_branch_level=lod_max_level,
+                                 min_thickness=lod_min_thick, leaf_amount=leaf_amount / 100.0,
+                                 leaf_density=leaf_density / 100.0, max_subdiv_level=lod_subdiv)
         obj_render = lbw_to_bl_obj(plant, plant.name + " (render)", mesh_lbw, model_season, False)
         obj_render.parent = obj_viewport
         obj_render.hide_viewport = True
