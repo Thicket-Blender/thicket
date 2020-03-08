@@ -138,7 +138,7 @@ class LBWBL_Pref(AddonPreferences):
         if valid_lbw_path and "lbwdb" not in sys.modules:
             if sdk_path not in sys.path:
                 sys.path.append(sdk_path)
-            from io_import_laubwerk import lbwdb
+            from thicket import lbwdb
             db = lbwdb.LaubwerkDB(db_path, locale, bpy.app.binary_path_python)
 
         box = self.layout.box()
@@ -205,7 +205,7 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
     model_season: EnumProperty(items=model_season_callback, name="Season")
 
     def execute(self, context):
-        from io_import_laubwerk import import_lbw
+        from thicket import import_lbw
         keywords = self.as_keywords(ignore=("filter_glob", "oldpath"))
         keywords["model_id"] = self.properties["model_id"]
         return import_lbw.LBWImportDialog.load(self, context, **keywords)  # noqa: F821
@@ -312,7 +312,7 @@ def register():
     if sdk_path not in sys.path:
         sys.path.append(sdk_path)
 
-    from io_import_laubwerk import lbwdb
+    from thicket import lbwdb
     db = lbwdb.LaubwerkDB(db_path, locale, bpy.app.binary_path_python)
 
 
