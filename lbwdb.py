@@ -4,6 +4,7 @@
 import argparse
 import glob
 import json
+import pathlib
 import subprocess
 import sys
 import time
@@ -75,7 +76,8 @@ class LaubwerkDB:
         self.db["plants"][plant_filename] = plant_record
 
     def import_plant(self, plant_filename):
-        sub = subprocess.Popen([self.python, "./lbwdb_plant.py", plant_filename],
+        lbwdb_plant_cmd = pathlib.Path(__file__).parent.absolute() / "lbwdb_plant.py"
+        sub = subprocess.Popen([self.python, str(lbwdb_plant_cmd), plant_filename],
                                stdout=subprocess.PIPE)
         outs, errs = sub.communicate()
         p_rec = json.loads(outs)
@@ -93,9 +95,10 @@ def lbwdb_write(db_filename, plants_dir, python=sys.executable):
     # FIXME: .gz is optional
     plant_files = glob.glob(plants_dir + "/*/*.lbw.gz")
 
+    lbwdb_plant_cmd = pathlib.Path(__file__).parent.absolute() / "lbwdb_plant.py"
     subs = []
     for f in plant_files:
-        subs.append(subprocess.Popen([db.python, "./lbwdb_plant.py", f], stdout=subprocess.PIPE))
+        subs.append(subprocess.Popen([db.python, str(lbwdb_plant_cmd), f], stdout=subprocess.PIPE))
 
     while len(subs) > 0:
         for sub in subs:
