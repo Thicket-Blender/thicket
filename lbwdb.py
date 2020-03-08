@@ -100,18 +100,13 @@ def lbwdb_write(db_filename, plants_dir, python=sys.executable):
     for f in plant_files:
         subs.append(subprocess.Popen([db.python, str(lbwdb_plant_cmd), f], stdout=subprocess.PIPE))
 
-    while len(subs) > 0:
-        for sub in subs:
-            if sub.poll() is not None:
-                outs, errs = sub.communicate()
-                subs.remove(sub)
-                p_rec = json.loads(outs)
-                db.add_plant_record(sub.args[2], p_rec["plant"])
-                db.update_labels(p_rec["labels"])
-        print("Processed %d/%d plants" % (db.plant_count(), len(plant_files)), end='\r')
-        time.sleep(1)
-
+    for sub in subs:
+        outs, errs = sub.communicate()
+        p_rec = json.loads(outs)
+        db.add_plant_record(sub.args[2], p_rec["plant"])
+        db.update_labels(p_rec["labels"])
     db.save()
+    print("Processed %d/%d plants" % (db.plant_count(), len(plant_files)))
 
 
 def lbwdb_read(db_filename):
