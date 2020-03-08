@@ -147,6 +147,11 @@ class LBWBL_Pref(AddonPreferences):
         row.alert = not valid_lbw_path
         row.prop(self, "lbw_path")
 
+        if valid_lbw_path:
+            import laubwerk
+            row = box.row()
+            row.label(text=laubwerk.version)
+
         row = box.row()
         row.enabled = valid_lbw_path
         row.operator("lbwbl.rebuild_db", icon="FILE_REFRESH")
