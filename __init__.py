@@ -266,10 +266,10 @@ def menu_func_import(self, context):
     global plants_path, db
 
     if not db:
-        self.layout.label(text="Laubwerk plant (not configured)")
+        self.layout.label(text="Laubwerk Plant (not configured)")
         return
 
-    op = self.layout.operator(ImportLBW.bl_idname, text="Laubwerk plant (.lbw.gz)")
+    op = self.layout.operator(ImportLBW.bl_idname, text="Laubwerk Plant (.lbw.gz)")
     op.filepath = plants_path
 
 
