@@ -278,8 +278,8 @@ class LBWImportDialog(bpy.types.Operator):
         obj_viewport["lod_min_thick"] = lod_min_thick
 
         # Setup collection hierarchy
-        lbw_col = new_collection("Laubwerk", singleton=True, exclude=True)
-        plant_col = new_collection(obj_viewport.name, lbw_col)
+        thicket_col = new_collection("Thicket", singleton=True, exclude=True)
+        plant_col = new_collection(obj_viewport.name, thicket_col)
 
         # Add objects to the plant collection
         plant_col.objects.link(obj_viewport)
