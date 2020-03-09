@@ -131,6 +131,7 @@ def main():
     argParse = argparse.ArgumentParser(description='Laubwerk Database Tool')
     argParse.add_argument('cmd', help='read or write')
     argParse.add_argument('db', help='database filename')
+    argParse.add_argument('-p', help='path to Laubwerk Plants directory')
 
     args = argParse.parse_args()
 
@@ -138,7 +139,10 @@ def main():
     if cmd == 'read':
         lbwdb_read(args.db)
     elif cmd == 'write':
-        lbwdb_write(args.db, "/Users/dvhart/source/laubwerk/Plants")
+        if args.p == None:
+            print("Error: you must specify the Laubwerk plants directory")
+            return
+        lbwdb_write(args.db, args.p)
 
 
 if __name__ == "__main__":
