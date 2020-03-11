@@ -31,7 +31,7 @@ include installers for download. Until then, please follow these steps to try it
 out.
 
 * Download and install the prerequisites
-  * [Blender](http://www.blender.org/) 2.80 or later. The plugin is known to run with [Blender 2.81a](http://www.blender.org/features/past-releases/2-81/).
+  * [Blender](http://www.blender.org/) 2.80 or later. The plugin is known to run with [Blender 2.82](http://www.blender.org/features/past-releases/2-82/).
   * Laubwerk Python3 SDK 1.0.32 or later, provided by all Laubwerk Plant Kits, including the [Plants Kit Freebie](http://www.laubwerk.com/store/plants-kit-freebie).
 * Exit Blender
 * Clone the `thicket` git repository into the Blender `addons` folder:
@@ -61,10 +61,9 @@ The file dialog will default to the Laubwerk Plants installation path, presentin
 
 ![doc/thicket-filebrowser-half.png](doc/thicket-filebrowser-half.png)
 
-You can configure the plant variant, age, season, and level of detail using the Viewport and Render settings in
-the lower left of the dialog.
+The image preview will update when you change the model variant and age. You can also configure season and level of detail using the Viewport and Render settings.
 
-Import Laubwerk Plant
+Plant Model
 * Model: Select variant and age. There are typically 3 variants of each plant,
   as well as 3 ages for each variant.
 * Season: Affect plant's foliage, color, and flowers.
