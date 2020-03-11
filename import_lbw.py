@@ -247,9 +247,9 @@ class LBWImportDialog(bpy.types.Operator):
             mesh_lbw = model.get_proxy()
         else:
             mesh_lbw = model.get_mesh(qualifier_name=model_season, max_branch_level=3, min_thickness=0.6,
-                                     leaf_amount=leaf_amount / 100.0,
-                                     leaf_density=0.3 * (leaf_density / 100.0),
-                                     max_subdiv_level=0)
+                                      leaf_amount=leaf_amount / 100.0,
+                                      leaf_density=0.3 * (leaf_density / 100.0),
+                                      max_subdiv_level=0)
         obj_viewport = lbw_to_bl_obj(plant, plant.name, mesh_lbw, model_season, viewport_proxy)
         obj_viewport.hide_render = True
         obj_viewport.show_name = True
@@ -258,8 +258,8 @@ class LBWImportDialog(bpy.types.Operator):
         # Create the render object (high detail)
         time_local = time.time()
         mesh_lbw = model.get_mesh(qualifier_name=model_season, max_branch_level=lod_max_level,
-                                 min_thickness=lod_min_thick, leaf_amount=leaf_amount / 100.0,
-                                 leaf_density=leaf_density / 100.0, max_subdiv_level=lod_subdiv)
+                                  min_thickness=lod_min_thick, leaf_amount=leaf_amount / 100.0,
+                                  leaf_density=leaf_density / 100.0, max_subdiv_level=lod_subdiv)
         obj_render = lbw_to_bl_obj(plant, plant.name + " (render)", mesh_lbw, model_season, False)
         obj_render.parent = obj_viewport
         obj_render.hide_viewport = True
