@@ -22,6 +22,7 @@
 # <pep8-80 compliant>
 
 import os.path
+import pathlib
 import sys
 import time
 
@@ -37,6 +38,7 @@ from bpy.props import (BoolProperty,
                        )
 from bpy_extras.io_utils import ImportHelper
 from bpy.app.translations import locale
+import bpy.utils.previews
 
 bl_info = {
     "name": "Thicket: Laubwerk Plants Add-on for Blender",
@@ -244,6 +246,14 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
             self.model_season = ImportLBW.plant["models"][self.model_id]["default_qualifier"]
 
         # Create the UI entries.
+        preview_path_stem = str(pathlib.Path(pathlib.PurePath(self.filepath).stem).stem) + "_" + self.model_id
+        preview_path = pathlib.Path(self.filepath).parent.absolute() / "models" / (preview_path_stem + ".png")
+        print("preview_path: %s" % preview_path)
+        if preview_path.is_file():
+            if preview_path_stem not in previews:
+                previews.load(preview_path_stem, str(preview_path), 'IMAGE')
+            layout.template_icon(icon_value=previews[preview_path_stem].icon_id, scale=10)
+
         layout.label(text="%s" % db.get_label(ImportLBW.plant["name"]))
         layout.label(text="(%s)" % ImportLBW.plant["name"])
         layout.prop(self, "model_id")
@@ -274,7 +284,7 @@ def menu_func_import(self, context):
 
 
 def register():
-    global db, db_path, plants_path, sdk_path
+    global db, db_path, plants_path, sdk_path, previews
 
     # create Laubwerk Plant object properties
     bpy.types.Object.viewport_proxy = BoolProperty(name="Viewport Proxy", default=True)
@@ -304,6 +314,8 @@ def register():
         plants_path = os.path.join(lbw_path, "Plants" + os.sep)
         sdk_path = os.path.join(lbw_path, "Python" + os.sep)
 
+    previews = bpy.utils.previews.new()
+
     # Dynamically add the sdk_path to the sys.path
     if not sdk_path or not os.path.isdir(sdk_path):
         print("%s: Please configure Laubwerk Install Path in Addon Preferences" % __name__)
@@ -317,11 +329,14 @@ def register():
 
 
 def unregister():
+    global previews
+
     bpy.utils.unregister_class(ImportLBW)
     bpy.utils.unregister_class(LBWBL_Pref)
     bpy.utils.unregister_class(LBWBL_OT_rebuild_db)
     bpy.utils.unregister_class(LBWBL_OT_import_plant_db)
     bpy.types.TOPBAR_MT_file_import.remove(menu_func_import)
+    bpy.utils.previews.remove(previews)
 
 
 if __name__ == "__main__":
