@@ -1,7 +1,6 @@
 import hashlib
 import json
 import sys
-import laubwerk as lbw
 
 
 def md5sum(filename):
@@ -61,4 +60,9 @@ def main(filename):
 
 
 if __name__ == "__main__":
+    if len(sys.argv) > 2:
+        sdk_path = sys.argv[2]
+        if sdk_path not in sys.path:
+            sys.path.append(sdk_path)
+    import laubwerk as lbw
     main(sys.argv[1])

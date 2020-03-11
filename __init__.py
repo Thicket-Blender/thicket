@@ -69,12 +69,12 @@ class LBWBL_OT_rebuild_db(Operator):
     bl_options = {'REGISTER', 'INTERNAL'}
 
     def rebuild_db(self, context):
-        global db, db_path, plants_path
+        global db, db_path, plants_path, sdk_path
         print("%s: Rebuilding Laubwerk database, this may take several minutes..." % __name__)
         print("  Plants Library: %s" % plants_path)
         print("  Database: %s" % db_path)
         t0 = time.time()
-        lbwdb.lbwdb_write(db_path, plants_path, bpy.app.binary_path_python)  # noqa: F821
+        lbwdb.lbwdb_write(db_path, plants_path, sdk_path, bpy.app.binary_path_python)  # noqa: F821
         db = lbwdb.LaubwerkDB(db_path, locale, bpy.app.binary_path_python)  # noqa: F821
         self.report({'INFO'}, "%s: Updated Laubwerk database with %d plants in %0.2fs" %
                     (__name__, db.plant_count(), time.time()-t0))
@@ -98,10 +98,10 @@ class LBWBL_OT_import_plant_db(Operator):
     filepath: bpy.props.StringProperty(subtype="FILE_PATH")
 
     def import_plant_db(self):
-        global db
+        global db, sdk_path
         print("%s: Importing Laubwerk Plant into database from %s" % (__name__, self.filepath))
         t0 = time.time()
-        db.import_plant(self.filepath)
+        db.import_plant(self.filepath, sdk_path, bpy.app.binary_path_python)
         db.save()
         self.report({'INFO'}, "%s: Imported Laubwerk Plant into database in %0.2fs" %
                     (__name__, time.time()-t0))

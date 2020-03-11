@@ -4,8 +4,9 @@
 import argparse
 import glob
 import json
+import os
 import pathlib
-import subprocess
+from subprocess import Popen, PIPE
 import sys
 import laubwerk as lbw
 
@@ -74,10 +75,9 @@ class LaubwerkDB:
     def add_plant_record(self, plant_filename, plant_record):
         self.db["plants"][plant_filename] = plant_record
 
-    def import_plant(self, plant_filename):
+    def import_plant(self, plant_filename, sdk_path):
         lbwdb_plant_cmd = pathlib.Path(__file__).parent.absolute() / "lbwdb_plant.py"
-        sub = subprocess.Popen([self.python, str(lbwdb_plant_cmd), plant_filename],
-                               stdout=subprocess.PIPE)
+        sub = Popen([self.python, str(lbwdb_plant_cmd), plant_filename, sdk_path], stdout=PIPE)
         outs, errs = sub.communicate()
         p_rec = json.loads(outs)
         self.add_plant_record(plant_filename, p_rec["plant"])
@@ -87,7 +87,7 @@ class LaubwerkDB:
         return len(self.db["plants"])
 
 
-def lbwdb_write(db_filename, plants_dir, python=sys.executable):
+def lbwdb_write(db_filename, plants_dir, sdk_path, python=sys.executable):
     db = LaubwerkDB(db_filename, python=python)
     db.initialize()
 
@@ -97,7 +97,8 @@ def lbwdb_write(db_filename, plants_dir, python=sys.executable):
     lbwdb_plant_cmd = pathlib.Path(__file__).parent.absolute() / "lbwdb_plant.py"
     subs = []
     for f in plant_files:
-        subs.append(subprocess.Popen([db.python, str(lbwdb_plant_cmd), f], stdout=subprocess.PIPE))
+        sub = Popen([db.python, str(lbwdb_plant_cmd), f, sdk_path], stdout=PIPE)
+        subs.append(sub)
 
     for sub in subs:
         outs, errs = sub.communicate()
