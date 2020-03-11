@@ -7,7 +7,6 @@ import json
 import pathlib
 import subprocess
 import sys
-import time
 import laubwerk as lbw
 
 
@@ -139,7 +138,7 @@ def main():
     if cmd == 'read':
         lbwdb_read(args.db)
     elif cmd == 'write':
-        if args.p == None:
+        if args.p is None:
             print("Error: you must specify the Laubwerk plants directory")
             return
         lbwdb_write(args.db, args.p)
