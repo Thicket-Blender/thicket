@@ -4,7 +4,6 @@
 import argparse
 import glob
 import json
-import os
 import pathlib
 from subprocess import Popen, PIPE
 import sys
