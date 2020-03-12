@@ -248,7 +248,6 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
         # Create the UI entries.
         preview_path_stem = str(pathlib.Path(pathlib.PurePath(self.filepath).stem).stem) + "_" + self.model_id
         preview_path = pathlib.Path(self.filepath).parent.absolute() / "models" / (preview_path_stem + ".png")
-        print("preview_path: %s" % preview_path)
         if preview_path.is_file():
             if preview_path_stem not in previews:
                 previews.load(preview_path_stem, str(preview_path), 'IMAGE')
