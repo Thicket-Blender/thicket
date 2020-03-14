@@ -74,7 +74,7 @@ class LBWBL_OT_rebuild_db(Operator):
         print("  Plants Library: %s" % plants_path)
         print("  Database: %s" % db_path)
         t0 = time.time()
-        db = thicket_db.ThicketDB(db_path, locale, bpy.app.binary_path_python, True)  # noqa: F821
+        db = ThicketDB(db_path, locale, bpy.app.binary_path_python, True)  # noqa: F821
         db.build(plants_path, sdk_path)
         self.report({'INFO'}, "%s: Updated Laubwerk database with %d plants in %0.2fs" %
                     (__name__, db.plant_count(), time.time()-t0))
@@ -127,7 +127,7 @@ class LBWBL_Pref(AddonPreferences):
         )
 
     def draw(self, context):
-        global db, db_path, plants_path, sdk_path
+        global db, db_path, plants_path, sdk_path, ThicketDB
 
         # Test for a valid Laubwerk installation path
         # It should contain both a Plants and a Python directory
@@ -137,11 +137,15 @@ class LBWBL_Pref(AddonPreferences):
             sdk_path = os.path.join(self.lbw_path, "Python" + os.sep)
             valid_lbw_path = os.path.isdir(plants_path) and os.path.isdir(sdk_path)
 
-        if valid_lbw_path and "thicket_db" not in sys.modules:
+        if valid_lbw_path:
             if sdk_path not in sys.path:
                 sys.path.append(sdk_path)
-            from . import thicket_db
-            db = thicket_db.ThicketDB(db_path, locale, bpy.app.binary_path_python)
+                db = None
+            if "thicket_db" not in sys.modules:
+                from .thicket_db import ThicketDB
+                db = None
+            if not db:
+                db = ThicketDB(db_path, locale, bpy.app.binary_path_python)
 
         box = self.layout.box()
         box.label(text="Laubwerk Plants Library")
@@ -290,7 +294,7 @@ def menu_func_import(self, context):
 
 
 def register():
-    global db, db_path, plants_path, sdk_path, previews
+    global db, db_path, plants_path, sdk_path, previews, ThicketDB
 
     # create Laubwerk Plant object properties
     bpy.types.Object.viewport_proxy = BoolProperty(name="Viewport Proxy", default=True)
@@ -330,12 +334,12 @@ def register():
     if sdk_path not in sys.path:
         sys.path.append(sdk_path)
 
-    from . import thicket_db
+    from .thicket_db import ThicketDB
     try:
-        db = thicket_db.ThicketDB(db_path, locale, bpy.app.binary_path_python)
+        db = ThicketDB(db_path, locale, bpy.app.binary_path_python)
     except FileNotFoundError:
         print("%s: Database not found, creating empty database" % __name__)
-        db = thicket_db.ThicketDB(db_path, locale, bpy.app.binary_path_python, True)
+        db = ThicketDB(db_path, locale, bpy.app.binary_path_python, True)
 
 
 def unregister():
