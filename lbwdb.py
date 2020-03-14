@@ -2,9 +2,11 @@
 # SPDX-License-Identifier: GPL-2.0-only
 
 import argparse
+from collections import deque
 import glob
 import hashlib
 import json
+import os
 from subprocess import Popen, PIPE
 import sys
 import textwrap
@@ -104,20 +106,38 @@ class LaubwerkDB:
 
         # FIXME: .gz is optional
         plant_files = glob.glob(plants_dir + "/*/*.lbw.gz")
+        num_plants = len(plant_files)
 
-        subs = []
-        for f in plant_files:
-            sub = Popen([self.python, __file__, "-f", f, "-s", sdk_path, "parse_plant"],
-                        stdout=PIPE)
-            subs.append(sub)
+        num_jobs = os.cpu_count()
+        if not num_jobs:
+            num_jobs = 4
+        jobs = deque()
 
-        for sub in subs:
-            outs, errs = sub.communicate()
+        print("Parsing %d plants using %d parallel jobs" % (num_plants, num_jobs))
+        while len(plant_files) > 0 or len(jobs) > 0:
+            # Keep up to num_jobs jobs running
+            while len(jobs) < num_jobs and len(plant_files) > 0:
+                f = plant_files.pop()
+                job = Popen([self.python, __file__, "-f", f, "-s", sdk_path, "parse_plant"],
+                            stdout=PIPE)
+                jobs.append(job)
+
+            # Wait for the oldest job to complete
+            job = jobs.popleft()
+            outs, errs = job.communicate()
             p_rec = json.loads(outs)
-            self.add_plant_record(sub.args[3], p_rec["plant"])
+            self.add_plant_record(job.args[3], p_rec["plant"])
             self.update_labels(p_rec["labels"])
+            print("  added %s" % p_rec["plant"]["name"])
+
+        if len(plant_files) > 0:
+            print("ERROR: exited worker loop with %d plant files remaining" % len(plant_files))
+
+        if len(jobs) > 0:
+            print("ERROR: exited worker loop with %d jobs still running" % len(jobs))
+
         self.save()
-        print("Processed %d/%d plants" % (self.plant_count(), len(plant_files)))
+        print("Processed %d/%d plants" % (self.plant_count(), num_plants))
 
     def read(self):
         self.print_info()
@@ -203,20 +223,24 @@ Commands:
 
     args = argParse.parse_args()
 
+    if args.s:
+        # If the SDK path was specified, attempt to import the Laubwerk SDK The
+        # build and parse_plant commands require the Laubwerk SDK which may or
+        # may not be in the sys.path depending on the OS, environment, and how
+        # it was called (from Blender, as a subprocess, or via the command
+        # line).
+        if args.s not in sys.path:
+            sys.path.append(args.s)
+        import laubwerk as lbw
+
     cmd = args.cmd
     if cmd == 'read' and args.d:
         db = LaubwerkDB(args.d, create=False)
         db.read()
-    elif cmd == 'build' and args.d and args.p and args.s:
+    elif cmd == 'build' and args.d and args.p and lbw:
         db = LaubwerkDB(args.d, create=True)
         db.build(args.p, args.s)
-    elif cmd == 'parse_plant' and args.f and args.s:
-        # The plant command is intended to be run as a separate process
-        # The Laubwerk SDK may need to be explicitly added to the sys.path
-        # This is required on Mac. and not on Windows in my testing.
-        if args.s not in sys.path:
-            sys.path.append(args.s)
-        import laubwerk as lbw
+    elif cmd == 'parse_plant' and args.f and lbw:
         LaubwerkDB.parse_plant_json(args.f)
     else:
         argParse.print_help()
