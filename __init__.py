@@ -99,12 +99,11 @@ class LBWBL_OT_import_plant_db(Operator):
 
     def import_plant_db(self):
         global db, sdk_path
-        print("%s: Importing Laubwerk Plant into database from %s" % (__name__, self.filepath))
         t0 = time.time()
         db.import_plant(self.filepath)
         db.save()
-        self.report({'INFO'}, "%s: Imported Laubwerk Plant into database in %0.2fs" %
-                    (__name__, time.time()-t0))
+        self.report({'INFO'}, "%s: Added %s to database in %0.2fs" %
+                    (__name__, db.get_plant(self.filepath)["name"], time.time()-t0))
 
     def invoke(self, context, event):
         return context.window_manager.invoke_confirm(self, event)
