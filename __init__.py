@@ -56,7 +56,7 @@ bl_info = {
 
 # A global variable for the plant.
 db = None
-db_path = os.path.join(bpy.utils.user_resource('SCRIPTS', "addons", True), __name__, "laubwerk.db")
+db_path = os.path.join(bpy.utils.user_resource('SCRIPTS', "addons", True), __name__, "thicket.db")
 plants_path = ""
 sdk_path = ""
 
