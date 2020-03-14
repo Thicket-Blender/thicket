@@ -27,7 +27,7 @@ def md5sum(filename):
 
 class LaubwerkDB:
     """ Laubwerk Database Interface """
-    def __init__(self, db_filename, locale="en-US", python=sys.executable):
+    def __init__(self, db_filename, locale="en-US", python=sys.executable, create=False):
         self.db_filename = db_filename
         self.locale = locale.replace('_', '-')
         self.python = python
@@ -35,9 +35,11 @@ class LaubwerkDB:
             with open(db_filename, 'r', encoding='utf-8') as f:
                 self.db = json.load(f)
         except FileNotFoundError:
-            # if failed, create, and initialize
-            self.initialize()
-            self.save()
+            if create:
+                self.initialize()
+                self.save()
+            else:
+                raise FileNotFoundError
 
     def initialize(self):
         self.db = {}
@@ -194,21 +196,19 @@ Commands:
 '''))
 
     argParse.add_argument('cmd', choices=['read', 'build', 'parse_plant'])
-    argParse.add_argument('-d', help='database filename', default="thicket.db")
+    argParse.add_argument('-d', help='database filename')
     argParse.add_argument('-f', help='Laubwerk Plant filename (lbw.gz)')
     argParse.add_argument('-p', help='Laubwerk Plants path')
     argParse.add_argument('-s', help='Laubwerk Python SDK path')
 
     args = argParse.parse_args()
 
-    db = None
-    if args.d:
-        db = LaubwerkDB(args.d)
-
     cmd = args.cmd
-    if cmd == 'read' and db:
+    if cmd == 'read' and args.d:
+        db = LaubwerkDB(args.d, create=False)
         db.read()
-    elif cmd == 'build' and db and args.p and args.s:
+    elif cmd == 'build' and args.d and args.p and args.s:
+        db = LaubwerkDB(args.d, create=True)
         db.build(args.p, args.s)
     elif cmd == 'parse_plant' and args.f and args.s:
         # The plant command is intended to be run as a separate process

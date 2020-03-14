@@ -74,7 +74,7 @@ class LBWBL_OT_rebuild_db(Operator):
         print("  Plants Library: %s" % plants_path)
         print("  Database: %s" % db_path)
         t0 = time.time()
-        db = lbwdb.LaubwerkDB(db_path, locale, bpy.app.binary_path_python)  # noqa: F821
+        db = lbwdb.LaubwerkDB(db_path, locale, bpy.app.binary_path_python, True)  # noqa: F821
         db.build(plants_path, sdk_path)
         self.report({'INFO'}, "%s: Updated Laubwerk database with %d plants in %0.2fs" %
                     (__name__, db.plant_count(), time.time()-t0))
@@ -331,7 +331,11 @@ def register():
         sys.path.append(sdk_path)
 
     from . import lbwdb
-    db = lbwdb.LaubwerkDB(db_path, locale, bpy.app.binary_path_python)
+    try:
+        db = lbwdb.LaubwerkDB(db_path, locale, bpy.app.binary_path_python)
+    except FileNotFoundError:
+        print("%s: Database not found, creating empty database" % __name__)
+        db = lbwdb.LaubwerkDB(db_path, locale, bpy.app.binary_path_python, True)
 
 
 def unregister():
