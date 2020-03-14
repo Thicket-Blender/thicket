@@ -101,7 +101,7 @@ class LBWBL_OT_import_plant_db(Operator):
         global db, sdk_path
         print("%s: Importing Laubwerk Plant into database from %s" % (__name__, self.filepath))
         t0 = time.time()
-        db.import_plant(self.filepath, sdk_path, bpy.app.binary_path_python)
+        db.import_plant(self.filepath)
         db.save()
         self.report({'INFO'}, "%s: Imported Laubwerk Plant into database in %0.2fs" %
                     (__name__, time.time()-t0))
