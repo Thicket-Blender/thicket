@@ -239,6 +239,13 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
             layout.label(text="You may also import only this plant.")
             op = layout.operator("lbwbl.import_plant_db", icon="IMPORT")
             op.filepath = self.filepath
+            # Because this plant was not in the database, the model_id and
+            # model_season properties are empty. We need to force reloading them
+            # or executing import the import after it is added to the DB will
+            # result in failure - not finding the model_id in the empty enum.
+            # Force this by setting oldpath to the empty string, which will
+            # trigger draw() to treat this as a new file.
+            self.oldpath = ""
             return
 
         if new_file:
