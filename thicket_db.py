@@ -27,8 +27,8 @@ def md5sum(filename):
     return md5.hexdigest()
 
 
-class LaubwerkDB:
-    """ Laubwerk Database Interface """
+class ThicketDB:
+    """ Thicket Database Interface """
     def __init__(self, db_filename, locale="en-US", python=sys.executable, create=False):
         self.db_filename = db_filename
         self.locale = locale.replace('_', '-')
@@ -94,7 +94,7 @@ class LaubwerkDB:
         self.db["plants"][plant_filename] = plant_record
 
     def import_plant(self, plant_filename):
-        p_rec = LaubwerkDB.parse_plant(plant_filename)
+        p_rec = ThicketDB.parse_plant(plant_filename)
         self.add_plant_record(plant_filename, p_rec["plant"])
         self.update_labels(p_rec["labels"])
 
@@ -200,7 +200,7 @@ class LaubwerkDB:
         return p_rec
 
     def parse_plant_json(plant_filename):
-        p_rec = LaubwerkDB.parse_plant(plant_filename)
+        p_rec = ThicketDB.parse_plant(plant_filename)
         print(json.dumps(p_rec))
 
 
@@ -235,13 +235,13 @@ Commands:
 
     cmd = args.cmd
     if cmd == 'read' and args.d:
-        db = LaubwerkDB(args.d, create=False)
+        db = ThicketDB(args.d, create=False)
         db.read()
     elif cmd == 'build' and args.d and args.p and lbw:
-        db = LaubwerkDB(args.d, create=True)
+        db = ThicketDB(args.d, create=True)
         db.build(args.p, args.s)
     elif cmd == 'parse_plant' and args.f and lbw:
-        LaubwerkDB.parse_plant_json(args.f)
+        ThicketDB.parse_plant_json(args.f)
     else:
         argParse.print_help()
         return 1

@@ -74,7 +74,7 @@ class LBWBL_OT_rebuild_db(Operator):
         print("  Plants Library: %s" % plants_path)
         print("  Database: %s" % db_path)
         t0 = time.time()
-        db = lbwdb.LaubwerkDB(db_path, locale, bpy.app.binary_path_python, True)  # noqa: F821
+        db = thicket_db.ThicketDB(db_path, locale, bpy.app.binary_path_python, True)  # noqa: F821
         db.build(plants_path, sdk_path)
         self.report({'INFO'}, "%s: Updated Laubwerk database with %d plants in %0.2fs" %
                     (__name__, db.plant_count(), time.time()-t0))
@@ -137,11 +137,11 @@ class LBWBL_Pref(AddonPreferences):
             sdk_path = os.path.join(self.lbw_path, "Python" + os.sep)
             valid_lbw_path = os.path.isdir(plants_path) and os.path.isdir(sdk_path)
 
-        if valid_lbw_path and "lbwdb" not in sys.modules:
+        if valid_lbw_path and "thicket_db" not in sys.modules:
             if sdk_path not in sys.path:
                 sys.path.append(sdk_path)
-            from . import lbwdb
-            db = lbwdb.LaubwerkDB(db_path, locale, bpy.app.binary_path_python)
+            from . import thicket_db
+            db = thicket_db.ThicketDB(db_path, locale, bpy.app.binary_path_python)
 
         box = self.layout.box()
         box.label(text="Laubwerk Plants Library")
@@ -330,12 +330,12 @@ def register():
     if sdk_path not in sys.path:
         sys.path.append(sdk_path)
 
-    from . import lbwdb
+    from . import thicket_db
     try:
-        db = lbwdb.LaubwerkDB(db_path, locale, bpy.app.binary_path_python)
+        db = thicket_db.ThicketDB(db_path, locale, bpy.app.binary_path_python)
     except FileNotFoundError:
         print("%s: Database not found, creating empty database" % __name__)
-        db = lbwdb.LaubwerkDB(db_path, locale, bpy.app.binary_path_python, True)
+        db = thicket_db.ThicketDB(db_path, locale, bpy.app.binary_path_python, True)
 
 
 def unregister():
