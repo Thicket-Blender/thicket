@@ -74,8 +74,8 @@ class LBWBL_OT_rebuild_db(Operator):
         print("  Plants Library: %s" % plants_path)
         print("  Database: %s" % db_path)
         t0 = time.time()
-        lbwdb.lbwdb_write(db_path, plants_path, sdk_path, bpy.app.binary_path_python)  # noqa: F821
         db = lbwdb.LaubwerkDB(db_path, locale, bpy.app.binary_path_python)  # noqa: F821
+        db.build(plants_path, sdk_path)
         self.report({'INFO'}, "%s: Updated Laubwerk database with %d plants in %0.2fs" %
                     (__name__, db.plant_count(), time.time()-t0))
 
