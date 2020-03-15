@@ -18,6 +18,9 @@ except ImportError:
 
 # <pep8 compliant>
 
+SCHEMA_VERSION = 1
+
+
 def md5sum(filename):
     md5 = hashlib.md5()
     with open(filename, mode='rb') as f:
@@ -31,12 +34,15 @@ def md5sum(filename):
 class ThicketDB:
     """ Thicket Database Interface """
     def __init__(self, db_filename, locale="en-US", python=sys.executable, create=False):
+        global SCHEMA_VERSION
         self.db_filename = db_filename
         self.locale = locale.replace('_', '-')
         self.python = python
         try:
             with open(db_filename, 'r', encoding='utf-8') as f:
                 self.db = json.load(f)
+            if self.db["info"]["schema_version"] != SCHEMA_VERSION:
+                print("WARN: Unknown database schema version")
         except FileNotFoundError:
             if create:
                 self.initialize()
@@ -45,6 +51,7 @@ class ThicketDB:
                 raise FileNotFoundError
 
     def initialize(self):
+        global SCHEMA_VERSION
         self.db = {}
         self.db["info"] = {}
         self.db["labels"] = {}
@@ -54,6 +61,7 @@ class ThicketDB:
         self.db["info"]["sdk_major"] = lbw.version_info.major
         self.db["info"]["sdk_minor"] = lbw.version_info.minor
         self.db["info"]["sdk_micro"] = lbw.version_info.micro
+        self.db["info"]["schema_version"] = SCHEMA_VERSION
 
     def save(self):
         with open(self.db_filename, 'w', encoding='utf-8') as f:
