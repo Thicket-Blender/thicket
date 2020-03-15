@@ -21,6 +21,7 @@
 
 # <pep8 compliant>
 
+import logging
 import os
 from pathlib import Path, PurePath
 import sys
@@ -39,6 +40,8 @@ from bpy.props import (BoolProperty,
 from bpy_extras.io_utils import ImportHelper
 from bpy.app.translations import locale
 import bpy.utils.previews
+
+logging.basicConfig(format='%(levelname)s: thicket: %(message)s', level=logging.INFO)
 
 bl_info = {
     "name": "Thicket: Laubwerk Plants Add-on for Blender",
@@ -70,14 +73,14 @@ class THICKET_OT_rebuild_db(Operator):
 
     def rebuild_db(self, context):
         global db, db_path, plants_path, sdk_path
-        print("%s: Rebuilding Laubwerk database, this may take several minutes..." % __name__)
-        print("  Plants Library: %s" % plants_path)
-        print("  Database: %s" % db_path)
+        logging.info("Rebuilding database, this may take several minutes...")
+        logging.info("Plants Library: %s" % plants_path)
+        logging.info("Database: %s" % db_path)
         t0 = time.time()
         db = ThicketDB(db_path, locale, bpy.app.binary_path_python, True)  # noqa: F821
         db.build(str(plants_path), str(sdk_path))
-        self.report({'INFO'}, "%s: Updated Laubwerk database with %d plants in %0.2fs" %
-                    (__name__, db.plant_count(), time.time()-t0))
+        logging.info("Rebuilt database in %0.2fs" % (time.time()-t0))
+        self.report({'INFO'}, "thicket: Added %d plants to database" % db.plant_count())
 
     def invoke(self, context, event):
         return context.window_manager.invoke_confirm(self, event)
@@ -339,7 +342,7 @@ def register():
 
     # Dynamically add the sdk_path to the sys.path
     if not sdk_path or not sdk_path.is_dir():
-        print("%s: Please configure Laubwerk Install Path in Addon Preferences" % __name__)
+        logging.info("Please configure Laubwerk Install Path in Addon Preferences")
         return
 
     if str(sdk_path) not in sys.path:
@@ -349,8 +352,9 @@ def register():
     try:
         db = ThicketDB(db_path, locale, bpy.app.binary_path_python)
     except FileNotFoundError:
-        print("%s: Database not found, creating empty database" % __name__)
+        logging.warn("Database not found, creating empty database")
         db = ThicketDB(db_path, locale, bpy.app.binary_path_python, True)
+    logging.info("Ready")
 
 
 def unregister():

@@ -29,6 +29,7 @@ Run this script from "File->Import" menu and then load the desired Laubwerk file
 Note, This loads mesh objects and materials.
 
 """
+import logging
 import time
 import bpy
 import laubwerk
@@ -115,7 +116,7 @@ def lbw_to_bl_obj(plant, name, mesh_lbw, model_season, proxy):
         if mat_index != -1:
             obj.data.polygons[i].material_index = mat_index
         else:
-            print('%s: WARN: Material %s not found' % (__name__, mat_name))
+            logging.warn('Material %s not found' % mat_name)
 
         i += 1
 
@@ -148,7 +149,7 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, model_season=None, proxy_color=None):
         return mat
 
     # Diffuse Texture (FIXME: Assumes one sided)
-    # print("Diffuse Texture: %s" % plantmat.get_front().diffuse_texture)
+    logging.debug("Diffuse Texture: %s" % plantmat.get_front().diffuse_texture)
     img_path = plantmat.get_front().diffuse_texture
     node_img = nodes.new(type='ShaderNodeTexImage')
     node_img.location = 0, 2 * NH
@@ -159,7 +160,7 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, model_season=None, proxy_color=None):
     # Blender render engines support using the diffuse map alpha channel. We
     # assume this rather than a separate alpha image.
     alpha_path = plantmat.alpha_texture
-    # print("Alpha Texture: %s" % plantmat.alpha_texture)
+    logging.debug("Alpha Texture: %s" % plantmat.alpha_texture)
     if alpha_path != '':
         # Enable leaf clipping in Eevee
         mat.blend_method = 'CLIP'
@@ -168,14 +169,14 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, model_season=None, proxy_color=None):
             links.new(node_img.outputs['Alpha'], node_dif.inputs['Alpha'])
         else:
             # TODO: This affects 'Fagus sylvatica'
-            print("%s: WARN: Alpha Texture differs from diffuse image path. Not supported.", __name__)
+            logging.warn("Alpha Texture differs from diffuse image path. Not supported.")
 
     # Subsurface Texture
-    # print("Subsurface Color: " + str(plantmat.subsurface_color))
+    logging.debug("Subsurface Color: " + str(plantmat.subsurface_color))
     if plantmat.subsurface_color:
         node_dif.inputs['Subsurface Color'].default_value = plantmat.subsurface_color + (1.0,)
 
-    # print("Subsurface Texture: %s" % plantmat.subsurface_texture)
+    logging.debug("Subsurface Texture: %s" % plantmat.subsurface_texture)
     sub_path = plantmat.subsurface_texture
     if sub_path != '':
         node_sub = nodes.new(type='ShaderNodeTexImage')
@@ -184,15 +185,15 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, model_season=None, proxy_color=None):
 
         # Laubwerk models only support subsurface as a translucency effect,
         # indicated by a subsurface_depth of 0.0.
-        # print("Subsurface Depth: %f" % plantmat.subsurface_depth)
+        logging.debug("Subsurface Depth: %f" % plantmat.subsurface_depth)
         if plantmat.subsurface_depth == 0.0:
             node_sub.image.colorspace_settings.is_data = True
             links.new(node_sub.outputs['Color'], node_dif.inputs['Transmission'])
         else:
-            print("%s: WARN: Subsurface Depth > 0. Not supported." % __name__)
+            logging.warn("Subsurface Depth > 0. Not supported.")
 
     # Bump Texture
-    # print("Bump Texture: %s" % plantmat.get_front().bump_texture)
+    logging.debug("Bump Texture: %s" % plantmat.get_front().bump_texture)
     bump_path = plantmat.get_front().bump_texture
     if bump_path != '':
         node_bumpimg = nodes.new(type='ShaderNodeTexImage')
@@ -202,16 +203,15 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, model_season=None, proxy_color=None):
         node_bump = nodes.new(type='ShaderNodeBump')
         node_bump.location = NW, 0
         # TODO: Make the Distance configurable to tune for each render engine
-        # print("Bump Strength: %f" % plantmat.get_front().bump_strength)
+        logging.debug("Bump Strength: %f" % plantmat.get_front().bump_strength)
         node_bump.inputs['Strength'].default_value = plantmat.get_front().bump_strength
         node_bump.inputs['Distance'].default_value = 0.02
         links.new(node_bumpimg.outputs['Color'], node_bump.inputs['Height'])
         links.new(node_bump.outputs['Normal'], node_dif.inputs['Normal'])
 
-    # print("Displacement Texture: %s" % plantmat.displacement_texture)
-    # print("Normal Texture: %s" % plantmat.get_front().normal_texture)
-    # print("Specular Texture: %s" % plantmat.get_front().specular_texture)
-    # print("--------------------")
+    logging.debug("Displacement Texture: %s" % plantmat.displacement_texture)
+    logging.debug("Normal Texture: %s" % plantmat.get_front().normal_texture)
+    logging.debug("Specular Texture: %s" % plantmat.get_front().specular_texture)
 
     return mat
 
@@ -238,7 +238,7 @@ class LBWImportDialog(bpy.types.Operator):
 
         time_main = time.time()
         plant = laubwerk.load(filepath)
-        print('%s: Importing %s' % (__name__, plant.name))
+        logging.info('Importing %s' % plant.name)
         model = plant.models[model_id]
 
         # Create the viewport object (low detail)
@@ -253,7 +253,7 @@ class LBWImportDialog(bpy.types.Operator):
         obj_viewport = lbw_to_bl_obj(plant, plant.name, mesh_lbw, model_season, viewport_proxy)
         obj_viewport.hide_render = True
         obj_viewport.show_name = True
-        print("  generated low resolution viewport object in %.4fs" % (time.time() - time_local))
+        logging.info("Generated low resolution viewport object in %.4fs" % (time.time() - time_local))
 
         # Create the render object (high detail)
         time_local = time.time()
@@ -264,7 +264,7 @@ class LBWImportDialog(bpy.types.Operator):
         obj_render.parent = obj_viewport
         obj_render.hide_viewport = True
         obj_render.hide_select = True
-        print("  generated high resolution render object in %.4fs" % (time.time() - time_local))
+        logging.info("Generated high resolution render object in %.4fs" % (time.time() - time_local))
 
         # set custom properties to show in properties tab
         obj_viewport["lbw_path"] = filepath
@@ -298,7 +298,7 @@ class LBWImportDialog(bpy.types.Operator):
         obj_inst.select_set(True)
         bpy.context.view_layer.objects.active = obj_inst
 
-        print("%s: Imported %s in %.4fs" % (__name__, plant.name, (time.time() - time_main)))
+        logging.info("Imported %s in %.4fs" % (plant.name, time.time() - time_main))
         return {'FINISHED'}
 
 
