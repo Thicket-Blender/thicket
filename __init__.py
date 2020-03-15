@@ -21,8 +21,7 @@
 
 # <pep8-80 compliant>
 
-import os.path
-import pathlib
+from pathlib import Path, PurePath
 import sys
 import time
 
@@ -56,9 +55,9 @@ bl_info = {
 
 # A global variable for the plant.
 db = None
-db_path = os.path.join(bpy.utils.user_resource('SCRIPTS', "addons", True), __name__, "thicket.db")
-plants_path = ""
-sdk_path = ""
+db_path = Path(bpy.utils.user_resource('SCRIPTS', "addons", True)) / __name__ / "thicket.db"
+plants_path = None
+sdk_path = None
 
 
 # Update Database Operator (called from AddonPreferences)
@@ -75,7 +74,7 @@ class LBWBL_OT_rebuild_db(Operator):
         print("  Database: %s" % db_path)
         t0 = time.time()
         db = ThicketDB(db_path, locale, bpy.app.binary_path_python, True)  # noqa: F821
-        db.build(plants_path, sdk_path)
+        db.build(str(plants_path), str(sdk_path))
         self.report({'INFO'}, "%s: Updated Laubwerk database with %d plants in %0.2fs" %
                     (__name__, db.plant_count(), time.time()-t0))
 
@@ -131,14 +130,14 @@ class LBWBL_Pref(AddonPreferences):
         # Test for a valid Laubwerk installation path
         # It should contain both a Plants and a Python directory
         valid_lbw_path = False
-        if os.path.isdir(self.lbw_path):
-            plants_path = os.path.join(self.lbw_path, "Plants" + os.sep)
-            sdk_path = os.path.join(self.lbw_path, "Python" + os.sep)
-            valid_lbw_path = os.path.isdir(plants_path) and os.path.isdir(sdk_path)
+        if Path(self.lbw_path).is_dir():
+            plants_path = Path(self.lbw_path) / "Plants"
+            sdk_path = Path(self.lbw_path) / "Python"
+            valid_lbw_path = plants_path.is_dir() and sdk_path.is_dir()
 
         if valid_lbw_path:
-            if sdk_path not in sys.path:
-                sys.path.append(sdk_path)
+            if str(sdk_path) not in sys.path:
+                sys.path.append(str(sdk_path))
                 db = None
             if "thicket_db" not in sys.modules:
                 from .thicket_db import ThicketDB
@@ -228,7 +227,7 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
             self.oldpath = self.filepath
             new_file = True
 
-        if not os.path.isfile(self.filepath):
+        if not Path(self.filepath).is_file():
             # Path is most likely a directory
             layout.label(text="Choose a Laubwerk file.")
             return
@@ -256,8 +255,8 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
             self.model_season = ImportLBW.plant["models"][self.model_id]["default_qualifier"]
 
         # Create the UI entries.
-        preview_path_stem = str(pathlib.Path(pathlib.PurePath(self.filepath).stem).stem) + "_" + self.model_id
-        preview_path = pathlib.Path(self.filepath).parent.absolute() / "models" / (preview_path_stem + ".png")
+        preview_path_stem = str(Path(PurePath(self.filepath).stem).stem) + "_" + self.model_id
+        preview_path = Path(self.filepath).parent.absolute() / "models" / (preview_path_stem + ".png")
         if preview_path.is_file():
             if preview_path_stem not in previews:
                 previews.load(preview_path_stem, str(preview_path), 'IMAGE')
@@ -289,7 +288,7 @@ def menu_func_import(self, context):
         return
 
     op = self.layout.operator(ImportLBW.bl_idname, text="Laubwerk Plant (.lbw.gz)")
-    op.filepath = plants_path
+    op.filepath = str(plants_path)
 
 
 def register():
@@ -314,24 +313,25 @@ def register():
     bpy.types.TOPBAR_MT_file_import.append(menu_func_import)
 
     # Create the database path if it does not exist
-    if not os.path.exists(db_path):
-        os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    if not db_path.exists():
+        db_dir = Path(PurePath(db_path).parent)
+        db_dir.mkdir(parents=True, exist_ok=True)
 
     # Initial global plants_path and sdk_path
     lbw_path = bpy.context.preferences.addons[__name__].preferences.lbw_path
-    if lbw_path and os.path.isdir(lbw_path):
-        plants_path = os.path.join(lbw_path, "Plants" + os.sep)
-        sdk_path = os.path.join(lbw_path, "Python" + os.sep)
+    if lbw_path and Path(lbw_path).is_dir():
+        plants_path = Path(lbw_path) / "Plants"
+        sdk_path = Path(lbw_path) / "Python"
 
     previews = bpy.utils.previews.new()
 
     # Dynamically add the sdk_path to the sys.path
-    if not sdk_path or not os.path.isdir(sdk_path):
+    if not sdk_path or not sdk_path.is_dir():
         print("%s: Please configure Laubwerk Install Path in Addon Preferences" % __name__)
         return
 
-    if sdk_path not in sys.path:
-        sys.path.append(sdk_path)
+    if str(sdk_path) not in sys.path:
+        sys.path.append(str(sdk_path))
 
     from .thicket_db import ThicketDB
     try:
