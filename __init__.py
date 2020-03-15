@@ -255,12 +255,22 @@ class THICKET_IO_import_lbw(bpy.types.Operator, ImportHelper):
             self.model_season = THICKET_IO_import_lbw.plant["models"][self.model_id]["default_qualifier"]
 
         # Create the UI entries.
-        preview_path_stem = str(Path(PurePath(self.filepath).stem).stem) + "_" + self.model_id
-        preview_path = Path(self.filepath).parent.absolute() / "models" / (preview_path_stem + ".png")
-        if preview_path.is_file():
-            if preview_path_stem not in previews:
-                previews.load(preview_path_stem, str(preview_path), 'IMAGE')
-            layout.template_icon(icon_value=previews[preview_path_stem].icon_id, scale=10)
+        preview_key = THICKET_IO_import_lbw.plant["name"].replace(' ', '_') + "_" + self.model_id
+        if preview_key not in previews:
+            # Attempt to add the model specific preview if it is not already loaded
+            preview_path = THICKET_IO_import_lbw.plant["models"][self.model_id]["preview"]
+            if preview_path != "" and Path(preview_path).is_file():
+                previews.load(preview_key, preview_path, 'IMAGE')
+        if preview_key not in previews:
+            # The model specific preview was not found, try the plant preview
+            preview_key = THICKET_IO_import_lbw.plant["name"].replace(' ', '_')
+        if preview_key not in previews:
+            preview_path = THICKET_IO_import_lbw.plant["preview"]
+            if preview_path != "" and Path(preview_path).is_file():
+                previews.load(preview_key, preview_path, 'IMAGE')
+        if preview_key not in previews:
+            preview_key = "missing_preview"
+        layout.template_icon(icon_value=previews[preview_key].icon_id, scale=10)
 
         layout.label(text="%s" % db.get_label(THICKET_IO_import_lbw.plant["name"]))
         layout.label(text="(%s)" % THICKET_IO_import_lbw.plant["name"])
@@ -324,6 +334,8 @@ def register():
         sdk_path = Path(lbw_path) / "Python"
 
     previews = bpy.utils.previews.new()
+    missing_path = Path(bpy.utils.user_resource('SCRIPTS', "addons", True)) / __name__ / "doc" / "missing_preview.png"
+    previews.load("missing_preview", str(missing_path), 'IMAGE')
 
     # Dynamically add the sdk_path to the sys.path
     if not sdk_path or not sdk_path.is_dir():
