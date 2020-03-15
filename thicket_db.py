@@ -173,7 +173,7 @@ class ThicketDB:
         plant["name"] = p.name
         plant["md5"] = md5sum(plant_filename)
         plant["default_model"] = p.default_model.name
-        preview_path = Path(plant_filename).parent.absolute() / (p.name.replace(' ', '_') + ".png")
+        preview_path = Path(plant_filename).parent.absolute() / (p.name.replace(' ', '_').replace('.', '') + ".png")
         if not preview_path.is_file():
             preview_path = ""
         plant["preview"] = str(preview_path)
