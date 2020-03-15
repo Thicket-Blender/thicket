@@ -45,7 +45,7 @@ bl_info = {
     "version": (0, 1, 9),
     "blender": (2, 80, 0),
     "location": "File > Import",
-    "description": "Import Laubwerk Plants (lbw.gz)",
+    "description": "Import Laubwerk Plants (.lbw.gz)",
     "warning": "",
     'wiki_url': 'https://github.com/dvhart/lbwbl/blob/master/README.md',
     'tracker_url': 'https://github.com/dvhart/lbwbl/issues',
@@ -167,7 +167,7 @@ class THICKET_Pref(AddonPreferences):
 class THICKET_IO_import_lbw(bpy.types.Operator, ImportHelper):
     """Import a Laubwerk LBW.GZ File"""
     bl_idname = "import_object.lbw"
-    bl_label = "Import Laubwerk Plant"
+    bl_label = "Import LBW"
 
     filter_glob: StringProperty(default="*.lbw;*.lbw.gz", options={'HIDDEN'})
     filepath: StringProperty(name="File Path", subtype="FILE_PATH")
@@ -229,7 +229,7 @@ class THICKET_IO_import_lbw(bpy.types.Operator, ImportHelper):
 
         if not Path(self.filepath).is_file():
             # Path is most likely a directory
-            layout.label(text="Choose a Laubwerk file.")
+            layout.label(text="Choose a Laubwerk Plant (.lbw.gz)")
             return
 
         THICKET_IO_import_lbw.plant = db.get_plant(self.filepath)
@@ -279,7 +279,7 @@ class THICKET_IO_import_lbw(bpy.types.Operator, ImportHelper):
         box.prop(self, "lod_min_thick")
 
 
-def menu_func_import(self, context):
+def menu_import_lbw(self, context):
     global plants_path, db
 
     if not db:
@@ -309,7 +309,7 @@ def register():
     bpy.utils.register_class(THICKET_Pref)
     bpy.utils.register_class(THICKET_OT_rebuild_db)
     bpy.utils.register_class(THICKET_OT_add_plant_db)
-    bpy.types.TOPBAR_MT_file_import.append(menu_func_import)
+    bpy.types.TOPBAR_MT_file_import.append(menu_import_lbw)
 
     # Create the database path if it does not exist
     if not db_path.exists():
@@ -347,7 +347,7 @@ def unregister():
     bpy.utils.unregister_class(THICKET_Pref)
     bpy.utils.unregister_class(THICKET_OT_rebuild_db)
     bpy.utils.unregister_class(THICKET_OT_add_plant_db)
-    bpy.types.TOPBAR_MT_file_import.remove(menu_func_import)
+    bpy.types.TOPBAR_MT_file_import.remove(menu_import_lbw)
     bpy.utils.previews.remove(previews)
 
 
