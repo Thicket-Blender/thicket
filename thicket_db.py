@@ -6,6 +6,7 @@ from collections import deque
 import glob
 import hashlib
 import json
+import logging
 import os
 from pathlib import Path
 from subprocess import Popen, PIPE
@@ -43,7 +44,7 @@ class ThicketDB:
             with open(db_filename, 'r', encoding='utf-8') as f:
                 self.db = json.load(f)
             if self.db["info"]["schema_version"] != SCHEMA_VERSION:
-                print("WARN: Unknown database schema version")
+                logging.warn("Unknown database schema version")
         except FileNotFoundError:
             if create:
                 self.initialize()
@@ -120,12 +121,13 @@ class ThicketDB:
             num_jobs = 4
         jobs = deque()
 
-        print("Parsing %d plants using %d parallel jobs" % (num_plants, num_jobs))
+        log_level = logging.getLevelName(logging.root.level)
+        logging.info("Parsing %d plants using %d parallel jobs" % (num_plants, num_jobs))
         while len(plant_files) > 0 or len(jobs) > 0:
             # Keep up to num_jobs jobs running
             while len(jobs) < num_jobs and len(plant_files) > 0:
                 f = plant_files.pop()
-                job = Popen([self.python, __file__, "-f", f, "-s", sdk_path, "parse_plant"],
+                job = Popen([self.python, __file__, "-f", f, "-s", sdk_path, "-l", log_level, "parse_plant"],
                             stdout=PIPE)
                 jobs.append(job)
 
@@ -135,16 +137,16 @@ class ThicketDB:
             p_rec = json.loads(outs)
             self.db["plants"][job.args[3]] = p_rec["plant"]
             self.update_labels(p_rec["labels"])
-            print("  added %s" % p_rec["plant"]["name"])
+            logging.info("Added %s" % p_rec["plant"]["name"])
 
         if len(plant_files) > 0:
-            print("ERROR: exited worker loop with %d plant files remaining" % len(plant_files))
+            logging.error("Exited worker loop with %d plant files remaining" % len(plant_files))
 
         if len(jobs) > 0:
-            print("ERROR: exited worker loop with %d jobs still running" % len(jobs))
+            logging.error("Exited worker loop with %d jobs still running" % len(jobs))
 
         self.save()
-        print("Processed %d/%d plants" % (self.plant_count(), num_plants))
+        logging.info("Processed %d/%d plants" % (self.plant_count(), num_plants))
 
     def read(self):
         self.print_info()
@@ -163,6 +165,7 @@ class ThicketDB:
 
     # Class methods
     def parse_plant(plant_filename):
+        logging.debug("Parsing: %s" % plant_filename)
         p = lbw.load(plant_filename)
         p_rec = {}
 
@@ -234,10 +237,14 @@ Commands:
     argParse.add_argument('cmd', choices=['read', 'build', 'parse_plant'])
     argParse.add_argument('-d', help='database filename')
     argParse.add_argument('-f', help='Laubwerk Plant filename (lbw.gz)')
+    argParse.add_argument('-l', choices=['DEBUG', 'INFO', 'WARN', 'ERROR', 'CRITICAL'],
+                          default='INFO', help='Logging level')
     argParse.add_argument('-p', help='Laubwerk Plants path')
     argParse.add_argument('-s', help='Laubwerk Python SDK path')
 
     args = argParse.parse_args()
+
+    logging.basicConfig(format='%(levelname)s: thicket: %(message)s', level=args.l)
 
     if args.s:
         # If the SDK path was specified, attempt to import the Laubwerk SDK The
