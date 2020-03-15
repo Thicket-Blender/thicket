@@ -44,7 +44,7 @@ class ThicketDB:
             with open(db_filename, 'r', encoding='utf-8') as f:
                 self.db = json.load(f)
             if self.db["info"]["schema_version"] != SCHEMA_VERSION:
-                logging.warn("Unknown database schema version")
+                logging.warning("Unknown database schema version")
         except FileNotFoundError:
             if create:
                 self.initialize()
@@ -176,7 +176,7 @@ class ThicketDB:
         preview_stem = p.name.replace(' ', '_').replace('.', '')
         preview_path = Path(plant_filename).parent.absolute() / (preview_stem + ".png")
         if not preview_path.is_file():
-            logging.warn("Preview not found: %s" % preview_path)
+            logging.warning("Preview not found: %s" % preview_path)
             preview_path = ""
         plant["preview"] = str(preview_path)
 
@@ -204,7 +204,7 @@ class ThicketDB:
             m_rec["default_qualifier"] = m.default_qualifier
             preview_path = Path(plant_filename).parent.absolute() / "models" / (preview_stem + "_" + m.name + ".png")
             if not preview_path.is_file():
-                logging.warn("Preview not found: %s" % preview_path)
+                logging.warning("Preview not found: %s" % preview_path)
                 preview_path = ""
             m_rec["preview"] = str(preview_path)
             models[m.name] = m_rec
