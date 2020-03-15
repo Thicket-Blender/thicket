@@ -116,7 +116,7 @@ def lbw_to_bl_obj(plant, name, mesh_lbw, model_season, proxy):
         if mat_index != -1:
             obj.data.polygons[i].material_index = mat_index
         else:
-            logging.warn('Material %s not found' % mat_name)
+            logging.warning('Material %s not found' % mat_name)
 
         i += 1
 
@@ -169,7 +169,7 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, model_season=None, proxy_color=None):
             links.new(node_img.outputs['Alpha'], node_dif.inputs['Alpha'])
         else:
             # TODO: This affects 'Fagus sylvatica'
-            logging.warn("Alpha Texture differs from diffuse image path. Not supported.")
+            logging.warning("Alpha Texture differs from diffuse image path. Not supported.")
 
     # Subsurface Texture
     logging.debug("Subsurface Color: " + str(plantmat.subsurface_color))
@@ -190,7 +190,7 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, model_season=None, proxy_color=None):
             node_sub.image.colorspace_settings.is_data = True
             links.new(node_sub.outputs['Color'], node_dif.inputs['Transmission'])
         else:
-            logging.warn("Subsurface Depth > 0. Not supported.")
+            logging.warning("Subsurface Depth > 0. Not supported.")
 
     # Bump Texture
     logging.debug("Bump Texture: %s" % plantmat.get_front().bump_texture)

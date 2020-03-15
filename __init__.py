@@ -266,14 +266,14 @@ class THICKET_IO_import_lbw(bpy.types.Operator, ImportHelper):
                 previews.load(preview_key, preview_path, 'IMAGE')
         if preview_key not in previews:
             # The model specific preview was not found, try the plant preview
-            logging.warn("Preview key %s not found" % preview_key)
+            logging.warning("Preview key %s not found" % preview_key)
             preview_key = THICKET_IO_import_lbw.plant["name"].replace(' ', '_').replace('.', '')
         if preview_key not in previews:
             preview_path = THICKET_IO_import_lbw.plant["preview"]
             if preview_path != "" and Path(preview_path).is_file():
                 previews.load(preview_key, preview_path, 'IMAGE')
         if preview_key not in previews:
-            logging.warn("Preview key %s not found" % preview_key)
+            logging.warning("Preview key %s not found" % preview_key)
             preview_key = "missing_preview"
         layout.template_icon(icon_value=previews[preview_key].icon_id, scale=10)
 
@@ -354,7 +354,7 @@ def register():
     try:
         db = ThicketDB(db_path, locale, bpy.app.binary_path_python)
     except FileNotFoundError:
-        logging.warn("Database not found, creating empty database")
+        logging.warning("Database not found, creating empty database")
         db = ThicketDB(db_path, locale, bpy.app.binary_path_python, True)
     logging.info("Ready")
 
