@@ -19,7 +19,7 @@
 # Copyright (C) 2019-2020 Darren Hart <dvhart@infradead.org>
 
 
-# <pep8-80 compliant>
+# <pep8 compliant>
 
 from pathlib import Path, PurePath
 import sys

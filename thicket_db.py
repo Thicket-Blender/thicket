@@ -16,6 +16,7 @@ except ImportError:
     # Likely running as a subprocess, this will be added in main()
     pass
 
+# <pep8 compliant>
 
 def md5sum(filename):
     md5 = hashlib.md5()
