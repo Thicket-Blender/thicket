@@ -258,7 +258,7 @@ class THICKET_IO_import_lbw(bpy.types.Operator, ImportHelper):
             self.model_season = THICKET_IO_import_lbw.plant["models"][self.model_id]["default_qualifier"]
 
         # Create the UI entries.
-        preview_key = THICKET_IO_import_lbw.plant["name"].replace(' ', '_') + "_" + self.model_id
+        preview_key = THICKET_IO_import_lbw.plant["name"].replace(' ', '_').replace('.', '') + "_" + self.model_id
         if preview_key not in previews:
             # Attempt to add the model specific preview if it is not already loaded
             preview_path = THICKET_IO_import_lbw.plant["models"][self.model_id]["preview"]
@@ -266,7 +266,7 @@ class THICKET_IO_import_lbw(bpy.types.Operator, ImportHelper):
                 previews.load(preview_key, preview_path, 'IMAGE')
         if preview_key not in previews:
             # The model specific preview was not found, try the plant preview
-            preview_key = THICKET_IO_import_lbw.plant["name"].replace(' ', '_')
+            preview_key = THICKET_IO_import_lbw.plant["name"].replace(' ', '_').replace('.', '')
         if preview_key not in previews:
             preview_path = THICKET_IO_import_lbw.plant["preview"]
             if preview_path != "" and Path(preview_path).is_file():
