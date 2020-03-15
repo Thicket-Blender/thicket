@@ -266,12 +266,14 @@ class THICKET_IO_import_lbw(bpy.types.Operator, ImportHelper):
                 previews.load(preview_key, preview_path, 'IMAGE')
         if preview_key not in previews:
             # The model specific preview was not found, try the plant preview
+            logging.warn("Preview key %s not found" % preview_key)
             preview_key = THICKET_IO_import_lbw.plant["name"].replace(' ', '_').replace('.', '')
         if preview_key not in previews:
             preview_path = THICKET_IO_import_lbw.plant["preview"]
             if preview_path != "" and Path(preview_path).is_file():
                 previews.load(preview_key, preview_path, 'IMAGE')
         if preview_key not in previews:
+            logging.warn("Preview key %s not found" % preview_key)
             preview_key = "missing_preview"
         layout.template_icon(icon_value=previews[preview_key].icon_id, scale=10)
 
