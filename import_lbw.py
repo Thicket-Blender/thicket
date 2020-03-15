@@ -235,10 +235,10 @@ class LBWImportDialog(bpy.types.Operator):
         """
         Called by the user interface or another script.
         """
-        print('%s: Importing Laubwerk Plant from %r' % (__name__, filepath))
 
         time_main = time.time()
         plant = laubwerk.load(filepath)
+        print('%s: Importing %s' % (__name__, plant.name))
         model = plant.models[model_id]
 
         # Create the viewport object (low detail)
@@ -253,7 +253,7 @@ class LBWImportDialog(bpy.types.Operator):
         obj_viewport = lbw_to_bl_obj(plant, plant.name, mesh_lbw, model_season, viewport_proxy)
         obj_viewport.hide_render = True
         obj_viewport.show_name = True
-        print("\tgenerated low resolution viewport object in %.4fs" % (time.time() - time_local))
+        print("  generated low resolution viewport object in %.4fs" % (time.time() - time_local))
 
         # Create the render object (high detail)
         time_local = time.time()
@@ -264,7 +264,7 @@ class LBWImportDialog(bpy.types.Operator):
         obj_render.parent = obj_viewport
         obj_render.hide_viewport = True
         obj_render.hide_select = True
-        print("\tgenerated high resolution render object in %.4fs" % (time.time() - time_local))
+        print("  generated high resolution render object in %.4fs" % (time.time() - time_local))
 
         # set custom properties to show in properties tab
         obj_viewport["lbw_path"] = filepath
@@ -298,7 +298,7 @@ class LBWImportDialog(bpy.types.Operator):
         obj_inst.select_set(True)
         bpy.context.view_layer.objects.active = obj_inst
 
-        print("\tfinished importing %s in %.4fs" % (plant.name, (time.time() - time_main)))
+        print("%s: Imported %s in %.4fs" % (__name__, plant.name, (time.time() - time_main)))
         return {'FINISHED'}
 
 
