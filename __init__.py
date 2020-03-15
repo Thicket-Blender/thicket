@@ -61,8 +61,8 @@ sdk_path = None
 
 
 # Update Database Operator (called from AddonPreferences)
-class LBWBL_OT_rebuild_db(Operator):
-    bl_idname = "lbwbl.rebuild_db"
+class THICKET_OT_rebuild_db(Operator):
+    bl_idname = "thicket.rebuild_db"
     bl_label = "Rebuild Database"
     bl_description = "Process Laubwerk Plants library and update the database (may take several minutes)"
     bl_options = {'REGISTER', 'INTERNAL'}
@@ -88,7 +88,7 @@ class LBWBL_OT_rebuild_db(Operator):
 
 
 # Add Plant to Database Operator (called from Import File Dialog)
-class LBWBL_OT_add_plant_db(Operator):
+class THICKET_OT_add_plant_db(Operator):
     bl_idname = "thicket.add_plant_db"
     bl_label = "Add Plant to Database"
     bl_description = "Parse a Laubwerk Plants file and add to the database"
@@ -114,7 +114,7 @@ class LBWBL_OT_add_plant_db(Operator):
 
 
 # Addon Preferences
-class LBWBL_Pref(AddonPreferences):
+class THICKET_Pref(AddonPreferences):
     bl_idname = __name__
 
     lbw_path: StringProperty(
@@ -158,14 +158,14 @@ class LBWBL_Pref(AddonPreferences):
 
         row = box.row()
         row.enabled = valid_lbw_path
-        row.operator("lbwbl.rebuild_db", icon="FILE_REFRESH")
+        row.operator("thicket.rebuild_db", icon="FILE_REFRESH")
 
         if db:
             row.label(text="Database contains %d plants" % db.plant_count())
 
 
-class ImportLBW(bpy.types.Operator, ImportHelper):
-    """Load a Laubwerk LBW.GZ File"""
+class THICKET_IO_import_lbw(bpy.types.Operator, ImportHelper):
+    """Import a Laubwerk LBW.GZ File"""
     bl_idname = "import_object.lbw"
     bl_label = "Import Laubwerk Plant"
 
@@ -193,15 +193,15 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
     def model_id_callback(self, context):
         global db
         items = []
-        for model in ImportLBW.plant["models"].keys():
-            index = ImportLBW.plant["models"][model]["index"]
+        for model in THICKET_IO_import_lbw.plant["models"].keys():
+            index = THICKET_IO_import_lbw.plant["models"][model]["index"]
             items.append((model, db.get_label(model), "", index))
         return items
 
     def model_season_callback(self, context):
         global db
         items = []
-        for qualifier in ImportLBW.plant["models"][self.model_id]["qualifiers"]:
+        for qualifier in THICKET_IO_import_lbw.plant["models"][self.model_id]["qualifiers"]:
             items.append((qualifier, db.get_label(qualifier), ""))
         return items
 
@@ -209,10 +209,10 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
     model_season: EnumProperty(items=model_season_callback, name="Season")
 
     def execute(self, context):
-        from . import import_lbw
+        from .thicket_import import LBWImportDialog
         keywords = self.as_keywords(ignore=("filter_glob", "oldpath"))
         keywords["model_id"] = self.properties["model_id"]
-        return import_lbw.LBWImportDialog.load(self, context, **keywords)  # noqa: F821
+        return LBWImportDialog.load(self, context, **keywords)  # noqa: F821
 
     def invoke(self, context, event):
         context.window_manager.fileselect_add(self)
@@ -232,8 +232,8 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
             layout.label(text="Choose a Laubwerk file.")
             return
 
-        ImportLBW.plant = db.get_plant(self.filepath)
-        if not ImportLBW.plant:
+        THICKET_IO_import_lbw.plant = db.get_plant(self.filepath)
+        if not THICKET_IO_import_lbw.plant:
             layout.label(text="Plant not found in database.", icon='ERROR')
             layout.label(text="Rebuild the database in")
             layout.label(text="Addon Preferences.")
@@ -250,8 +250,8 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
             return
 
         if new_file:
-            self.model_id = ImportLBW.plant["default_model"]
-            self.model_season = ImportLBW.plant["models"][self.model_id]["default_qualifier"]
+            self.model_id = THICKET_IO_import_lbw.plant["default_model"]
+            self.model_season = THICKET_IO_import_lbw.plant["models"][self.model_id]["default_qualifier"]
 
         # Create the UI entries.
         preview_path_stem = str(Path(PurePath(self.filepath).stem).stem) + "_" + self.model_id
@@ -261,8 +261,8 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
                 previews.load(preview_path_stem, str(preview_path), 'IMAGE')
             layout.template_icon(icon_value=previews[preview_path_stem].icon_id, scale=10)
 
-        layout.label(text="%s" % db.get_label(ImportLBW.plant["name"]))
-        layout.label(text="(%s)" % ImportLBW.plant["name"])
+        layout.label(text="%s" % db.get_label(THICKET_IO_import_lbw.plant["name"]))
+        layout.label(text="(%s)" % THICKET_IO_import_lbw.plant["name"])
         layout.prop(self, "model_id")
         layout.prop(self, "model_season")
 
@@ -286,7 +286,7 @@ def menu_func_import(self, context):
         self.layout.label(text="Laubwerk Plant (not configured)")
         return
 
-    op = self.layout.operator(ImportLBW.bl_idname, text="Laubwerk Plant (.lbw.gz)")
+    op = self.layout.operator(THICKET_IO_import_lbw.bl_idname, text="Laubwerk Plant (.lbw.gz)")
     op.filepath = str(plants_path)
 
 
@@ -305,10 +305,10 @@ def register():
     bpy.types.Object.lod_min_thick = FloatProperty(name="Min. Thickness", default=0.1, min=0.1, max=10000.0, step=1.0)
     bpy.types.Object.lod_max_level = IntProperty(name="Maximum Level", default=5, min=0, max=10, step=1)
 
-    bpy.utils.register_class(ImportLBW)
-    bpy.utils.register_class(LBWBL_Pref)
-    bpy.utils.register_class(LBWBL_OT_rebuild_db)
-    bpy.utils.register_class(LBWBL_OT_add_plant_db)
+    bpy.utils.register_class(THICKET_IO_import_lbw)
+    bpy.utils.register_class(THICKET_Pref)
+    bpy.utils.register_class(THICKET_OT_rebuild_db)
+    bpy.utils.register_class(THICKET_OT_add_plant_db)
     bpy.types.TOPBAR_MT_file_import.append(menu_func_import)
 
     # Create the database path if it does not exist
@@ -343,10 +343,10 @@ def register():
 def unregister():
     global previews
 
-    bpy.utils.unregister_class(ImportLBW)
-    bpy.utils.unregister_class(LBWBL_Pref)
-    bpy.utils.unregister_class(LBWBL_OT_rebuild_db)
-    bpy.utils.unregister_class(LBWBL_OT_add_plant_db)
+    bpy.utils.unregister_class(THICKET_IO_import_lbw)
+    bpy.utils.unregister_class(THICKET_Pref)
+    bpy.utils.unregister_class(THICKET_OT_rebuild_db)
+    bpy.utils.unregister_class(THICKET_OT_add_plant_db)
     bpy.types.TOPBAR_MT_file_import.remove(menu_func_import)
     bpy.utils.previews.remove(previews)
 
