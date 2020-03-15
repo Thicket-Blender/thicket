@@ -173,8 +173,10 @@ class ThicketDB:
         plant["name"] = p.name
         plant["md5"] = md5sum(plant_filename)
         plant["default_model"] = p.default_model.name
-        preview_path = Path(plant_filename).parent.absolute() / (p.name.replace(' ', '_').replace('.', '') + ".png")
+        preview_stem = p.name.replace(' ', '_').replace('.', '')
+        preview_path = Path(plant_filename).parent.absolute() / (preview_stem + ".png")
         if not preview_path.is_file():
+            logging.warn("Preview not found: %s" % preview_path)
             preview_path = ""
         plant["preview"] = str(preview_path)
 
@@ -200,9 +202,9 @@ class ThicketDB:
             m_rec["index"] = i
             m_rec["qualifiers"] = seasons
             m_rec["default_qualifier"] = m.default_qualifier
-            preview_stem = p.name.replace(' ', '_') + "_" + m.name
-            preview_path = Path(plant_filename).parent.absolute() / "models" / (preview_stem + ".png")
+            preview_path = Path(plant_filename).parent.absolute() / "models" / (preview_stem + "_" + m.name + ".png")
             if not preview_path.is_file():
+                logging.warn("Preview not found: %s" % preview_path)
                 preview_path = ""
             m_rec["preview"] = str(preview_path)
             models[m.name] = m_rec
