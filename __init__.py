@@ -21,6 +21,7 @@
 
 # <pep8 compliant>
 
+import os
 from pathlib import Path, PurePath
 import sys
 import time
@@ -287,7 +288,7 @@ def menu_import_lbw(self, context):
         return
 
     op = self.layout.operator(THICKET_IO_import_lbw.bl_idname, text="Laubwerk Plant (.lbw.gz)")
-    op.filepath = str(plants_path)
+    op.filepath = str(plants_path) + os.sep
 
 
 def register():
