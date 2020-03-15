@@ -87,19 +87,19 @@ class LBWBL_OT_rebuild_db(Operator):
         return {'FINISHED'}
 
 
-# Import Plant Operator (called from Import File Dialog)
-class LBWBL_OT_import_plant_db(Operator):
-    bl_idname = "lbwbl.import_plant_db"
-    bl_label = "Import Plant into Database"
-    bl_description = "Process a Laubwerk Plants file and add to the database"
+# Add Plant to Database Operator (called from Import File Dialog)
+class LBWBL_OT_add_plant_db(Operator):
+    bl_idname = "thicket.add_plant_db"
+    bl_label = "Add Plant to Database"
+    bl_description = "Parse a Laubwerk Plants file and add to the database"
     bl_options = {'REGISTER', 'INTERNAL'}
 
     filepath: bpy.props.StringProperty(subtype="FILE_PATH")
 
-    def import_plant_db(self):
+    def add_plant_db(self):
         global db, sdk_path
         t0 = time.time()
-        db.import_plant(self.filepath)
+        db.add_plant(self.filepath)
         db.save()
         self.report({'INFO'}, "%s: Added %s to database in %0.2fs" %
                     (__name__, db.get_plant(self.filepath)["name"], time.time()-t0))
@@ -108,7 +108,7 @@ class LBWBL_OT_import_plant_db(Operator):
         return context.window_manager.invoke_confirm(self, event)
 
     def execute(self, context):
-        self.import_plant_db()
+        self.add_plant_db()
         context.area.tag_redraw()
         return {'FINISHED'}
 
@@ -238,15 +238,14 @@ class ImportLBW(bpy.types.Operator, ImportHelper):
             layout.label(text="Rebuild the database in")
             layout.label(text="Addon Preferences.")
             layout.separator()
-            layout.label(text="You may also import only this plant.")
-            op = layout.operator("lbwbl.import_plant_db", icon="IMPORT")
+            layout.label(text="You may add this plant individually.")
+            op = layout.operator("thicket.add_plant_db", icon="IMPORT")
             op.filepath = self.filepath
             # Because this plant was not in the database, the model_id and
             # model_season properties are empty. We need to force reloading them
-            # or executing import the import after it is added to the DB will
-            # result in failure - not finding the model_id in the empty enum.
-            # Force this by setting oldpath to the empty string, which will
-            # trigger draw() to treat this as a new file.
+            # after it is added to the DB. Force this by setting oldpath to the
+            # empty string, which will trigger draw() to treat this as a new
+            # file.
             self.oldpath = ""
             return
 
@@ -309,7 +308,7 @@ def register():
     bpy.utils.register_class(ImportLBW)
     bpy.utils.register_class(LBWBL_Pref)
     bpy.utils.register_class(LBWBL_OT_rebuild_db)
-    bpy.utils.register_class(LBWBL_OT_import_plant_db)
+    bpy.utils.register_class(LBWBL_OT_add_plant_db)
     bpy.types.TOPBAR_MT_file_import.append(menu_func_import)
 
     # Create the database path if it does not exist
@@ -347,7 +346,7 @@ def unregister():
     bpy.utils.unregister_class(ImportLBW)
     bpy.utils.unregister_class(LBWBL_Pref)
     bpy.utils.unregister_class(LBWBL_OT_rebuild_db)
-    bpy.utils.unregister_class(LBWBL_OT_import_plant_db)
+    bpy.utils.unregister_class(LBWBL_OT_add_plant_db)
     bpy.types.TOPBAR_MT_file_import.remove(menu_func_import)
     bpy.utils.previews.remove(previews)
 

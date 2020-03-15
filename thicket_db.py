@@ -90,12 +90,9 @@ class ThicketDB:
         except KeyError:
             return None
 
-    def add_plant_record(self, plant_filename, plant_record):
-        self.db["plants"][plant_filename] = plant_record
-
-    def import_plant(self, plant_filename):
+    def add_plant(self, plant_filename):
         p_rec = ThicketDB.parse_plant(plant_filename)
-        self.add_plant_record(plant_filename, p_rec["plant"])
+        self.db["plants"][plant_filename] = p_rec["plant"]
         self.update_labels(p_rec["labels"])
 
     def plant_count(self):
@@ -126,7 +123,7 @@ class ThicketDB:
             job = jobs.popleft()
             outs, errs = job.communicate()
             p_rec = json.loads(outs)
-            self.add_plant_record(job.args[3], p_rec["plant"])
+            self.db["plants"][job.args[3]] = p_rec["plant"]
             self.update_labels(p_rec["labels"])
             print("  added %s" % p_rec["plant"]["name"])
 
