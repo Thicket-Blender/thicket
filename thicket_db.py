@@ -7,6 +7,7 @@ import glob
 import hashlib
 import json
 import os
+from pathlib import Path
 from subprocess import Popen, PIPE
 import sys
 import textwrap
@@ -169,6 +170,10 @@ class ThicketDB:
         plant["name"] = p.name
         plant["md5"] = md5sum(plant_filename)
         plant["default_model"] = p.default_model.name
+        preview_path = Path(plant_filename).parent.absolute() / (p.name.replace(' ', '_') + ".png")
+        if not preview_path.is_file():
+            preview_path = ""
+        plant["preview"] = str(preview_path)
 
         labels = {}
         p_labels = {}
@@ -192,6 +197,11 @@ class ThicketDB:
             m_rec["index"] = i
             m_rec["qualifiers"] = seasons
             m_rec["default_qualifier"] = m.default_qualifier
+            preview_stem = p.name.replace(' ', '_') + "_" + m.name
+            preview_path = Path(plant_filename).parent.absolute() / "models" / (preview_stem + ".png")
+            if not preview_path.is_file():
+                preview_path = ""
+            m_rec["preview"] = str(preview_path)
             models[m.name] = m_rec
             m_labels = {}
             # FIXME: highly redundant
