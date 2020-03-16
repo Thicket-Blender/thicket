@@ -116,7 +116,7 @@ def lbw_to_bl_obj(plant, name, mesh_lbw, model_season, proxy):
         if mat_index != -1:
             obj.data.polygons[i].material_index = mat_index
         else:
-            logging.warning('Material %s not found' % mat_name)
+            logging.warning("Material not found: %s" % mat_name)
 
         i += 1
 
@@ -172,7 +172,7 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, model_season=None, proxy_color=None):
             logging.warning("Alpha Texture differs from diffuse image path. Not supported.")
 
     # Subsurface Texture
-    logging.debug("Subsurface Color: " + str(plantmat.subsurface_color))
+    logging.debug("Subsurface Color: %s" % str(plantmat.subsurface_color))
     if plantmat.subsurface_color:
         node_dif.inputs['Subsurface Color'].default_value = plantmat.subsurface_color + (1.0,)
 
@@ -238,7 +238,7 @@ class LBWImportDialog(bpy.types.Operator):
 
         time_main = time.time()
         plant = laubwerk.load(filepath)
-        logging.info('Importing %s' % plant.name)
+        logging.info('Importing "%s"' % plant.name)
         model = plant.models[model_id]
         proxy = False
 
@@ -302,7 +302,7 @@ class LBWImportDialog(bpy.types.Operator):
         obj_inst.select_set(True)
         bpy.context.view_layer.objects.active = obj_inst
 
-        logging.info("Imported %s in %.4fs" % (plant.name, time.time() - time_main))
+        logging.info('Imported "%s" in %.4fs' % (plant.name, time.time() - time_main))
         return {'FINISHED'}
 
 
