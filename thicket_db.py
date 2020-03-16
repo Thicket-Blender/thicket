@@ -137,7 +137,7 @@ class ThicketDB:
             p_rec = json.loads(outs)
             self.db["plants"][job.args[3]] = p_rec["plant"]
             self.update_labels(p_rec["labels"])
-            logging.info("Added %s" % p_rec["plant"]["name"])
+            logging.info('Added "%s"' % p_rec['plant']['name'])
 
         if len(plant_files) > 0:
             logging.error("Exited worker loop with %d plant files remaining" % len(plant_files))
