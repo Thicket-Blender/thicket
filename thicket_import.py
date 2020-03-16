@@ -230,7 +230,7 @@ class LBWImportDialog(bpy.types.Operator):
     def invoke(self, context, event):
         return context.window_manager.invoke_props_dialog(self)
 
-    def load(self, context, filepath, leaf_density, model_id, model_season, viewport_proxy,
+    def load(self, context, filepath, leaf_density, model_id, model_season, viewport_lod,
              lod_min_thick, lod_max_level, lod_subdiv, leaf_amount):
         """
         Called by the user interface or another script.
@@ -240,17 +240,21 @@ class LBWImportDialog(bpy.types.Operator):
         plant = laubwerk.load(filepath)
         logging.info('Importing %s' % plant.name)
         model = plant.models[model_id]
+        proxy = False
 
         # Create the viewport object (low detail)
         time_local = time.time()
-        if viewport_proxy:
-            mesh_lbw = model.get_proxy()
-        else:
+        if viewport_lod == 'low':
             mesh_lbw = model.get_mesh(qualifier_name=model_season, max_branch_level=3, min_thickness=0.6,
-                                      leaf_amount=leaf_amount / 100.0,
-                                      leaf_density=0.3 * (leaf_density / 100.0),
+                                      leaf_amount=leaf_amount / 100.0, leaf_density=0.3 * (leaf_density / 100.0),
                                       max_subdiv_level=0)
-        obj_viewport = lbw_to_bl_obj(plant, plant.name, mesh_lbw, model_season, viewport_proxy)
+        else:
+            proxy = True
+            mesh_lbw = model.get_proxy()
+            if viewport_lod != 'proxy':
+                logging.warn("Unknown viewport_lod: %s" % viewport_lod)
+
+        obj_viewport = lbw_to_bl_obj(plant, plant.name, mesh_lbw, model_season, proxy)
         obj_viewport.hide_render = True
         obj_viewport.show_name = True
         logging.info("Generated low resolution viewport object in %.4fs" % (time.time() - time_local))
@@ -270,7 +274,7 @@ class LBWImportDialog(bpy.types.Operator):
         obj_viewport["lbw_path"] = filepath
         obj_viewport["model_type"] = model.name
         obj_viewport["model_season"] = model_season
-        obj_viewport["viewport_proxy"] = viewport_proxy
+        obj_viewport["viewport_lod"] = viewport_lod
         obj_viewport["lod_subdiv"] = lod_subdiv
         obj_viewport["leaf_density"] = leaf_density
         obj_viewport["leaf_amount"] = leaf_amount

@@ -177,19 +177,20 @@ class THICKET_IO_import_lbw(bpy.types.Operator, ImportHelper):
     filepath: StringProperty(name="File Path", subtype="FILE_PATH")
     oldpath: StringProperty(name="Old Path", subtype="FILE_PATH")
 
-    # Viewport Settings
-    viewport_proxy: BoolProperty(name="Display Proxy", default=True)
-
-    # Render Settings
-    lod_subdiv: IntProperty(name="Subdivision", default=3, min=0, max=5, step=1)
-    leaf_density: FloatProperty(name="Leaf density",
-                                description="The density of the leafs of the plant.",
+    # Level of detail settings
+    viewport_lod: EnumProperty(name="Detail", items=[("proxy", "Very Low (Convex Hull)", ""),
+                                                     ("low", "Low (Realistic)", "")])
+    lod_subdiv: IntProperty(name="Subdivision", description="How round the trunk and branches appear",
+                            default=3, min=0, max=5, step=1)
+    leaf_density: FloatProperty(name="Leaf Density", description="How full the foliage appears",
                                 default=100.0, min=0.01, max=100.0, subtype='PERCENTAGE')
-    leaf_amount: FloatProperty(name="Leaf amount",
-                               description="The amount of leafs of the plant.",
+    leaf_amount: FloatProperty(name="Leaf Amount", description="How many leaves used for leaf density "
+                               "(smaller number means larger leaves)",
                                default=100.0, min=0.01, max=100.0, subtype='PERCENTAGE')
-    lod_max_level: IntProperty(name="Maximum Level", default=5, min=0, max=10, step=1)
-    lod_min_thick: FloatProperty(name="Minimum Thickness", default=0.1, min=0.1, max=10000.0, step=1.0)
+    lod_max_level: IntProperty(name="Branching Level", description="Max branching levels off the trunk",
+                               default=5, min=0, max=10, step=1)
+    lod_min_thick: FloatProperty(name="Min Branch Thickness", description="Min thickness of trunk or branches",
+                                 default=0.1, min=0.1, max=10000.0, step=1.0)
 
     # Class variable
     plant = None
@@ -283,11 +284,10 @@ class THICKET_IO_import_lbw(bpy.types.Operator, ImportHelper):
         layout.prop(self, "model_season")
 
         box = layout.box()
-        box.label(text="Viewport Settings")
-        box.prop(self, "viewport_proxy")
-
+        box.label(text="Viewport Model")
+        box.prop(self, "viewport_lod")
         box = layout.box()
-        box.label(text="Render Settings")
+        box.label(text="Render Model")
         box.prop(self, "lod_subdiv")
         box.prop(self, "leaf_density")
         box.prop(self, "leaf_amount")
