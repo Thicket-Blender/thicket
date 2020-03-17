@@ -147,7 +147,7 @@ class THICKET_Pref(AddonPreferences):
                 from .thicket_db import ThicketDB
                 db = None
             if not db:
-                db = ThicketDB(db_path, locale, bpy.app.binary_path_python)
+                db = ThicketDB(db_path, locale, bpy.app.binary_path_python, True)
 
         box = self.layout.box()
         box.label(text="Laubwerk Plants Library")
