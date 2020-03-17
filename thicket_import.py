@@ -34,6 +34,8 @@ import time
 import bpy
 import laubwerk
 
+from .thicket_utils import THICKET_GUID
+
 
 def new_collection(name, parent=bpy.context.scene.collection, singleton=False, exclude=False):
 
@@ -276,17 +278,6 @@ class LBWImportDialog(bpy.types.Operator):
         obj_render.hide_select = True
         logging.info("Generated high resolution render object in %.4fs" % (time.time() - time_local))
 
-        # set custom properties to show in properties tab
-        obj_viewport["lbw_path"] = filepath
-        obj_viewport["model_type"] = model.name
-        obj_viewport["model_season"] = model_season
-        obj_viewport["viewport_lod"] = viewport_lod
-        obj_viewport["lod_subdiv"] = lod_subdiv
-        obj_viewport["leaf_density"] = leaf_density
-        obj_viewport["leaf_amount"] = leaf_amount
-        obj_viewport["lod_max_level"] = lod_max_level
-        obj_viewport["lod_min_thick"] = lod_min_thick
-
         # Setup collection hierarchy
         thicket_col = new_collection("Thicket", singleton=True, exclude=True)
         plant_col = new_collection(obj_viewport.name, thicket_col)
@@ -300,6 +291,7 @@ class LBWImportDialog(bpy.types.Operator):
         obj_inst.instance_collection = plant_col
         obj_inst.instance_type = 'COLLECTION'
         obj_inst.show_name = True
+
         context.collection.objects.link(obj_inst)
 
         # Make the instance the active selected object
@@ -308,17 +300,19 @@ class LBWImportDialog(bpy.types.Operator):
         obj_inst.select_set(True)
         bpy.context.view_layer.objects.active = obj_inst
 
+        # Set Thicket properties on the template plant collection
+        plant_col.thicket.magic = THICKET_GUID
+        plant_col.thicket.name = plant.name
+        plant_col.thicket.filepath = filepath
+        plant_col.thicket.model_id = model.name
+        plant_col.thicket.qualifier = qualifier
+        plant_col.thicket.viewport_lod = viewport_lod
+        plant_col.thicket.lod_subdiv = lod_subdiv
+        plant_col.thicket.leaf_density = leaf_density
+        plant_col.thicket.leaf_amount = leaf_amount
+        plant_col.thicket.lod_max_level = lod_max_level
+        plant_col.thicket.lod_min_thick = lod_min_thick
+        plant_col.thicket.copy_to(plant_col.thicket_shadow)
+
         logging.info('Imported "%s" in %.4fs' % (plant.name, time.time() - time_main))
         return {'FINISHED'}
-
-
-def register():
-    bpy.utils.register_class(LBWImportDialog)
-
-
-def unregister():
-    bpy.utils.uregister_class(LBWImportDialog)
-
-
-if __name__ == "__main__":
-    register()

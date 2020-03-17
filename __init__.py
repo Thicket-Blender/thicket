@@ -30,16 +30,24 @@ import time
 import bpy
 from bpy.types import (AddonPreferences,
                        Operator,
+                       Panel,
+                       PropertyGroup
                        )
 from bpy.props import (BoolProperty,
+                       EnumProperty,
                        FloatProperty,
                        IntProperty,
                        StringProperty,
-                       EnumProperty,
                        )
 from bpy_extras.io_utils import ImportHelper
 from bpy.app.translations import locale
 import bpy.utils.previews
+
+from .thicket_utils import (is_thicket_instance,
+                            delete_plant_template,
+                            delete_plant,
+                            make_unique,
+                            )
 
 logging.basicConfig(format='%(levelname)s: thicket: %(message)s', level=logging.INFO)
 
@@ -106,6 +114,229 @@ def get_preview(plant_name, model):
         logging.warning("Preview key %s not found" % preview_key)
         preview_key = "missing_preview"
     return previews[preview_key]
+
+
+# Thicket property group
+class ThicketPropGroup(PropertyGroup):
+    def __eq__(self, other):
+        for k, v in self.items():
+            if self[k] != other[k]:
+                return False
+        return True
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def copy_to(self, other):
+        for k, v in self.items():
+            other[k] = v
+
+    def as_keywords(self, ignore):
+        keywords = dict(self)
+        for key in ignore:
+            keywords.pop(key, None)
+        # Use the Enum string (not the integer) for model_season
+        # TODO: see about doing this for model as well throughout
+        keywords["model_season"] = self.model_season
+        keywords["viewport_lod"] = self.viewport_lod
+        return keywords
+
+    def model_callback(self, context):
+        global db
+        # TODO: should this be active_object?
+        o = context.object
+        if not is_thicket_instance(o):
+            return []
+        tp = o.instance_collection.thicket
+        plant = db.get_plant(tp.filepath)
+        items = []
+        for model in plant["models"].keys():
+            index = plant["models"][model]["index"]
+            items.append((model, db.get_label(model), "", index))
+        return items
+
+    def season_callback(self, context):
+        global db
+        # TODO: should this be active_object?
+        o = context.object
+        if not is_thicket_instance(o):
+            return []
+        tp = o.instance_collection.thicket
+        plant = db.get_plant(tp.filepath)
+        items = []
+        for qualifier in plant["models"][tp.model_id]["qualifiers"]:
+            items.append((qualifier, db.get_label(qualifier), ""))
+        return items
+
+    magic: bpy.props.StringProperty()
+    name: bpy.props.StringProperty()
+    filepath: bpy.props.StringProperty()
+
+    # The list of models and seasons is plant specific, so we cannot encode it
+    # in the generic property group unfortunately.
+    model_id: EnumProperty(items=model_callback, name="Model")
+    model_season: EnumProperty(items=season_callback, name="Season")
+    viewport_lod: EnumProperty(name="Detail", items=[("proxy", "Very Low (Convex Hull)", ""),
+                                                     ("low", "Low (Realistic)", "")])
+    lod_subdiv: IntProperty(name="Subdivision", description="How round the trunk and branches appear",
+                            default=3, min=0, max=5, step=1)
+    leaf_density: FloatProperty(name="Leaf Density", description="How full the foliage appears",
+                                default=100.0, min=0.01, max=100.0, subtype='PERCENTAGE')
+    leaf_amount: FloatProperty(name="Leaf Amount", description="How many leaves used for leaf density "
+                               "(smaller number means larger leaves)",
+                               default=100.0, min=0.01, max=100.0, subtype='PERCENTAGE')
+    lod_max_level: IntProperty(name="Branching Level", description="Max branching levels off the trunk",
+                               default=5, min=0, max=10, step=1)
+    lod_min_thick: FloatProperty(name="Min Branch Thickness", description="Min thickness of trunk or branches",
+                                 default=0.1, min=0.1, max=10000.0, step=1.0)
+
+
+# Thicket operator to copy the model properties to the modified shadow copy
+class THICKET_OT_reset_object(Operator):
+    bl_idname = "thicket.reset_object"
+    bl_label = "Reset Plant"
+    bl_description = "Restore the UI properties to the model properties"
+    bl_options = {'REGISTER', 'INTERNAL'}
+
+    def reset_props(self, context):
+        o = context.active_object
+        t = o.instance_collection
+        t.thicket.copy_to(t.thicket_shadow)
+
+    def execute(self, context):
+        instance = context.active_object
+        if not is_thicket_instance(instance):
+            logging.error("reset_object failed: non-Thicket object: %" % instance.name)
+            return
+        self.reset_props(context)
+        context.area.tag_redraw()
+        return {'FINISHED'}
+
+
+# Thicket operator to modify (delete and replace) the backing objects
+class THICKET_OT_update_object(Operator):
+    bl_idname = "thicket.update_object"
+    bl_label = "Update Plant"
+    bl_description = "Update plant with new properties"
+    bl_options = {'REGISTER', 'INTERNAL'}
+
+    def update_object(self, context):
+        instance = context.active_object
+        logging.info("Update object: %s" % instance.name)
+        template = instance.instance_collection
+        logging.info("instance collection: %s" % template.name)
+
+        # Load new plant model
+        from .thicket_import import LBWImportDialog
+        keywords = template.thicket_shadow.as_keywords(ignore=("magic", "name"))
+        LBWImportDialog.load(self, context, **keywords)  # noqa: F821
+        new_instance = context.active_object
+        new_template = new_instance.instance_collection
+
+        # Update the instance_collection reference in the instances
+        for i in template.users_dupli_group:
+            i.instance_collection = new_template
+            i.name = template.name
+
+        # Remove the instance collection created
+        delete_plant(new_instance)
+        # Remove the old template
+        delete_plant_template(template)
+
+        # Restore the active object
+        instance.select_set(True)
+        bpy.context.view_layer.objects.active = instance
+
+    def execute(self, context):
+        self.update_object(context)
+        context.area.tag_redraw()
+        return {'FINISHED'}
+
+
+# Thicket make unique operator
+class THICKET_OT_make_unique(Operator):
+    bl_idname = "thicket.make_unique"
+    bl_label = "Make Unique"
+    bl_description = "Display number of plants using this template (click to make unique)"
+    bl_options = {'REGISTER', 'INTERNAL'}
+
+    def execute(self, context):
+        instance = context.active_object
+        if not is_thicket_instance(instance):
+            logging.error("make_unique failed: non-Thicket object: %" % instance.name)
+            return
+        make_unique(instance)
+        context.area.tag_redraw()
+        return {'FINISHED'}
+
+
+# Thicket operator to delete the active object, and the template if users is 0
+class THICKET_OT_delete_plant(Operator):
+    bl_idname = "thicket.delete_plant"
+    bl_label = "Delete Plant"
+    bl_description = "Delete the active plant and remove the template if there are no instances remaining"
+    bl_options = {'REGISTER', 'INTERNAL'}
+
+    def execute(self, context):
+        instance = context.active_object
+        if not is_thicket_instance(instance):
+            logging.error("Failed to delete non-Thicket object: %" % instance.name)
+            return
+        delete_plant(instance)
+        context.area.tag_redraw()
+        return {'FINISHED'}
+
+
+# Thicket Object Properties Panel
+# TODO: We should be able to reuse the code from the ImportHelper here
+#       We may need to refactor first
+class THICKET_PT_object_properties(Panel):
+    # bl_idname = self.type
+    bl_label = "Thicket Plant Properties"
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_category = "Thicket"
+
+    # TODO: base class? ThicketObjectOperator
+    @classmethod
+    def poll(self, context):
+        return is_thicket_instance(context.active_object)
+
+    def draw(self, context):
+        instance = context.active_object
+        layout = self.layout
+        template = instance.instance_collection
+        tp = template.thicket_shadow
+        num_siblings = len(template.users_dupli_group)
+
+        layout.operator("thicket.delete_plant", icon="NONE")
+
+        # TODO: make this an operator to select a different plan
+        layout.template_icon(icon_value=get_preview(tp.name, tp.model).icon_id, scale=10)
+
+        for key in tp.keys():
+            if key in ["magic", "filepath"]:
+                continue
+            if key == "name":
+                r = layout.row()
+                r.alignment = 'EXPAND'
+                c = r.column()
+                c.alignment = 'EXPAND'
+                c.label(text=tp.name)
+                c = r.column()
+                c.alignment = 'RIGHT'
+                c.operator("thicket.make_unique", icon="NONE", text="%d" % num_siblings)
+                c.enabled = num_siblings > 1
+            else:
+                layout.prop(tp, key)
+
+        changed = tp != template.thicket
+        r = layout.row()
+        r.enabled = changed
+        r.operator("thicket.reset_plant", icon="NONE")
+        r = layout.row()
+        r.enabled = changed
+        r.operator("thicket.update_object", icon="NONE")
 
 
 # Update Database Operator (called from AddonPreferences)
@@ -359,7 +590,15 @@ def register():
     bpy.utils.register_class(THICKET_Pref)
     bpy.utils.register_class(THICKET_OT_rebuild_db)
     bpy.utils.register_class(THICKET_OT_add_plant_db)
+    bpy.utils.register_class(THICKET_OT_reset_object)
+    bpy.utils.register_class(THICKET_OT_update_object)
+    bpy.utils.register_class(THICKET_OT_delete_plant)
+    bpy.utils.register_class(THICKET_OT_make_unique)
     bpy.types.TOPBAR_MT_file_import.append(menu_import_lbw)
+    bpy.utils.register_class(ThicketPropGroup)
+    bpy.utils.register_class(THICKET_PT_object_properties)
+    bpy.types.Collection.thicket = bpy.props.PointerProperty(type=ThicketPropGroup)
+    bpy.types.Collection.thicket_shadow = bpy.props.PointerProperty(type=ThicketPropGroup)
 
     # Create the database path if it does not exist
     if not db_path.exists():
@@ -396,8 +635,14 @@ def unregister():
     bpy.utils.unregister_class(THICKET_IO_import_lbw)
     bpy.utils.unregister_class(THICKET_Pref)
     bpy.utils.unregister_class(THICKET_OT_rebuild_db)
+    bpy.utils.unregister_class(THICKET_OT_reset_object)
+    bpy.utils.unregister_class(THICKET_OT_update_object)
+    bpy.utils.unregister_class(THICKET_OT_delete_plant)
+    bpy.utils.unregister_class(THICKET_OT_make_unique)
     bpy.utils.unregister_class(THICKET_OT_add_plant_db)
     bpy.types.TOPBAR_MT_file_import.remove(menu_import_lbw)
+    bpy.utils.unregister_class(ThicketPropGroup)
+    bpy.utils.unregister_class(THICKET_PT_object_properties)
     bpy.utils.previews.remove(previews)
 
 
