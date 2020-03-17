@@ -165,11 +165,17 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, model_season=None, proxy_color=None):
         # Enable leaf clipping in Eevee
         mat.blend_method = 'CLIP'
         # TODO: mat.transparent_shadow_method = 'CLIP' ?
-        if alpha_path == img_path:
-            links.new(node_img.outputs['Alpha'], node_dif.inputs['Alpha'])
-        else:
-            # TODO: This affects 'Fagus sylvatica'
-            logging.warning("Alpha Texture differs from diffuse image path. Not supported.")
+
+        # All tested models either use the diffuse map for alpha or list a
+        # different texture for alpha in error (wrong diffuse map as opposed a
+        # separate alpha map). Ignore the difference if it exists, assume alpha
+        # comes from diffuse, and issue a warning when the difference appears.
+        links.new(node_img.outputs['Alpha'], node_dif.inputs['Alpha'])
+        if alpha_path != img_path:
+            # NOTE: This affects at least 'Howea forsteriana'
+            logging.warning("Alpha Texture differs from diffuse image path:")
+            logging.warning("Alpha Texture: %s" % plantmat.alpha_texture)
+            logging.warning("Diffuse Texture: %s" % plantmat.get_front().diffuse_texture)
 
     # Subsurface Texture
     logging.debug("Subsurface Color: %s" % str(plantmat.subsurface_color))
