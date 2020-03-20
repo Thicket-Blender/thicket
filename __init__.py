@@ -62,6 +62,50 @@ db = None
 db_path = Path(bpy.utils.user_resource('SCRIPTS', "addons", True)) / __name__ / "thicket.db"
 plants_path = None
 sdk_path = None
+previews = None
+
+
+# Add thumbnails to previews
+def populate_previews():
+    global db, previews
+
+    if previews:
+        bpy.utils.previews.remove(previews)
+    previews = bpy.utils.previews.new()
+
+    t0 = time.time()
+
+    thicket_path = Path(bpy.utils.user_resource('SCRIPTS', 'addons', True)) / __name__
+    missing_path = thicket_path / "doc" / "missing_preview.png"
+    previews.load("missing_preview", str(missing_path), 'IMAGE')
+
+    for (filename, plant) in db.db["plants"].items():
+        # Load the top plant (no model) preview
+        plant_preview_key = plant["name"].replace(' ', '_').replace('.', '')
+        preview_path = plant["preview"]
+        if preview_path != "" and Path(preview_path).is_file():
+            previews.load(plant_preview_key, preview_path, 'IMAGE')
+
+        # Load the previews for each model of the plant
+        for model in plant["models"].keys():
+            preview_key = plant_preview_key + "_" + model
+            preview_path = plant["models"][model]["preview"]
+            if preview_path != "" and Path(preview_path).is_file():
+                previews.load(preview_key, preview_path, 'IMAGE')
+
+    logging.info("Added %d previews in %0.2fs" % (len(previews), time.time()-t0))
+
+
+def get_preview(plant_name, model):
+    preview_key = plant_name.replace(' ', '_').replace('.', '') + "_" + model
+    if preview_key not in previews:
+        # The model specific preview was not found, try the plant preview
+        logging.warning("Preview key %s not found" % preview_key)
+        preview_key = plant_name.replace(' ', '_').replace('.', '')
+    if preview_key not in previews:
+        logging.warning("Preview key %s not found" % preview_key)
+        preview_key = "missing_preview"
+    return previews[preview_key]
 
 
 # Update Database Operator (called from AddonPreferences)
@@ -81,6 +125,7 @@ class THICKET_OT_rebuild_db(Operator):
         db.build(str(plants_path), str(sdk_path))
         logging.info("Rebuilt database in %0.2fs" % (time.time()-t0))
         self.report({'INFO'}, "thicket: Added %d plants to database" % db.plant_count())
+        populate_previews()
 
     def invoke(self, context, event):
         return context.window_manager.invoke_confirm(self, event)
@@ -107,6 +152,7 @@ class THICKET_OT_add_plant_db(Operator):
         db.save()
         self.report({'INFO'}, "%s: Added %s to database in %0.2fs" %
                     (__name__, db.get_plant(self.filepath)["name"], time.time()-t0))
+        populate_previews()
 
     def invoke(self, context, event):
         return context.window_manager.invoke_confirm(self, event)
@@ -121,11 +167,15 @@ class THICKET_OT_add_plant_db(Operator):
 class THICKET_Pref(AddonPreferences):
     bl_idname = __name__
 
+    def lbw_path_on_update(self, context):
+        populate_previews()
+
     lbw_path: StringProperty(
         name="Install Path",
         subtype="DIR_PATH",
         description="absolute path to Laubwerk installation containing Plants and Python folders",
-        default=""
+        default="",
+        update=lbw_path_on_update
         )
 
     def draw(self, context):
@@ -259,24 +309,8 @@ class THICKET_IO_import_lbw(bpy.types.Operator, ImportHelper):
             self.model_season = THICKET_IO_import_lbw.plant["models"][self.model_id]["default_qualifier"]
 
         # Create the UI entries.
-        preview_key = THICKET_IO_import_lbw.plant["name"].replace(' ', '_').replace('.', '') + "_" + self.model_id
-        if preview_key not in previews:
-            # Attempt to add the model specific preview if it is not already loaded
-            preview_path = THICKET_IO_import_lbw.plant["models"][self.model_id]["preview"]
-            if preview_path != "" and Path(preview_path).is_file():
-                previews.load(preview_key, preview_path, 'IMAGE')
-        if preview_key not in previews:
-            # The model specific preview was not found, try the plant preview
-            logging.warning("Preview key %s not found" % preview_key)
-            preview_key = THICKET_IO_import_lbw.plant["name"].replace(' ', '_').replace('.', '')
-        if preview_key not in previews:
-            preview_path = THICKET_IO_import_lbw.plant["preview"]
-            if preview_path != "" and Path(preview_path).is_file():
-                previews.load(preview_key, preview_path, 'IMAGE')
-        if preview_key not in previews:
-            logging.warning("Preview key %s not found" % preview_key)
-            preview_key = "missing_preview"
-        layout.template_icon(icon_value=previews[preview_key].icon_id, scale=10)
+        plant_name = THICKET_IO_import_lbw.plant["name"]
+        layout.template_icon(icon_value=get_preview(plant_name, self.model_id).icon_id, scale=10)
 
         layout.label(text="%s" % db.get_label(THICKET_IO_import_lbw.plant["name"]))
         layout.label(text="(%s)" % THICKET_IO_import_lbw.plant["name"])
@@ -338,10 +372,6 @@ def register():
         plants_path = Path(lbw_path) / "Plants"
         sdk_path = Path(lbw_path) / "Python"
 
-    previews = bpy.utils.previews.new()
-    missing_path = Path(bpy.utils.user_resource('SCRIPTS', "addons", True)) / __name__ / "doc" / "missing_preview.png"
-    previews.load("missing_preview", str(missing_path), 'IMAGE')
-
     # Dynamically add the sdk_path to the sys.path
     if not sdk_path or not sdk_path.is_dir():
         logging.info("Please configure Laubwerk Install Path in Addon Preferences")
@@ -356,6 +386,7 @@ def register():
     except FileNotFoundError:
         logging.warning("Database not found, creating empty database")
         db = ThicketDB(db_path, locale, bpy.app.binary_path_python, True)
+    populate_previews()
     logging.info("Ready")
 
 
