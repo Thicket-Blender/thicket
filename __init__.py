@@ -191,39 +191,38 @@ class ThicketPropGroup(PropertyGroup):
 
 
 # Thicket operator to copy the model properties to the modified shadow copy
-class THICKET_OT_reset_object(Operator):
-    bl_idname = "thicket.reset_object"
+class THICKET_OT_reset_plant(Operator):
+    bl_idname = "thicket.reset_plant"
     bl_label = "Reset Plant"
     bl_description = "Restore the UI properties to the model properties"
     bl_options = {'REGISTER', 'INTERNAL'}
 
-    def reset_props(self, context):
-        o = context.active_object
-        t = o.instance_collection
-        t.thicket.copy_to(t.thicket_shadow)
-
     def execute(self, context):
         instance = context.active_object
         if not is_thicket_instance(instance):
-            logging.error("reset_object failed: non-Thicket object: %" % instance.name)
+            logging.error("reset_plant failed: non-Thicket object: %" % instance.name)
             return
-        self.reset_props(context)
+        template = instance.instance_collection
+        template.thicket.copy_to(template.thicket_shadow)
         context.area.tag_redraw()
         return {'FINISHED'}
 
 
 # Thicket operator to modify (delete and replace) the backing objects
-class THICKET_OT_update_object(Operator):
-    bl_idname = "thicket.update_object"
+class THICKET_OT_update_plant(Operator):
+    bl_idname = "thicket.update_plant"
     bl_label = "Update Plant"
     bl_description = "Update plant with new properties"
     bl_options = {'REGISTER', 'INTERNAL'}
 
-    def update_object(self, context):
+    def execute(self, context):
         instance = context.active_object
-        logging.info("Update object: %s" % instance.name)
+        if not is_thicket_instance(instance):
+            logging.error("update_plant failed: non-Thicket object: %" % instance.name)
+            return
+        instance = context.active_object
+        logging.info("Update plant: %s" % instance.name)
         template = instance.instance_collection
-        logging.info("instance collection: %s" % template.name)
 
         # Load new plant model
         from .thicket_import import LBWImportDialog
@@ -246,8 +245,6 @@ class THICKET_OT_update_object(Operator):
         instance.select_set(True)
         bpy.context.view_layer.objects.active = instance
 
-    def execute(self, context):
-        self.update_object(context)
         context.area.tag_redraw()
         return {'FINISHED'}
 
@@ -279,7 +276,7 @@ class THICKET_OT_delete_plant(Operator):
     def execute(self, context):
         instance = context.active_object
         if not is_thicket_instance(instance):
-            logging.error("Failed to delete non-Thicket object: %" % instance.name)
+            logging.error("delete_plant failed: non-Thicket object: %" % instance.name)
             return
         delete_plant(instance)
         context.area.tag_redraw()
@@ -289,14 +286,13 @@ class THICKET_OT_delete_plant(Operator):
 # Thicket Object Properties Panel
 # TODO: We should be able to reuse the code from the ImportHelper here
 #       We may need to refactor first
-class THICKET_PT_object_properties(Panel):
+class THICKET_PT_plant_properties(Panel):
     # bl_idname = self.type
     bl_label = "Thicket Plant Properties"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
     bl_category = "Thicket"
 
-    # TODO: base class? ThicketObjectOperator
     @classmethod
     def poll(self, context):
         return is_thicket_instance(context.active_object)
@@ -335,7 +331,7 @@ class THICKET_PT_object_properties(Panel):
         r.operator("thicket.reset_plant", icon="NONE")
         r = layout.row()
         r.enabled = changed
-        r.operator("thicket.update_object", icon="NONE")
+        r.operator("thicket.update_plant", icon="NONE")
 
 
 # Update Database Operator (called from AddonPreferences)
@@ -345,7 +341,10 @@ class THICKET_OT_rebuild_db(Operator):
     bl_description = "Process Laubwerk Plants library and update the database (may take several minutes)"
     bl_options = {'REGISTER', 'INTERNAL'}
 
-    def rebuild_db(self, context):
+    def invoke(self, context, event):
+        return context.window_manager.invoke_confirm(self, event)
+
+    def execute(self, context):
         global db, db_path, plants_path, sdk_path
         logging.info("Rebuilding database, this may take several minutes...")
         logging.info("Plants Library: %s" % plants_path)
@@ -356,12 +355,6 @@ class THICKET_OT_rebuild_db(Operator):
         logging.info("Rebuilt database in %0.2fs" % (time.time()-t0))
         self.report({'INFO'}, "thicket: Added %d plants to database" % db.plant_count())
         populate_previews()
-
-    def invoke(self, context, event):
-        return context.window_manager.invoke_confirm(self, event)
-
-    def execute(self, context):
-        self.rebuild_db(context)
         context.area.tag_redraw()
         return {'FINISHED'}
 
@@ -375,7 +368,10 @@ class THICKET_OT_add_plant_db(Operator):
 
     filepath: bpy.props.StringProperty(subtype="FILE_PATH")
 
-    def add_plant_db(self):
+    def invoke(self, context, event):
+        return context.window_manager.invoke_confirm(self, event)
+
+    def execute(self, context):
         global db, sdk_path
         t0 = time.time()
         db.add_plant(self.filepath)
@@ -383,12 +379,6 @@ class THICKET_OT_add_plant_db(Operator):
         self.report({'INFO'}, "%s: Added %s to database in %0.2fs" %
                     (__name__, db.get_plant(self.filepath)["name"], time.time()-t0))
         populate_previews()
-
-    def invoke(self, context, event):
-        return context.window_manager.invoke_confirm(self, event)
-
-    def execute(self, context):
-        self.add_plant_db()
         context.area.tag_redraw()
         return {'FINISHED'}
 
@@ -587,13 +577,13 @@ def register():
     bpy.utils.register_class(THICKET_Pref)
     bpy.utils.register_class(THICKET_OT_rebuild_db)
     bpy.utils.register_class(THICKET_OT_add_plant_db)
-    bpy.utils.register_class(THICKET_OT_reset_object)
-    bpy.utils.register_class(THICKET_OT_update_object)
+    bpy.utils.register_class(THICKET_OT_reset_plant)
+    bpy.utils.register_class(THICKET_OT_update_plant)
     bpy.utils.register_class(THICKET_OT_delete_plant)
     bpy.utils.register_class(THICKET_OT_make_unique)
     bpy.types.TOPBAR_MT_file_import.append(menu_import_lbw)
     bpy.utils.register_class(ThicketPropGroup)
-    bpy.utils.register_class(THICKET_PT_object_properties)
+    bpy.utils.register_class(THICKET_PT_plant_properties)
     bpy.types.Collection.thicket = bpy.props.PointerProperty(type=ThicketPropGroup)
     bpy.types.Collection.thicket_shadow = bpy.props.PointerProperty(type=ThicketPropGroup)
 
@@ -632,14 +622,14 @@ def unregister():
     bpy.utils.unregister_class(THICKET_IO_import_lbw)
     bpy.utils.unregister_class(THICKET_Pref)
     bpy.utils.unregister_class(THICKET_OT_rebuild_db)
-    bpy.utils.unregister_class(THICKET_OT_reset_object)
-    bpy.utils.unregister_class(THICKET_OT_update_object)
+    bpy.utils.unregister_class(THICKET_OT_reset_plant)
+    bpy.utils.unregister_class(THICKET_OT_update_plant)
     bpy.utils.unregister_class(THICKET_OT_delete_plant)
     bpy.utils.unregister_class(THICKET_OT_make_unique)
     bpy.utils.unregister_class(THICKET_OT_add_plant_db)
     bpy.types.TOPBAR_MT_file_import.remove(menu_import_lbw)
     bpy.utils.unregister_class(ThicketPropGroup)
-    bpy.utils.unregister_class(THICKET_PT_object_properties)
+    bpy.utils.unregister_class(THICKET_PT_plant_properties)
     bpy.utils.previews.remove(previews)
 
 
