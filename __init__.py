@@ -135,8 +135,8 @@ class ThicketPropGroup(PropertyGroup):
         keywords = dict(self)
         for key in ignore:
             keywords.pop(key, None)
-        # Use the Enum string (not the integer) for qualifier
-        # TODO: see about doing this for model as well throughout
+        # Use the Enum string (not the blender internal integer)
+        keywords["model"] = self.model
         keywords["qualifier"] = self.qualifier
         keywords["viewport_lod"] = self.viewport_lod
         return keywords
@@ -151,8 +151,7 @@ class ThicketPropGroup(PropertyGroup):
         plant = db.get_plant(tp.filepath)
         items = []
         for model in plant["models"].keys():
-            index = plant["models"][model]["index"]
-            items.append((model, db.get_label(model), "", index))
+            items.append((model, db.get_label(model), ""))
         return items
 
     def qualifier_callback(self, context):
@@ -164,7 +163,7 @@ class ThicketPropGroup(PropertyGroup):
         tp = o.instance_collection.thicket
         plant = db.get_plant(tp.filepath)
         items = []
-        for qualifier in plant["models"][tp.model_id]["qualifiers"]:
+        for qualifier in plant["models"][tp.model]["qualifiers"]:
             items.append((qualifier, db.get_label(qualifier), ""))
         return items
 
@@ -174,7 +173,7 @@ class ThicketPropGroup(PropertyGroup):
 
     # The list of models and qualifiers is plant specific, so we cannot encode it
     # in the generic property group unfortunately.
-    model_id: EnumProperty(items=model_callback, name="Model")
+    model: EnumProperty(items=model_callback, name="Model")
     qualifier: EnumProperty(items=qualifier_callback, name="Season")
     viewport_lod: EnumProperty(name="Detail", items=[("proxy", "Very Low (Convex Hull)", ""),
                                                      ("low", "Low (Realistic)", "")])
@@ -476,28 +475,26 @@ class THICKET_IO_import_lbw(bpy.types.Operator, ImportHelper):
     # Class variable
     plant = None
 
-    def model_id_callback(self, context):
+    def model_name_callback(self, context):
         global db
         items = []
         for model in THICKET_IO_import_lbw.plant["models"].keys():
-            index = THICKET_IO_import_lbw.plant["models"][model]["index"]
-            items.append((model, db.get_label(model), "", index))
+            items.append((model, db.get_label(model), ""))
         return items
 
     def model_qualifier_callback(self, context):
         global db
         items = []
-        for qualifier in THICKET_IO_import_lbw.plant["models"][self.model_id]["qualifiers"]:
+        for qualifier in THICKET_IO_import_lbw.plant["models"][self.model]["qualifiers"]:
             items.append((qualifier, db.get_label(qualifier), ""))
         return items
 
-    model_id: EnumProperty(items=model_id_callback, name="Model")
+    model: EnumProperty(items=model_name_callback, name="Model")
     qualifier: EnumProperty(items=model_qualifier_callback, name="Season")
 
     def execute(self, context):
         from .thicket_import import LBWImportDialog
         keywords = self.as_keywords(ignore=("filter_glob", "oldpath"))
-        keywords["model_id"] = self.properties["model_id"]
         return LBWImportDialog.load(self, context, **keywords)  # noqa: F821
 
     def invoke(self, context, event):
@@ -527,7 +524,7 @@ class THICKET_IO_import_lbw(bpy.types.Operator, ImportHelper):
             layout.label(text="You may add this plant individually.")
             op = layout.operator("thicket.add_plant_db", icon="IMPORT")
             op.filepath = self.filepath
-            # Because this plant was not in the database, the model_id and
+            # Because this plant was not in the database, the model and
             # qualifier properties are empty. We need to force reloading them
             # after it is added to the DB. Force this by setting oldpath to the
             # empty string, which will trigger draw() to treat this as a new
@@ -536,16 +533,16 @@ class THICKET_IO_import_lbw(bpy.types.Operator, ImportHelper):
             return
 
         if new_file:
-            self.model_id = THICKET_IO_import_lbw.plant["default_model"]
-            self.qualifier = THICKET_IO_import_lbw.plant["models"][self.model_id]["default_qualifier"]
+            self.model = THICKET_IO_import_lbw.plant["default_model"]
+            self.qualifier = THICKET_IO_import_lbw.plant["models"][self.model]["default_qualifier"]
 
         # Create the UI entries.
         plant_name = THICKET_IO_import_lbw.plant["name"]
-        layout.template_icon(icon_value=get_preview(plant_name, self.model_id).icon_id, scale=10)
+        layout.template_icon(icon_value=get_preview(plant_name, self.model).icon_id, scale=10)
 
         layout.label(text="%s" % db.get_label(THICKET_IO_import_lbw.plant["name"]))
         layout.label(text="(%s)" % THICKET_IO_import_lbw.plant["name"])
-        layout.prop(self, "model_id")
+        layout.prop(self, "model")
         layout.prop(self, "qualifier")
 
         box = layout.box()

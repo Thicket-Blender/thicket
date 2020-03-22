@@ -238,7 +238,7 @@ class LBWImportDialog(bpy.types.Operator):
     def invoke(self, context, event):
         return context.window_manager.invoke_props_dialog(self)
 
-    def load(self, context, filepath, leaf_density, model_id, qualifier, viewport_lod,
+    def load(self, context, filepath, leaf_density, model, qualifier, viewport_lod,
              lod_min_thick, lod_max_level, lod_subdiv, leaf_amount):
         """
         Called by the user interface or another script.
@@ -247,20 +247,23 @@ class LBWImportDialog(bpy.types.Operator):
         time_main = time.time()
         plant = laubwerk.load(filepath)
         logging.info('Importing "%s"' % plant.name)
-        model = plant.models[model_id]
+        lbw_model = next((m for m in plant.models if m.name == model), plant.default_model)
+        if not lbw_model.name == model:
+            logging.warning("Model '%s' not found for '%s', using default model '%s'" %
+                            (model, plant.name, lbw_model.name))
         proxy = False
 
         # Create the viewport object (low detail)
         time_local = time.time()
         if viewport_lod == 'low':
             # TODO: remove qualifierName once the Laubwerk SDK implements the # qualifier keyword
-            mesh_lbw = model.get_mesh(qualifier=qualifier, qualifierName=qualifier,
-                                      max_branch_level=3, min_thickness=0.6,
-                                      leaf_amount=leaf_amount / 100.0, leaf_density=0.3 * (leaf_density / 100.0),
-                                      max_subdiv_level=0)
+            mesh_lbw = lbw_model.get_mesh(qualifier=qualifier, qualifierName=qualifier,
+                                          max_branch_level=3, min_thickness=0.6,
+                                          leaf_amount=leaf_amount / 100.0, leaf_density=0.3 * (leaf_density / 100.0),
+                                          max_subdiv_level=0)
         else:
             proxy = True
-            mesh_lbw = model.get_proxy()
+            mesh_lbw = lbw_model.get_proxy()
             if viewport_lod != 'proxy':
                 logging.warn("Unknown viewport_lod: %s" % viewport_lod)
 
@@ -272,10 +275,10 @@ class LBWImportDialog(bpy.types.Operator):
         # Create the render object (high detail)
         time_local = time.time()
         # TODO: remove qualifierName once the Laubwerk SDK implements the # qualifier keyword
-        mesh_lbw = model.get_mesh(qualifier=qualifier, qualifierName=qualifier,
-                                  max_branch_level=lod_max_level, min_thickness=lod_min_thick,
-                                  leaf_amount=leaf_amount / 100.0, leaf_density=leaf_density / 100.0,
-                                  max_subdiv_level=lod_subdiv)
+        mesh_lbw = lbw_model.get_mesh(qualifier=qualifier, qualifierName=qualifier,
+                                      max_branch_level=lod_max_level, min_thickness=lod_min_thick,
+                                      leaf_amount=leaf_amount / 100.0, leaf_density=leaf_density / 100.0,
+                                      max_subdiv_level=lod_subdiv)
         obj_render = lbw_to_bl_obj(plant, plant.name + " (render)", mesh_lbw, qualifier, False)
         obj_render.parent = obj_viewport
         obj_render.hide_viewport = True
@@ -308,7 +311,7 @@ class LBWImportDialog(bpy.types.Operator):
         plant_col.thicket.magic = THICKET_GUID
         plant_col.thicket.name = plant.name
         plant_col.thicket.filepath = filepath
-        plant_col.thicket.model_id = model.name
+        plant_col.thicket.model = lbw_model.name
         plant_col.thicket.qualifier = qualifier
         plant_col.thicket.viewport_lod = viewport_lod
         plant_col.thicket.lod_subdiv = lod_subdiv
