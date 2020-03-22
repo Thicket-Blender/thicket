@@ -135,9 +135,9 @@ class ThicketPropGroup(PropertyGroup):
         keywords = dict(self)
         for key in ignore:
             keywords.pop(key, None)
-        # Use the Enum string (not the integer) for model_season
+        # Use the Enum string (not the integer) for qualifier
         # TODO: see about doing this for model as well throughout
-        keywords["model_season"] = self.model_season
+        keywords["qualifier"] = self.qualifier
         keywords["viewport_lod"] = self.viewport_lod
         return keywords
 
@@ -155,7 +155,7 @@ class ThicketPropGroup(PropertyGroup):
             items.append((model, db.get_label(model), "", index))
         return items
 
-    def season_callback(self, context):
+    def qualifier_callback(self, context):
         global db
         # TODO: should this be active_object?
         o = context.object
@@ -172,10 +172,10 @@ class ThicketPropGroup(PropertyGroup):
     name: bpy.props.StringProperty()
     filepath: bpy.props.StringProperty()
 
-    # The list of models and seasons is plant specific, so we cannot encode it
+    # The list of models and qualifiers is plant specific, so we cannot encode it
     # in the generic property group unfortunately.
     model_id: EnumProperty(items=model_callback, name="Model")
-    model_season: EnumProperty(items=season_callback, name="Season")
+    qualifier: EnumProperty(items=qualifier_callback, name="Season")
     viewport_lod: EnumProperty(name="Detail", items=[("proxy", "Very Low (Convex Hull)", ""),
                                                      ("low", "Low (Realistic)", "")])
     lod_subdiv: IntProperty(name="Subdivision", description="How round the trunk and branches appear",
@@ -484,7 +484,7 @@ class THICKET_IO_import_lbw(bpy.types.Operator, ImportHelper):
             items.append((model, db.get_label(model), "", index))
         return items
 
-    def model_season_callback(self, context):
+    def model_qualifier_callback(self, context):
         global db
         items = []
         for qualifier in THICKET_IO_import_lbw.plant["models"][self.model_id]["qualifiers"]:
@@ -492,7 +492,7 @@ class THICKET_IO_import_lbw(bpy.types.Operator, ImportHelper):
         return items
 
     model_id: EnumProperty(items=model_id_callback, name="Model")
-    model_season: EnumProperty(items=model_season_callback, name="Season")
+    qualifier: EnumProperty(items=model_qualifier_callback, name="Season")
 
     def execute(self, context):
         from .thicket_import import LBWImportDialog
@@ -528,7 +528,7 @@ class THICKET_IO_import_lbw(bpy.types.Operator, ImportHelper):
             op = layout.operator("thicket.add_plant_db", icon="IMPORT")
             op.filepath = self.filepath
             # Because this plant was not in the database, the model_id and
-            # model_season properties are empty. We need to force reloading them
+            # qualifier properties are empty. We need to force reloading them
             # after it is added to the DB. Force this by setting oldpath to the
             # empty string, which will trigger draw() to treat this as a new
             # file.
@@ -537,7 +537,7 @@ class THICKET_IO_import_lbw(bpy.types.Operator, ImportHelper):
 
         if new_file:
             self.model_id = THICKET_IO_import_lbw.plant["default_model"]
-            self.model_season = THICKET_IO_import_lbw.plant["models"][self.model_id]["default_qualifier"]
+            self.qualifier = THICKET_IO_import_lbw.plant["models"][self.model_id]["default_qualifier"]
 
         # Create the UI entries.
         plant_name = THICKET_IO_import_lbw.plant["name"]
@@ -546,7 +546,7 @@ class THICKET_IO_import_lbw(bpy.types.Operator, ImportHelper):
         layout.label(text="%s" % db.get_label(THICKET_IO_import_lbw.plant["name"]))
         layout.label(text="(%s)" % THICKET_IO_import_lbw.plant["name"])
         layout.prop(self, "model_id")
-        layout.prop(self, "model_season")
+        layout.prop(self, "qualifier")
 
         box = layout.box()
         box.label(text="Viewport Model")

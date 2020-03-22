@@ -48,7 +48,7 @@ def new_collection(name, parent=bpy.context.scene.collection, singleton=False, e
     return col
 
 
-def lbw_to_bl_obj(plant, name, mesh_lbw, model_season, proxy):
+def lbw_to_bl_obj(plant, name, mesh_lbw, qualifier, proxy):
     """ Generate the Blender Object from the Laubwerk mesh and materials """
 
     verts_list = []
@@ -111,7 +111,7 @@ def lbw_to_bl_obj(plant, name, mesh_lbw, model_season, proxy):
             materials.append(mat_id)
             mat = bpy.data.materials.get(mat_name)
             if mat is None:
-                mat = lbw_to_bl_mat(plant, mat_id, mat_name, model_season, proxy_color)
+                mat = lbw_to_bl_mat(plant, mat_id, mat_name, qualifier, proxy_color)
             obj.data.materials.append(mat)
 
         mat_index = obj.data.materials.find(mat_name)
@@ -125,7 +125,7 @@ def lbw_to_bl_obj(plant, name, mesh_lbw, model_season, proxy):
     return obj
 
 
-def lbw_to_bl_mat(plant, mat_id, mat_name, model_season=None, proxy_color=None):
+def lbw_to_bl_mat(plant, mat_id, mat_name, qualifier=None, proxy_color=None):
     NW = 300
     NH = 300
 
@@ -238,7 +238,7 @@ class LBWImportDialog(bpy.types.Operator):
     def invoke(self, context, event):
         return context.window_manager.invoke_props_dialog(self)
 
-    def load(self, context, filepath, leaf_density, model_id, model_season, viewport_lod,
+    def load(self, context, filepath, leaf_density, model_id, qualifier, viewport_lod,
              lod_min_thick, lod_max_level, lod_subdiv, leaf_amount):
         """
         Called by the user interface or another script.
@@ -253,7 +253,9 @@ class LBWImportDialog(bpy.types.Operator):
         # Create the viewport object (low detail)
         time_local = time.time()
         if viewport_lod == 'low':
-            mesh_lbw = model.get_mesh(qualifier_name=model_season, max_branch_level=3, min_thickness=0.6,
+            # TODO: remove qualifierName once the Laubwerk SDK implements the # qualifier keyword
+            mesh_lbw = model.get_mesh(qualifier=qualifier, qualifierName=qualifier,
+                                      max_branch_level=3, min_thickness=0.6,
                                       leaf_amount=leaf_amount / 100.0, leaf_density=0.3 * (leaf_density / 100.0),
                                       max_subdiv_level=0)
         else:
@@ -262,17 +264,19 @@ class LBWImportDialog(bpy.types.Operator):
             if viewport_lod != 'proxy':
                 logging.warn("Unknown viewport_lod: %s" % viewport_lod)
 
-        obj_viewport = lbw_to_bl_obj(plant, plant.name, mesh_lbw, model_season, proxy)
+        obj_viewport = lbw_to_bl_obj(plant, plant.name, mesh_lbw, qualifier, proxy)
         obj_viewport.hide_render = True
         obj_viewport.show_name = True
         logging.info("Generated low resolution viewport object in %.4fs" % (time.time() - time_local))
 
         # Create the render object (high detail)
         time_local = time.time()
-        mesh_lbw = model.get_mesh(qualifier_name=model_season, max_branch_level=lod_max_level,
-                                  min_thickness=lod_min_thick, leaf_amount=leaf_amount / 100.0,
-                                  leaf_density=leaf_density / 100.0, max_subdiv_level=lod_subdiv)
-        obj_render = lbw_to_bl_obj(plant, plant.name + " (render)", mesh_lbw, model_season, False)
+        # TODO: remove qualifierName once the Laubwerk SDK implements the # qualifier keyword
+        mesh_lbw = model.get_mesh(qualifier=qualifier, qualifierName=qualifier,
+                                  max_branch_level=lod_max_level, min_thickness=lod_min_thick,
+                                  leaf_amount=leaf_amount / 100.0, leaf_density=leaf_density / 100.0,
+                                  max_subdiv_level=lod_subdiv)
+        obj_render = lbw_to_bl_obj(plant, plant.name + " (render)", mesh_lbw, qualifier, False)
         obj_render.parent = obj_viewport
         obj_render.hide_viewport = True
         obj_render.hide_select = True
