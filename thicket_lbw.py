@@ -1,4 +1,4 @@
-# Blender import plugin for Lauawberk plant models
+# Thicket calls depending on the Laubwerk SDK
 #
 # SPDX-License-Identifier: GPL-2.0-or-later
 #
@@ -21,14 +21,7 @@
 
 # <pep8 compliant>
 
-"""
-This script imports a Laubwerk plant lbw.gz files to Blender.
 
-Usage:
-Run this script from "File->Import" menu and then load the desired Laubwerk file.
-Note, This loads mesh objects and materials.
-
-"""
 import logging
 import time
 import bpy
@@ -224,102 +217,84 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, qualifier=None, proxy_color=None):
     return mat
 
 
-class LBWImportDialog(bpy.types.Operator):
-    """ This will be the Laubwerk Player window for browsing and importing trees from the library."""
-    bl_idname = "object.lbw_import_dialog"
-    bl_label = "Laubwerk Plant Player"
+def import_lbw(filepath, leaf_density, model, qualifier, viewport_lod,
+               lod_min_thick, lod_max_level, lod_subdiv, leaf_amount):
+    time_main = time.time()
+    plant = laubwerk.load(filepath)
+    logging.info('Importing "%s"' % plant.name)
+    lbw_model = next((m for m in plant.models if m.name == model), plant.default_model)
+    if not lbw_model.name == model:
+        logging.warning("Model '%s' not found for '%s', using default model '%s'" %
+                        (model, plant.name, lbw_model.name))
+    proxy = False
 
-    def execute(self, context):
-        return {'FINISHED'}
-
-    def draw(self, context):
-        pass
-
-    def invoke(self, context, event):
-        return context.window_manager.invoke_props_dialog(self)
-
-    def load(self, context, filepath, leaf_density, model, qualifier, viewport_lod,
-             lod_min_thick, lod_max_level, lod_subdiv, leaf_amount):
-        """
-        Called by the user interface or another script.
-        """
-
-        time_main = time.time()
-        plant = laubwerk.load(filepath)
-        logging.info('Importing "%s"' % plant.name)
-        lbw_model = next((m for m in plant.models if m.name == model), plant.default_model)
-        if not lbw_model.name == model:
-            logging.warning("Model '%s' not found for '%s', using default model '%s'" %
-                            (model, plant.name, lbw_model.name))
-        proxy = False
-
-        # Create the viewport object (low detail)
-        time_local = time.time()
-        if viewport_lod == 'low':
-            # TODO: remove qualifierName once the Laubwerk SDK implements the # qualifier keyword
-            mesh_lbw = lbw_model.get_mesh(qualifier=qualifier, qualifierName=qualifier,
-                                          max_branch_level=3, min_thickness=0.6,
-                                          leaf_amount=leaf_amount / 100.0, leaf_density=0.3 * (leaf_density / 100.0),
-                                          max_subdiv_level=0)
-        else:
-            proxy = True
-            mesh_lbw = lbw_model.get_proxy()
-            if viewport_lod != 'proxy':
-                logging.warn("Unknown viewport_lod: %s" % viewport_lod)
-
-        obj_viewport = lbw_to_bl_obj(plant, plant.name, mesh_lbw, qualifier, proxy)
-        obj_viewport.hide_render = True
-        obj_viewport.show_name = True
-        logging.info("Generated low resolution viewport object in %.4fs" % (time.time() - time_local))
-
-        # Create the render object (high detail)
-        time_local = time.time()
+    # Create the viewport object (low detail)
+    time_local = time.time()
+    if viewport_lod == 'low':
         # TODO: remove qualifierName once the Laubwerk SDK implements the # qualifier keyword
         mesh_lbw = lbw_model.get_mesh(qualifier=qualifier, qualifierName=qualifier,
-                                      max_branch_level=lod_max_level, min_thickness=lod_min_thick,
-                                      leaf_amount=leaf_amount / 100.0, leaf_density=leaf_density / 100.0,
-                                      max_subdiv_level=lod_subdiv)
-        obj_render = lbw_to_bl_obj(plant, plant.name + " (render)", mesh_lbw, qualifier, False)
-        obj_render.parent = obj_viewport
-        obj_render.hide_viewport = True
-        obj_render.hide_select = True
-        logging.info("Generated high resolution render object in %.4fs" % (time.time() - time_local))
+                                      max_branch_level=3, min_thickness=0.6,
+                                      leaf_amount=leaf_amount / 100.0, leaf_density=0.3 * (leaf_density / 100.0),
+                                      max_subdiv_level=0)
+    else:
+        proxy = True
+        mesh_lbw = lbw_model.get_proxy()
+        if viewport_lod != 'proxy':
+            logging.warn("Unknown viewport_lod: %s" % viewport_lod)
 
-        # Setup collection hierarchy
-        thicket_col = new_collection("Thicket", singleton=True, exclude=True)
-        plant_col = new_collection(obj_viewport.name, thicket_col)
+    obj_viewport = lbw_to_bl_obj(plant, plant.name, mesh_lbw, qualifier, proxy)
+    obj_viewport.hide_render = True
+    obj_viewport.show_name = True
+    logging.info("Generated low resolution viewport object in %.4fs" % (time.time() - time_local))
 
-        # Add objects to the plant collection
-        plant_col.objects.link(obj_viewport)
-        plant_col.objects.link(obj_render)
+    # Create the render object (high detail)
+    time_local = time.time()
+    # TODO: remove qualifierName once the Laubwerk SDK implements the # qualifier keyword
+    mesh_lbw = lbw_model.get_mesh(qualifier=qualifier, qualifierName=qualifier,
+                                  max_branch_level=lod_max_level, min_thickness=lod_min_thick,
+                                  leaf_amount=leaf_amount / 100.0, leaf_density=leaf_density / 100.0,
+                                  max_subdiv_level=lod_subdiv)
+    obj_render = lbw_to_bl_obj(plant, plant.name + " (render)", mesh_lbw, qualifier, False)
+    obj_render.parent = obj_viewport
+    obj_render.hide_viewport = True
+    obj_render.hide_select = True
+    logging.info("Generated high resolution render object in %.4fs" % (time.time() - time_local))
 
-        # Create an instance of the plant collection in the active collection
-        obj_inst = bpy.data.objects.new(name=obj_viewport.name, object_data=None)
-        obj_inst.instance_collection = plant_col
-        obj_inst.instance_type = 'COLLECTION'
-        obj_inst.show_name = True
+    # Setup collection hierarchy
+    thicket_col = new_collection("Thicket", singleton=True, exclude=True)
+    plant_col = new_collection(obj_viewport.name, thicket_col)
 
-        context.collection.objects.link(obj_inst)
+    # Add objects to the plant collection
+    plant_col.objects.link(obj_viewport)
+    plant_col.objects.link(obj_render)
 
-        # Make the instance the active selected object
-        for o in bpy.context.selected_objects:
-            o.select_set(False)
-        obj_inst.select_set(True)
-        bpy.context.view_layer.objects.active = obj_inst
+    # Create an instance of the plant collection in the active collection
+    obj_inst = bpy.data.objects.new(name=obj_viewport.name, object_data=None)
+    obj_inst.instance_collection = plant_col
+    obj_inst.instance_type = 'COLLECTION'
+    obj_inst.show_name = True
 
-        # Set Thicket properties on the template plant collection
-        plant_col.thicket.magic = THICKET_GUID
-        plant_col.thicket.name = plant.name
-        plant_col.thicket.filepath = filepath
-        plant_col.thicket.model = lbw_model.name
-        plant_col.thicket.qualifier = qualifier
-        plant_col.thicket.viewport_lod = viewport_lod
-        plant_col.thicket.lod_subdiv = lod_subdiv
-        plant_col.thicket.leaf_density = leaf_density
-        plant_col.thicket.leaf_amount = leaf_amount
-        plant_col.thicket.lod_max_level = lod_max_level
-        plant_col.thicket.lod_min_thick = lod_min_thick
-        plant_col.thicket.copy_to(plant_col.thicket_shadow)
+    bpy.context.collection.objects.link(obj_inst)
 
-        logging.info('Imported "%s" in %.4fs' % (plant.name, time.time() - time_main))
-        return {'FINISHED'}
+    # Make the instance the active selected object
+    for o in bpy.context.selected_objects:
+        o.select_set(False)
+    obj_inst.select_set(True)
+    bpy.context.view_layer.objects.active = obj_inst
+
+    # Set Thicket properties on the template plant collection
+    plant_col.thicket.magic = THICKET_GUID
+    plant_col.thicket.name = plant.name
+    plant_col.thicket.filepath = filepath
+    plant_col.thicket.model = lbw_model.name
+    plant_col.thicket.qualifier = qualifier
+    plant_col.thicket.viewport_lod = viewport_lod
+    plant_col.thicket.lod_subdiv = lod_subdiv
+    plant_col.thicket.leaf_density = leaf_density
+    plant_col.thicket.leaf_amount = leaf_amount
+    plant_col.thicket.lod_max_level = lod_max_level
+    plant_col.thicket.lod_min_thick = lod_min_thick
+    plant_col.thicket.copy_to(plant_col.thicket_shadow)
+
+    logging.info('Imported "%s" in %.4fs' % (plant.name, time.time() - time_main))
+    return obj_inst

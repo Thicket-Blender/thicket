@@ -228,10 +228,9 @@ class THICKET_OT_update_plant(Operator):
         template = instance.instance_collection
 
         # Load new plant model
-        from .thicket_import import LBWImportDialog
+        from .thicket_lbw import import_lbw
         keywords = template.thicket_shadow.as_keywords(ignore=("magic", "name"))
-        LBWImportDialog.load(self, context, **keywords)  # noqa: F821
-        new_instance = context.active_object
+        new_instance = import_lbw(**keywords)  # noqa: F821
         new_template = new_instance.instance_collection
 
         # Update the instance_collection reference in the instances
@@ -507,9 +506,10 @@ class THICKET_IO_import_lbw(bpy.types.Operator, ImportHelper):
     plant = None
 
     def execute(self, context):
-        from .thicket_import import LBWImportDialog
+        from .thicket_lbw import import_lbw
         keywords = self.as_keywords(ignore=("filter_glob", "oldpath"))
-        return LBWImportDialog.load(self, context, **keywords)  # noqa: F821
+        import_lbw(**keywords)  # noqa: F821
+        return {'FINISHED'}
 
     def invoke(self, context, event):
         context.window_manager.fileselect_add(self)
