@@ -142,11 +142,10 @@ class ThicketPropGroup(PropertyGroup):
 
     def model_callback(self, context):
         global db
-        # TODO: should this be active_object?
-        o = context.object
-        if not is_thicket_instance(o):
+        instance = context.active_object
+        if not is_thicket_instance(instance):
             return []
-        tp = o.instance_collection.thicket
+        tp = instance.instance_collection.thicket
         plant = db.get_plant(tp.filepath)
         items = []
         for model in plant["models"].keys():
@@ -155,11 +154,10 @@ class ThicketPropGroup(PropertyGroup):
 
     def qualifier_callback(self, context):
         global db
-        # TODO: should this be active_object?
-        o = context.object
-        if not is_thicket_instance(o):
+        instance = context.active_object
+        if not is_thicket_instance(instance):
             return []
-        tp = o.instance_collection.thicket
+        tp = instance.instance_collection.thicket
         plant = db.get_plant(tp.filepath)
         items = []
         for qualifier in plant["models"][tp.model]["qualifiers"]:
