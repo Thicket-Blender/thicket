@@ -1,4 +1,4 @@
-# Blender import plugin for Lauawberk plant models
+# Thicket: Laubwerk Plants Add-on for Blender
 #
 # SPDX-License-Identifier: GPL-2.0-or-later
 #
@@ -64,7 +64,7 @@ bl_info = {
     "category": "Import"
 }
 
-# A global variable for the plant.
+
 db = None
 db_path = Path(bpy.utils.user_resource('SCRIPTS', "addons", True)) / __name__ / "thicket.db"
 plants_path = None
@@ -167,10 +167,10 @@ class ThicketPropGroup(PropertyGroup):
     magic: bpy.props.StringProperty()
 
     # WARNING: Properties from here to the closing comment for ThicketPropGroup
-    # and ImportLBW must be identical. A common draw routine is used for the
-    # Plant Properties Panel and for the import dialog panel. Class inheritance
-    # would preferable, but this does not appear to be possible with the Blender
-    # Python interface.
+    # and THICKET_IO_import_lbw must be identical. A common draw routine is used
+    # for the Plant Properties Panel and for the import dialog panel. Class
+    # inheritance would preferable, but this does not appear to be possible with
+    # the Blender Python interface.
     filepath: bpy.props.StringProperty(subtype='FILE_PATH')
     model: EnumProperty(items=model_callback, name="Model")
     qualifier: EnumProperty(items=qualifier_callback, name="Season")
@@ -477,10 +477,10 @@ class THICKET_IO_import_lbw(bpy.types.Operator, ImportHelper):
     oldpath: StringProperty(name="Old Path", subtype="FILE_PATH")
 
     # WARNING: Properties from here to the closing comment for ThicketPropGroup
-    # and ImportLBW must be identical. A common draw routine is used for the
-    # Plant Properties Panel and for the import dialog panel. Class inheritance
-    # would preferable, but this does not appear to be possible with the Blender
-    # Python interface.
+    # and THICKET_IO_import_lbw must be identical. A common draw routine is used
+    # for the Plant Properties Panel and for the import dialog panel. Class
+    # inheritance would preferable, but this does not appear to be possible with
+    # the Blender Python interface.
     filepath: StringProperty(name="File Path", subtype="FILE_PATH")
     viewport_lod: EnumProperty(name="Viewport Detail", items=[("proxy", "Proxy", ""),
                                                               ("low", "Partial Geometry", "")])
