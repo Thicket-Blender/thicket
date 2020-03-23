@@ -65,8 +65,8 @@ bl_info = {
 }
 
 
+thicket_ready = False
 db = None
-db_path = Path(bpy.utils.user_resource('SCRIPTS', "addons", True)) / __name__ / "thicket.db"
 plants_path = None
 sdk_path = None
 previews = None
@@ -101,6 +101,54 @@ def populate_previews():
                 previews.load(preview_key, preview_path, 'IMAGE')
 
     logging.info("Added %d previews in %0.2fs" % (len(previews), time.time()-t0))
+
+
+def thicket_init():
+    global thicket_ready, db, plants_path, sdk_path, ThicketDB, import_lbw, laubwerk
+
+    thicket_ready = False
+    db = None
+    plants_path = None
+    sdk_path = None
+
+    lbw_path = bpy.context.preferences.addons[__name__].preferences.lbw_path
+    if lbw_path and Path(lbw_path).is_dir():
+        plants_path = Path(lbw_path) / "Plants"
+        sdk_path = Path(lbw_path) / "Python"
+
+    if not plants_path.is_dir() or not sdk_path.is_dir():
+        plants_path = None
+        sdk_path = None
+        logging.warning("Invalid Laubwerk Install Path: %s" % lbw_path)
+        return
+
+    if str(sdk_path) not in sys.path:
+        sys.path.append(str(sdk_path))
+
+    if "laubwerk" not in sys.modules:
+        import laubwerk
+
+    if "thicket_lbw" not in sys.modules:
+        from .thicket_lbw import import_lbw
+
+    if "thicket_db" not in sys.modules:
+        from .thicket_db import ThicketDB
+
+    db_path = Path(bpy.utils.user_resource('SCRIPTS', "addons", True)) / __name__ / "thicket.db"
+    try:
+        db = ThicketDB(db_path, locale, bpy.app.binary_path_python)
+    except FileNotFoundError:
+        logging.warning("Database not found, creating empty database")
+        db_dir = Path(PurePath(db_path).parent)
+        db_dir.mkdir(parents=True, exist_ok=True)
+        db = ThicketDB(db_path, locale, bpy.app.binary_path_python, True)
+
+    thicket_ready = True
+    logging.info("Laubwerk Install Path: %s" % lbw_path)
+    logging.info(laubwerk.version)
+    logging.info("Database (%d plants): %s" % (db.plant_count(), db_path))
+    populate_previews()
+    logging.info("Ready")
 
 
 def get_preview(plant_name, model):
@@ -225,7 +273,6 @@ class THICKET_OT_update_plant(Operator):
         template = instance.instance_collection
 
         # Load new plant model
-        from .thicket_lbw import import_lbw
         keywords = template.thicket_shadow.as_keywords(ignore=("magic", "name"))
         new_instance = import_lbw(**keywords)  # noqa: F821
         new_template = new_instance.instance_collection
@@ -321,7 +368,7 @@ class THICKET_PT_plant_properties(Panel):
 
     @classmethod
     def poll(self, context):
-        return is_thicket_instance(context.active_object)
+        return thicket_ready and is_thicket_instance(context.active_object)
 
     def draw(self, context):
         global db
@@ -361,15 +408,13 @@ class THICKET_OT_rebuild_db(Operator):
         return context.window_manager.invoke_confirm(self, event)
 
     def execute(self, context):
-        global db, db_path, plants_path, sdk_path
+        global db, plants_path, sdk_path
         logging.info("Rebuilding database, this may take several minutes...")
-        logging.info("Plants Library: %s" % plants_path)
-        logging.info("Database: %s" % db_path)
         t0 = time.time()
-        db = ThicketDB(db_path, locale, bpy.app.binary_path_python, True)  # noqa: F821
+        # FIXME: should be able to drop this - this isn't visible unless thicket_ready (so there is a DB)
+        # db = ThicketDB(db_path, locale, bpy.app.binary_path_python, True)  # noqa: F821
         db.build(str(plants_path), str(sdk_path))
         logging.info("Rebuilt database in %0.2fs" % (time.time()-t0))
-        self.report({'INFO'}, "thicket: Added %d plants to database" % db.plant_count())
         populate_previews()
         context.area.tag_redraw()
         return {'FINISHED'}
@@ -404,7 +449,7 @@ class THICKET_Pref(AddonPreferences):
     bl_idname = __name__
 
     def lbw_path_on_update(self, context):
-        populate_previews()
+        thicket_init()
 
     lbw_path: StringProperty(
         name="Install Path",
@@ -415,43 +460,28 @@ class THICKET_Pref(AddonPreferences):
         )
 
     def draw(self, context):
-        global db, db_path, plants_path, sdk_path, ThicketDB
-
-        # Test for a valid Laubwerk installation path
-        # It should contain both a Plants and a Python directory
-        valid_lbw_path = False
-        if Path(self.lbw_path).is_dir():
-            plants_path = Path(self.lbw_path) / "Plants"
-            sdk_path = Path(self.lbw_path) / "Python"
-            valid_lbw_path = plants_path.is_dir() and sdk_path.is_dir()
-
-        if valid_lbw_path:
-            if str(sdk_path) not in sys.path:
-                sys.path.append(str(sdk_path))
-                db = None
-            if "thicket_db" not in sys.modules:
-                from .thicket_db import ThicketDB
-                db = None
-            if not db:
-                db = ThicketDB(db_path, locale, bpy.app.binary_path_python, True)
+        global db, thicket_ready
 
         box = self.layout.box()
         box.label(text="Laubwerk Plants Library")
         row = box.row()
-        row.alert = not valid_lbw_path
+        row.alert = not thicket_ready
         row.prop(self, "lbw_path")
 
-        if valid_lbw_path:
-            import laubwerk
-            row = box.row()
-            row.label(text=laubwerk.version)
+        lbw_version = "Laubwerk Version: N/A"
+        db_status = "No database found"
+        if thicket_ready:
+            lbw_version = laubwerk.version
+            db_status = "Database contains %d plants" % db.plant_count()
 
         row = box.row()
-        row.enabled = valid_lbw_path
-        row.operator("thicket.rebuild_db", icon="FILE_REFRESH")
+        row.enabled = thicket_ready
+        row.label(text=lbw_version)
 
-        if db:
-            row.label(text="Database contains %d plants" % db.plant_count())
+        row = box.row()
+        row.enabled = thicket_ready
+        row.label(text=db_status)
+        row.operator("thicket.rebuild_db", icon="FILE_REFRESH")
 
 
 class THICKET_IO_import_lbw(bpy.types.Operator, ImportHelper):
@@ -503,7 +533,6 @@ class THICKET_IO_import_lbw(bpy.types.Operator, ImportHelper):
     plant = None
 
     def execute(self, context):
-        from .thicket_lbw import import_lbw
         keywords = self.as_keywords(ignore=("filter_glob", "oldpath"))
         import_lbw(**keywords)  # noqa: F821
         return {'FINISHED'}
@@ -577,8 +606,6 @@ __classes__ = (
 
 
 def register():
-    global db, db_path, plants_path, sdk_path, previews, ThicketDB
-
     for c in __classes__:
         bpy.utils.register_class(c)
 
@@ -587,35 +614,7 @@ def register():
 
     bpy.types.TOPBAR_MT_file_import.append(menu_import_lbw)
 
-    # Create the database path if it does not exist
-    if not db_path.exists():
-        db_dir = Path(PurePath(db_path).parent)
-        db_dir.mkdir(parents=True, exist_ok=True)
-
-    # Initial global plants_path and sdk_path
-    lbw_path = bpy.context.preferences.addons[__name__].preferences.lbw_path
-    if lbw_path and Path(lbw_path).is_dir():
-        plants_path = Path(lbw_path) / "Plants"
-        sdk_path = Path(lbw_path) / "Python"
-
-    # Dynamically add the sdk_path to the sys.path
-    if not sdk_path or not sdk_path.is_dir():
-        logging.info("Please configure Laubwerk Install Path in Addon Preferences")
-        return
-
-    if str(sdk_path) not in sys.path:
-        sys.path.append(str(sdk_path))
-
-    from .thicket_db import ThicketDB
-    try:
-        db = ThicketDB(db_path, locale, bpy.app.binary_path_python)
-    except FileNotFoundError:
-        logging.warning("Database not found, creating empty database")
-        db = ThicketDB(db_path, locale, bpy.app.binary_path_python, True)
-
-    populate_previews()
-
-    logging.info("Ready")
+    thicket_init()
 
 
 def unregister():

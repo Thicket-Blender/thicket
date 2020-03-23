@@ -30,7 +30,7 @@ import laubwerk
 from .thicket_utils import THICKET_GUID
 
 
-def new_collection(name, parent=bpy.context.scene.collection, singleton=False, exclude=False):
+def new_collection(name, parent, singleton=False, exclude=False):
 
     if singleton and name in bpy.data.collections:
         return bpy.data.collections[name]
@@ -261,7 +261,7 @@ def import_lbw(filepath, leaf_density, model, qualifier, viewport_lod,
     logging.info("Generated high resolution render object in %.4fs" % (time.time() - time_local))
 
     # Setup collection hierarchy
-    thicket_col = new_collection("Thicket", singleton=True, exclude=True)
+    thicket_col = new_collection("Thicket", bpy.context.scene.collection, singleton=True, exclude=True)
     plant_col = new_collection(obj_viewport.name, thicket_col)
 
     # Add objects to the plant collection
