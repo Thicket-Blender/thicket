@@ -41,7 +41,7 @@ def new_collection(name, parent=bpy.context.scene.collection, singleton=False, e
     return col
 
 
-def lbw_to_bl_obj(plant, name, mesh_lbw, qualifier, proxy):
+def lbw_to_bl_obj(lbw_plant, name, lbw_mesh, qualifier, proxy):
     """ Generate the Blender Object from the Laubwerk mesh and materials """
 
     verts_list = []
@@ -51,11 +51,11 @@ def lbw_to_bl_obj(plant, name, mesh_lbw, qualifier, proxy):
     # write vertices
     # Laubwerk Mesh uses cm units. Blender units *appear* to be meters
     # regardless of scene units.
-    for point in mesh_lbw.points:
+    for point in lbw_mesh.points:
         verts_list.append((.01*point[0], .01*point[2], .01*point[1]))
 
     # write polygons
-    for polygon in zip(mesh_lbw.polygons):
+    for polygon in zip(lbw_mesh.polygons):
         for idx in zip(polygon):
             face = idx[0]
             polygon_list.append(face)
@@ -73,23 +73,23 @@ def lbw_to_bl_obj(plant, name, mesh_lbw, qualifier, proxy):
     mesh.uv_layers.new()
     i = 0
     for d in mesh.uv_layers[0].data:
-        uv = mesh_lbw.uvs[i]
+        uv = lbw_mesh.uvs[i]
         d.uv = (uv[0] * -1, uv[1] * -1)
         i += 1
     obj = bpy.data.objects.new(name, mesh)
 
     # String operations are expensive, do them here outside the material loop
-    wood_mat_name = plant.name + " wood"
-    wood_color = plant.get_wood_color()
-    foliage_mat_name = plant.name + " foliage"
-    foliage_color = plant.get_foliage_color()
+    wood_mat_name = lbw_plant.name + " wood"
+    wood_color = lbw_plant.get_wood_color()
+    foliage_mat_name = lbw_plant.name + " foliage"
+    foliage_color = lbw_plant.get_foliage_color()
 
     # read matids and materialnames and create and add materials to the laubwerktree
     i = 0
-    for matID in zip(mesh_lbw.matids):
+    for matID in zip(lbw_mesh.matids):
         mat_id = matID[0]
-        plantmat = plant.materials[mat_id]
-        mat_name = plantmat.name
+        lbw_mat = lbw_plant.materials[mat_id]
+        mat_name = lbw_mat.name
         proxy_color = None
 
         if proxy:
@@ -104,7 +104,7 @@ def lbw_to_bl_obj(plant, name, mesh_lbw, qualifier, proxy):
             materials.append(mat_id)
             mat = bpy.data.materials.get(mat_name)
             if mat is None:
-                mat = lbw_to_bl_mat(plant, mat_id, mat_name, qualifier, proxy_color)
+                mat = lbw_to_bl_mat(lbw_plant, mat_id, mat_name, qualifier, proxy_color)
             obj.data.materials.append(mat)
 
         mat_index = obj.data.materials.find(mat_name)
@@ -122,7 +122,7 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, qualifier=None, proxy_color=None):
     NW = 300
     NH = 300
 
-    plantmat = plant.materials[mat_id]
+    lbw_mat = plant.materials[mat_id]
     mat = bpy.data.materials.new(mat_name)
 
     mat.use_nodes = True
@@ -138,24 +138,24 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, qualifier=None, proxy_color=None):
     links = mat.node_tree.links
     links.new(node_dif.outputs[0], node_out.inputs[0])
 
-    mat.diffuse_color = proxy_color or plantmat.get_front().diffuse_color + (1.0,)
+    mat.diffuse_color = proxy_color or lbw_mat.get_front().diffuse_color + (1.0,)
     node_dif.inputs[0].default_value = mat.diffuse_color
     if proxy_color:
         return mat
 
     # Diffuse Texture (FIXME: Assumes one sided)
-    logging.debug("Diffuse Texture: %s" % plantmat.get_front().diffuse_texture)
-    img_path = plantmat.get_front().diffuse_texture
+    logging.debug("Diffuse Texture: %s" % lbw_mat.get_front().diffuse_texture)
+    diffuse_path = lbw_mat.get_front().diffuse_texture
     node_img = nodes.new(type='ShaderNodeTexImage')
     node_img.location = 0, 2 * NH
-    node_img.image = bpy.data.images.load(img_path)
+    node_img.image = bpy.data.images.load(diffuse_path)
     links.new(node_img.outputs[0], node_dif.inputs[0])
 
     # Alpha Texture
     # Blender render engines support using the diffuse map alpha channel. We
     # assume this rather than a separate alpha image.
-    alpha_path = plantmat.alpha_texture
-    logging.debug("Alpha Texture: %s" % plantmat.alpha_texture)
+    alpha_path = lbw_mat.alpha_texture
+    logging.debug("Alpha Texture: %s" % lbw_mat.alpha_texture)
     if alpha_path != '':
         # Enable leaf clipping in Eevee
         mat.blend_method = 'CLIP'
@@ -166,19 +166,19 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, qualifier=None, proxy_color=None):
         # separate alpha map). Ignore the difference if it exists, assume alpha
         # comes from diffuse, and issue a warning when the difference appears.
         links.new(node_img.outputs['Alpha'], node_dif.inputs['Alpha'])
-        if alpha_path != img_path:
+        if alpha_path != diffuse_path:
             # NOTE: This affects at least 'Howea forsteriana'
             logging.warning("Alpha Texture differs from diffuse image path:")
-            logging.warning("Alpha Texture: %s" % plantmat.alpha_texture)
-            logging.warning("Diffuse Texture: %s" % plantmat.get_front().diffuse_texture)
+            logging.warning("Alpha Texture: %s" % lbw_mat.alpha_texture)
+            logging.warning("Diffuse Texture: %s" % lbw_mat.get_front().diffuse_texture)
 
     # Subsurface Texture
-    logging.debug("Subsurface Color: %s" % str(plantmat.subsurface_color))
-    if plantmat.subsurface_color:
-        node_dif.inputs['Subsurface Color'].default_value = plantmat.subsurface_color + (1.0,)
+    logging.debug("Subsurface Color: %s" % str(lbw_mat.subsurface_color))
+    if lbw_mat.subsurface_color:
+        node_dif.inputs['Subsurface Color'].default_value = lbw_mat.subsurface_color + (1.0,)
 
-    logging.debug("Subsurface Texture: %s" % plantmat.subsurface_texture)
-    sub_path = plantmat.subsurface_texture
+    logging.debug("Subsurface Texture: %s" % lbw_mat.subsurface_texture)
+    sub_path = lbw_mat.subsurface_texture
     if sub_path != '':
         node_sub = nodes.new(type='ShaderNodeTexImage')
         node_sub.location = 0, NH
@@ -186,16 +186,16 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, qualifier=None, proxy_color=None):
 
         # Laubwerk models only support subsurface as a translucency effect,
         # indicated by a subsurface_depth of 0.0.
-        logging.debug("Subsurface Depth: %f" % plantmat.subsurface_depth)
-        if plantmat.subsurface_depth == 0.0:
+        logging.debug("Subsurface Depth: %f" % lbw_mat.subsurface_depth)
+        if lbw_mat.subsurface_depth == 0.0:
             node_sub.image.colorspace_settings.is_data = True
             links.new(node_sub.outputs['Color'], node_dif.inputs['Transmission'])
         else:
             logging.warning("Subsurface Depth > 0. Not supported.")
 
     # Bump Texture
-    logging.debug("Bump Texture: %s" % plantmat.get_front().bump_texture)
-    bump_path = plantmat.get_front().bump_texture
+    logging.debug("Bump Texture: %s" % lbw_mat.get_front().bump_texture)
+    bump_path = lbw_mat.get_front().bump_texture
     if bump_path != '':
         node_bumpimg = nodes.new(type='ShaderNodeTexImage')
         node_bumpimg.location = 0, 0
@@ -204,15 +204,15 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, qualifier=None, proxy_color=None):
         node_bump = nodes.new(type='ShaderNodeBump')
         node_bump.location = NW, 0
         # TODO: Make the Distance configurable to tune for each render engine
-        logging.debug("Bump Strength: %f" % plantmat.get_front().bump_strength)
-        node_bump.inputs['Strength'].default_value = plantmat.get_front().bump_strength
+        logging.debug("Bump Strength: %f" % lbw_mat.get_front().bump_strength)
+        node_bump.inputs['Strength'].default_value = lbw_mat.get_front().bump_strength
         node_bump.inputs['Distance'].default_value = 0.02
         links.new(node_bumpimg.outputs['Color'], node_bump.inputs['Height'])
         links.new(node_bump.outputs['Normal'], node_dif.inputs['Normal'])
 
-    logging.debug("Displacement Texture: %s" % plantmat.displacement_texture)
-    logging.debug("Normal Texture: %s" % plantmat.get_front().normal_texture)
-    logging.debug("Specular Texture: %s" % plantmat.get_front().specular_texture)
+    logging.debug("Displacement Texture: %s" % lbw_mat.displacement_texture)
+    logging.debug("Normal Texture: %s" % lbw_mat.get_front().normal_texture)
+    logging.debug("Specular Texture: %s" % lbw_mat.get_front().specular_texture)
 
     return mat
 
@@ -220,29 +220,29 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, qualifier=None, proxy_color=None):
 def import_lbw(filepath, leaf_density, model, qualifier, viewport_lod,
                lod_min_thick, lod_max_level, lod_subdiv, leaf_amount):
     time_main = time.time()
-    plant = laubwerk.load(filepath)
-    logging.info('Importing "%s"' % plant.name)
-    lbw_model = next((m for m in plant.models if m.name == model), plant.default_model)
+    lbw_plant = laubwerk.load(filepath)
+    logging.info('Importing "%s"' % lbw_plant.name)
+    lbw_model = next((m for m in lbw_plant.models if m.name == model), lbw_plant.default_model)
     if not lbw_model.name == model:
         logging.warning("Model '%s' not found for '%s', using default model '%s'" %
-                        (model, plant.name, lbw_model.name))
+                        (model, lbw_plant.name, lbw_model.name))
     proxy = False
 
     # Create the viewport object (low detail)
     time_local = time.time()
     if viewport_lod == 'low':
         # TODO: remove qualifierName once the Laubwerk SDK implements the # qualifier keyword
-        mesh_lbw = lbw_model.get_mesh(qualifier=qualifier, qualifierName=qualifier,
+        lbw_mesh = lbw_model.get_mesh(qualifier=qualifier, qualifierName=qualifier,
                                       max_branch_level=3, min_thickness=0.6,
                                       leaf_amount=leaf_amount / 100.0, leaf_density=0.3 * (leaf_density / 100.0),
                                       max_subdiv_level=0)
     else:
         proxy = True
-        mesh_lbw = lbw_model.get_proxy()
+        lbw_mesh = lbw_model.get_proxy()
         if viewport_lod != 'proxy':
             logging.warn("Unknown viewport_lod: %s" % viewport_lod)
 
-    obj_viewport = lbw_to_bl_obj(plant, plant.name, mesh_lbw, qualifier, proxy)
+    obj_viewport = lbw_to_bl_obj(lbw_plant, lbw_plant.name, lbw_mesh, qualifier, proxy)
     obj_viewport.hide_render = True
     obj_viewport.show_name = True
     logging.info("Generated low resolution viewport object in %.4fs" % (time.time() - time_local))
@@ -250,11 +250,11 @@ def import_lbw(filepath, leaf_density, model, qualifier, viewport_lod,
     # Create the render object (high detail)
     time_local = time.time()
     # TODO: remove qualifierName once the Laubwerk SDK implements the # qualifier keyword
-    mesh_lbw = lbw_model.get_mesh(qualifier=qualifier, qualifierName=qualifier,
+    lbw_mesh = lbw_model.get_mesh(qualifier=qualifier, qualifierName=qualifier,
                                   max_branch_level=lod_max_level, min_thickness=lod_min_thick,
                                   leaf_amount=leaf_amount / 100.0, leaf_density=leaf_density / 100.0,
                                   max_subdiv_level=lod_subdiv)
-    obj_render = lbw_to_bl_obj(plant, plant.name + " (render)", mesh_lbw, qualifier, False)
+    obj_render = lbw_to_bl_obj(lbw_plant, lbw_plant.name + " (render)", lbw_mesh, qualifier, False)
     obj_render.parent = obj_viewport
     obj_render.hide_viewport = True
     obj_render.hide_select = True
@@ -284,7 +284,7 @@ def import_lbw(filepath, leaf_density, model, qualifier, viewport_lod,
 
     # Set Thicket properties on the template plant collection
     plant_col.thicket.magic = THICKET_GUID
-    plant_col.thicket.name = plant.name
+    plant_col.thicket.name = lbw_plant.name
     plant_col.thicket.filepath = filepath
     plant_col.thicket.model = lbw_model.name
     plant_col.thicket.qualifier = qualifier
@@ -296,5 +296,5 @@ def import_lbw(filepath, leaf_density, model, qualifier, viewport_lod,
     plant_col.thicket.lod_min_thick = lod_min_thick
     plant_col.thicket.copy_to(plant_col.thicket_shadow)
 
-    logging.info('Imported "%s" in %.4fs' % (plant.name, time.time() - time_main))
+    logging.info('Imported "%s" in %.4fs' % (lbw_plant.name, time.time() - time_main))
     return obj_inst
