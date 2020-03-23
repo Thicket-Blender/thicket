@@ -33,8 +33,7 @@ from bpy.types import (AddonPreferences,
                        Panel,
                        PropertyGroup
                        )
-from bpy.props import (BoolProperty,
-                       EnumProperty,
+from bpy.props import (EnumProperty,
                        FloatProperty,
                        IntProperty,
                        StringProperty,
@@ -565,34 +564,30 @@ def menu_import_lbw(self, context):
     op.filepath = str(plants_path) + os.sep
 
 
+__classes__ = (
+        THICKET_IO_import_lbw,
+        THICKET_Pref,
+        THICKET_OT_rebuild_db,
+        THICKET_OT_add_plant_db,
+        THICKET_OT_reset_plant,
+        THICKET_OT_update_plant,
+        THICKET_OT_delete_plant,
+        THICKET_OT_make_unique,
+        ThicketPropGroup,
+        THICKET_PT_plant_properties
+)
+
+
 def register():
     global db, db_path, plants_path, sdk_path, previews, ThicketDB
 
-    # create Laubwerk Plant object properties
-    bpy.types.Object.viewport_proxy = BoolProperty(name="Viewport Proxy", default=True)
-    bpy.types.Object.lod_subdiv = IntProperty(name="Subdivision", default=3, min=0, max=5, step=1)
-    bpy.types.Object.leaf_density = FloatProperty(name="Leaf density",
-                                                  description="The density of the leafs of the plant.",
-                                                  default=100.0, min=0.01, max=100.0, subtype='PERCENTAGE')
-    bpy.types.Object.leaf_amount = FloatProperty(name="Leaf amount", description="The amount of leafs of the plant.",
-                                                 default=100.0, min=0.01, max=100.0, subtype='PERCENTAGE',
-                                                 options={'HIDDEN'})
-    bpy.types.Object.lod_min_thick = FloatProperty(name="Min. Thickness", default=0.1, min=0.1, max=10000.0, step=1.0)
-    bpy.types.Object.lod_max_level = IntProperty(name="Maximum Level", default=5, min=0, max=10, step=1)
+    for c in __classes__:
+        bpy.utils.register_class(c)
 
-    bpy.utils.register_class(THICKET_IO_import_lbw)
-    bpy.utils.register_class(THICKET_Pref)
-    bpy.utils.register_class(THICKET_OT_rebuild_db)
-    bpy.utils.register_class(THICKET_OT_add_plant_db)
-    bpy.utils.register_class(THICKET_OT_reset_plant)
-    bpy.utils.register_class(THICKET_OT_update_plant)
-    bpy.utils.register_class(THICKET_OT_delete_plant)
-    bpy.utils.register_class(THICKET_OT_make_unique)
-    bpy.types.TOPBAR_MT_file_import.append(menu_import_lbw)
-    bpy.utils.register_class(ThicketPropGroup)
-    bpy.utils.register_class(THICKET_PT_plant_properties)
     bpy.types.Collection.thicket = bpy.props.PointerProperty(type=ThicketPropGroup)
     bpy.types.Collection.thicket_shadow = bpy.props.PointerProperty(type=ThicketPropGroup)
+
+    bpy.types.TOPBAR_MT_file_import.append(menu_import_lbw)
 
     # Create the database path if it does not exist
     if not db_path.exists():
@@ -619,25 +614,19 @@ def register():
     except FileNotFoundError:
         logging.warning("Database not found, creating empty database")
         db = ThicketDB(db_path, locale, bpy.app.binary_path_python, True)
+
     populate_previews()
+
     logging.info("Ready")
 
 
 def unregister():
     global previews
 
-    bpy.utils.unregister_class(THICKET_IO_import_lbw)
-    bpy.utils.unregister_class(THICKET_Pref)
-    bpy.utils.unregister_class(THICKET_OT_rebuild_db)
-    bpy.utils.unregister_class(THICKET_OT_reset_plant)
-    bpy.utils.unregister_class(THICKET_OT_update_plant)
-    bpy.utils.unregister_class(THICKET_OT_delete_plant)
-    bpy.utils.unregister_class(THICKET_OT_make_unique)
-    bpy.utils.unregister_class(THICKET_OT_add_plant_db)
-    bpy.types.TOPBAR_MT_file_import.remove(menu_import_lbw)
-    bpy.utils.unregister_class(ThicketPropGroup)
-    bpy.utils.unregister_class(THICKET_PT_plant_properties)
     bpy.utils.previews.remove(previews)
+    bpy.types.TOPBAR_MT_file_import.remove(menu_import_lbw)
+    for c in reversed(__classes__):
+        bpy.utils.unregister_class(c)
 
 
 if __name__ == "__main__":
