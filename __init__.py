@@ -168,15 +168,17 @@ class ThicketPropGroup(PropertyGroup):
         return items
 
     magic: bpy.props.StringProperty()
-    name: bpy.props.StringProperty()
-    filepath: bpy.props.StringProperty()
 
-    # The list of models and qualifiers is plant specific, so we cannot encode it
-    # in the generic property group unfortunately.
+    # WARNING: Properties from here to the closing comment for ThicketPropGroup
+    # and ImportLBW must be identical. A common draw routine is used for the
+    # Plant Properties Panel and for the import dialog panel. Class inheritance
+    # would preferable, but this does not appear to be possible with the Blender
+    # Python interface.
+    filepath: bpy.props.StringProperty(subtype='FILE_PATH')
     model: EnumProperty(items=model_callback, name="Model")
     qualifier: EnumProperty(items=qualifier_callback, name="Season")
-    viewport_lod: EnumProperty(name="Detail", items=[("proxy", "Very Low (Convex Hull)", ""),
-                                                     ("low", "Low (Realistic)", "")])
+    viewport_lod: EnumProperty(name="Viewport Detail", items=[("proxy", "Proxy", ""),
+                                                              ("low", "Partial Geometry", "")])
     lod_subdiv: IntProperty(name="Subdivision", description="How round the trunk and branches appear",
                             default=3, min=0, max=5, step=1)
     leaf_density: FloatProperty(name="Leaf Density", description="How full the foliage appears",
@@ -188,6 +190,7 @@ class ThicketPropGroup(PropertyGroup):
                                default=5, min=0, max=10, step=1)
     lod_min_thick: FloatProperty(name="Min Branch Thickness", description="Min thickness of trunk or branches",
                                  default=0.1, min=0.1, max=10000.0, step=1.0)
+    # End of common properties
 
 
 # Thicket operator to copy the model properties to the modified shadow copy
@@ -283,9 +286,36 @@ class THICKET_OT_delete_plant(Operator):
         return {'FINISHED'}
 
 
-# Thicket Object Properties Panel
-# TODO: We should be able to reuse the code from the ImportHelper here
-#       We may need to refactor first
+# TODO: put this in the ThicketProps class? thicket_utils?
+def draw_thicket_plant_props(layout, data):
+    global db
+    name = db.get_plant(data.filepath)["name"]
+    layout.template_icon(icon_value=get_preview(name, data.model).icon_id, scale=10)
+    layout.label(text="%s" % db.get_label(name))
+    layout.label(text="(%s)" % name)
+    layout.prop(data, "model")
+    layout.prop(data, "qualifier")
+
+    layout.separator()
+
+    layout.label(text="Level of Detail")
+
+    r = layout.row()
+    c = r.column()
+    c.alignment = 'EXPAND'
+    c.label(text="Viewport:")
+    c = r.column()
+    c.alignment = 'RIGHT'
+    c.prop(data, "viewport_lod", text="")
+
+    layout.prop(data, "lod_subdiv")
+    layout.prop(data, "leaf_density")
+    layout.prop(data, "leaf_amount")
+    layout.prop(data, "lod_max_level")
+    layout.prop(data, "lod_min_thick")
+
+
+# Thicket Plant Properties Panel
 class THICKET_PT_plant_properties(Panel):
     # bl_idname = self.type
     bl_label = "Thicket Plant Properties"
@@ -298,40 +328,30 @@ class THICKET_PT_plant_properties(Panel):
         return is_thicket_instance(context.active_object)
 
     def draw(self, context):
+        global db
         instance = context.active_object
         layout = self.layout
         template = instance.instance_collection
         tp = template.thicket_shadow
         num_siblings = len(template.users_dupli_group)
 
-        layout.operator("thicket.delete_plant", icon="NONE")
-
-        # TODO: make this an operator to select a different plan
-        layout.template_icon(icon_value=get_preview(tp.name, tp.model).icon_id, scale=10)
-
-        for key in tp.keys():
-            if key in ["magic", "filepath"]:
-                continue
-            if key == "name":
-                r = layout.row()
-                r.alignment = 'EXPAND'
-                c = r.column()
-                c.alignment = 'EXPAND'
-                c.label(text=tp.name)
-                c = r.column()
-                c.alignment = 'RIGHT'
-                c.operator("thicket.make_unique", icon="NONE", text="%d" % num_siblings)
-                c.enabled = num_siblings > 1
-            else:
-                layout.prop(tp, key)
-
-        changed = tp != template.thicket
         r = layout.row()
-        r.enabled = changed
-        r.operator("thicket.reset_plant", icon="NONE")
+        c = r.column()
+        c.operator("thicket.delete_plant", icon='NONE', text="Delete")
+        c = r.column()
+        c.operator("thicket.make_unique", icon="NONE", text="Make Unique (%d)" % num_siblings)
+        c.enabled = num_siblings > 1
+
+        draw_thicket_plant_props(layout, tp)
+
+        layout.separator()
+
         r = layout.row()
-        r.enabled = changed
-        r.operator("thicket.update_plant", icon="NONE")
+        r.enabled = tp != template.thicket
+        c = r.column()
+        c.operator("thicket.reset_plant", icon="NONE", text="Reset")
+        c = r.column()
+        c.operator("thicket.update_plant", icon="NONE", text="Update")
 
 
 # Update Database Operator (called from AddonPreferences)
@@ -443,13 +463,33 @@ class THICKET_IO_import_lbw(bpy.types.Operator, ImportHelper):
     bl_idname = "import_object.lbw"
     bl_label = "Import LBW"
 
+    def model_callback(self, context):
+        global db
+        items = []
+        for model in THICKET_IO_import_lbw.plant["models"].keys():
+            items.append((model, db.get_label(model), ""))
+        return items
+
+    def qualifier_callback(self, context):
+        global db
+        items = []
+        for qualifier in THICKET_IO_import_lbw.plant["models"][self.model]["qualifiers"]:
+            items.append((qualifier, db.get_label(qualifier), ""))
+        return items
+
     filter_glob: StringProperty(default="*.lbw;*.lbw.gz", options={'HIDDEN'})
-    filepath: StringProperty(name="File Path", subtype="FILE_PATH")
     oldpath: StringProperty(name="Old Path", subtype="FILE_PATH")
 
-    # Level of detail settings
-    viewport_lod: EnumProperty(name="Detail", items=[("proxy", "Very Low (Convex Hull)", ""),
-                                                     ("low", "Low (Realistic)", "")])
+    # WARNING: Properties from here to the closing comment for ThicketPropGroup
+    # and ImportLBW must be identical. A common draw routine is used for the
+    # Plant Properties Panel and for the import dialog panel. Class inheritance
+    # would preferable, but this does not appear to be possible with the Blender
+    # Python interface.
+    filepath: StringProperty(name="File Path", subtype="FILE_PATH")
+    viewport_lod: EnumProperty(name="Viewport Detail", items=[("proxy", "Proxy", ""),
+                                                              ("low", "Partial Geometry", "")])
+    model: EnumProperty(items=model_callback, name="Model")
+    qualifier: EnumProperty(items=qualifier_callback, name="Season")
     lod_subdiv: IntProperty(name="Subdivision", description="How round the trunk and branches appear",
                             default=3, min=0, max=5, step=1)
     leaf_density: FloatProperty(name="Leaf Density", description="How full the foliage appears",
@@ -461,26 +501,10 @@ class THICKET_IO_import_lbw(bpy.types.Operator, ImportHelper):
                                default=5, min=0, max=10, step=1)
     lod_min_thick: FloatProperty(name="Min Branch Thickness", description="Min thickness of trunk or branches",
                                  default=0.1, min=0.1, max=10000.0, step=1.0)
+    # End of common properties
 
     # Class variable
     plant = None
-
-    def model_name_callback(self, context):
-        global db
-        items = []
-        for model in THICKET_IO_import_lbw.plant["models"].keys():
-            items.append((model, db.get_label(model), ""))
-        return items
-
-    def model_qualifier_callback(self, context):
-        global db
-        items = []
-        for qualifier in THICKET_IO_import_lbw.plant["models"][self.model]["qualifiers"]:
-            items.append((qualifier, db.get_label(qualifier), ""))
-        return items
-
-    model: EnumProperty(items=model_name_callback, name="Model")
-    qualifier: EnumProperty(items=model_qualifier_callback, name="Season")
 
     def execute(self, context):
         from .thicket_import import LBWImportDialog
@@ -527,24 +551,7 @@ class THICKET_IO_import_lbw(bpy.types.Operator, ImportHelper):
             self.qualifier = THICKET_IO_import_lbw.plant["models"][self.model]["default_qualifier"]
 
         # Create the UI entries.
-        plant_name = THICKET_IO_import_lbw.plant["name"]
-        layout.template_icon(icon_value=get_preview(plant_name, self.model).icon_id, scale=10)
-
-        layout.label(text="%s" % db.get_label(THICKET_IO_import_lbw.plant["name"]))
-        layout.label(text="(%s)" % THICKET_IO_import_lbw.plant["name"])
-        layout.prop(self, "model")
-        layout.prop(self, "qualifier")
-
-        box = layout.box()
-        box.label(text="Viewport Model")
-        box.prop(self, "viewport_lod")
-        box = layout.box()
-        box.label(text="Render Model")
-        box.prop(self, "lod_subdiv")
-        box.prop(self, "leaf_density")
-        box.prop(self, "leaf_amount")
-        box.prop(self, "lod_max_level")
-        box.prop(self, "lod_min_thick")
+        draw_thicket_plant_props(layout, self)
 
 
 def menu_import_lbw(self, context):
