@@ -42,11 +42,6 @@ from bpy_extras.io_utils import ImportHelper
 from bpy.app.translations import locale
 import bpy.utils.previews
 
-from .thicket_utils import (is_thicket_instance,
-                            delete_plant_template,
-                            delete_plant,
-                            make_unique,
-                            )
 
 logging.basicConfig(format='%(levelname)s: thicket: %(message)s', level=logging.INFO)
 
@@ -70,6 +65,7 @@ db = None
 plants_path = None
 sdk_path = None
 previews = None
+THICKET_GUID = '5ff1c66f282a45a488a6faa3070152a2'
 
 
 # Add thumbnails to previews
@@ -101,6 +97,18 @@ def populate_previews():
                 previews.load(preview_key, preview_path, 'IMAGE')
 
     logging.info("Added %d previews in %0.2fs" % (len(previews), time.time()-t0))
+
+
+def get_preview(plant_name, model):
+    preview_key = plant_name.replace(' ', '_').replace('.', '') + "_" + model
+    if preview_key not in previews:
+        # The model specific preview was not found, try the plant preview
+        logging.warning("Preview key %s not found" % preview_key)
+        preview_key = plant_name.replace(' ', '_').replace('.', '')
+    if preview_key not in previews:
+        logging.warning("Preview key %s not found" % preview_key)
+        preview_key = "missing_preview"
+    return previews[preview_key]
 
 
 def thicket_init():
@@ -151,16 +159,35 @@ def thicket_init():
     logging.info("Ready")
 
 
-def get_preview(plant_name, model):
-    preview_key = plant_name.replace(' ', '_').replace('.', '') + "_" + model
-    if preview_key not in previews:
-        # The model specific preview was not found, try the plant preview
-        logging.warning("Preview key %s not found" % preview_key)
-        preview_key = plant_name.replace(' ', '_').replace('.', '')
-    if preview_key not in previews:
-        logging.warning("Preview key %s not found" % preview_key)
-        preview_key = "missing_preview"
-    return previews[preview_key]
+def is_thicket_instance(obj):
+    if not thicket_ready:
+        return False
+
+    if obj and obj.instance_collection and obj.instance_collection.thicket.magic == THICKET_GUID:
+        return True
+    return False
+
+
+def delete_plant_template(template):
+    if len(template.users_dupli_group) == 0:
+        for o in template.objects:
+            template.objects.unlink(o)
+            if o.users == 0:
+                bpy.data.objects.remove(o)
+        bpy.data.collections.remove(template, do_unlink=True)
+
+        for d in [d for d in bpy.data.meshes if d.users == 0]:
+            bpy.data.meshes.remove(d)
+        for d in [d for d in bpy.data.materials if d.users == 0]:
+            bpy.data.materials.remove(d)
+        for d in [d for d in bpy.data.images if d.users == 0]:
+            bpy.data.images.remove(d)
+
+
+def delete_plant(instance):
+    template = instance.instance_collection
+    bpy.data.objects.remove(instance, do_unlink=True)
+    delete_plant_template(template)
 
 
 # Thicket property group
@@ -302,12 +329,23 @@ class THICKET_OT_make_unique(Operator):
     bl_description = "Display number of plants using this template (click to make unique)"
     bl_options = {'REGISTER', 'INTERNAL'}
 
+    def make_unique(self, instance):
+        template = instance.instance_collection
+        if len(template.users_dupli_group) == 1:
+            logging.info("%s already is unique" % instance.name)
+            return
+
+        # Create a copy of the template and use the new one
+        new_template = template.copy()
+        bpy.data.collections['Thicket'].children.link(new_template)
+        instance.instance_collection = new_template
+
     def execute(self, context):
         instance = context.active_object
         if not is_thicket_instance(instance):
             logging.error("make_unique failed: non-Thicket object: %" % instance.name)
             return
-        make_unique(instance)
+        self.make_unique(instance)
         context.area.tag_redraw()
         return {'FINISHED'}
 
@@ -368,7 +406,7 @@ class THICKET_PT_plant_properties(Panel):
 
     @classmethod
     def poll(self, context):
-        return thicket_ready and is_thicket_instance(context.active_object)
+        return is_thicket_instance(context.active_object)
 
     def draw(self, context):
         global db

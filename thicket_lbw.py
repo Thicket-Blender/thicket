@@ -27,7 +27,7 @@ import time
 import bpy
 import laubwerk
 
-from .thicket_utils import THICKET_GUID
+from . import THICKET_GUID
 
 
 def new_collection(name, parent, singleton=False, exclude=False):
