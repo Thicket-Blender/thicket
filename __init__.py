@@ -182,12 +182,15 @@ def thicket_init():
     plants_path = None
     sdk_path = None
 
+    valid_lbw_path = False
     lbw_path = bpy.context.preferences.addons[__name__].preferences.lbw_path
     if lbw_path and Path(lbw_path).is_dir():
         plants_path = Path(lbw_path) / "Plants"
         sdk_path = Path(lbw_path) / "Python"
+        if plants_path.is_dir() and sdk_path.is_dir():
+            valid_lbw_path = True
 
-    if not plants_path.is_dir() or not sdk_path.is_dir():
+    if not valid_lbw_path:
         plants_path = None
         sdk_path = None
         logging.warning("Invalid Laubwerk Install Path: %s" % lbw_path)
@@ -648,6 +651,7 @@ class THICKET_Pref(AddonPreferences):
     bl_idname = __name__
 
     def lbw_path_on_update(self, context):
+        self["lbw_path"] = str(Path(self.lbw_path).resolve())
         thicket_init()
 
     lbw_path: StringProperty(
