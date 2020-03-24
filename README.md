@@ -22,6 +22,7 @@ Thicket generates separate viewport and render models, supporting various levels
   * Branching level
   * Leaf density
   * Branch thickness
+* Sidebar `Thicket` panel to change these options after import
 
 ![doc/thicket-banner-2048.png](doc/thicket-banner-2048.png)
 
@@ -33,21 +34,30 @@ out.
 * Download and install the prerequisites
   * [Blender](http://www.blender.org/) 2.80 or later. The plugin is known to run with [Blender 2.82](http://www.blender.org/features/past-releases/2-82/).
   * Laubwerk Python3 SDK 1.0.32 or later, provided by all Laubwerk Plant Kits, including the [Plants Kit Freebie](http://www.laubwerk.com/store/plants-kit-freebie).
-* Exit Blender
-* Clone the `thicket` git repository into the Blender `addons` folder:
-  * Mac: `~/Library/Blender/2.80/scripts/addons/thicket`
-  * Windows: `%AppData%/Blender Foundation/2.80/scripts/addons/thicket` (TODO: verify)
-* Start Blender
+* Installation options
+  * Latest from GitHub
+    * Exit Blender
+    * Clone the `thicket` git repository into the Blender `addons` folder:
+      * Mac: `~/Library/Blender/2.80/scripts/addons/thicket`
+      * Windows: `%AppData%\Blender Foundation\Blender\2.80\scripts\addons\thicket`
+    * Start Blender
+  * From a release Zip file
+    * Download the latest release zip file from the [Releases Tab](/../../releases/)
+    * Start Blender
+    * Choose `Edit -> Preferences -> Add-ons -> Install`
+    * Select the zip file and click `Install Add-on`
 * Configure Thicket
   * Choose `Edit -> Preferences...`
-  * Select the `Add-ons` tab and search for `thicket`.
+  * Select the `Add-ons` tab and search for `thicket`
   * Check the box to enable the row `Import: Thicket: Laubwerk Plants Add-on for
     Blender`
-  * Click the arrow to expand the add-on preferences.
+    * If you have more than one version installed, be sure to only enable one at
+      a time
+  * Click the arrow to expand the add-on preferences
   * Enter the Laubwerk install path. The box will be red until a valid path is
     entered, then the Laubwerk SDK version will be displayed below the path.
   * Click `Rebuild Database`. This will take a few minutes depending on your computer and the number of Laubwerk Plants Kits installed.
-  * When it completes, the number of plants in the database is displayed.
+  * When it completes, the number of plants in the database is displayed
 * Thicket is now ready to use (see Usage)
 
 ![doc/thicket-prefs-half.png](doc/thicket-prefs-half.png)
