@@ -21,6 +21,12 @@
 
 # <pep8 compliant>
 
+"""Thicket: Laubwerk Plants Add-on for Blender
+
+Thicket adds import and level-of-detail support to Blender for Laubwerk Plant
+Kits. It requires the Laubwerk Python SDK included with all Laubwerk Plant Kits.
+"""
+
 import logging
 import os
 from pathlib import Path, PurePath
@@ -68,8 +74,26 @@ previews = None
 THICKET_GUID = '5ff1c66f282a45a488a6faa3070152a2'
 
 
-# Add thumbnails to previews
+###############################################################################
+# Thicket helper functions
+#
+# These are mostly functions that are used by more than one class. Placed here
+# at the top for name resolution purposes.
+###############################################################################
+
+
 def populate_previews():
+    """Create a Blender preview collection of plant thumbnails
+
+    Walk through all the plants in the Thicket database and add the thumbnails
+    for each plant and each plant model to the previews collection for use in
+    the plant properties panels.
+
+    Previews are keyed on the plant name and model as well as just the plant
+    name as a fall back. In case no previews are available, the
+    "missing_preview" key points to a generic preview.
+    """
+
     global db, previews
 
     if previews:
@@ -100,6 +124,25 @@ def populate_previews():
 
 
 def get_preview(plant_name, model):
+    """Lookup plant model preview
+
+    Return the best match from best to worst:
+        * plant and model
+        * plant
+        * missing_preview
+
+    Parameters
+    ----------
+    plant_name : str
+        The name of the plant from the db or Laubwerk plant.name
+    model : str
+        The name of the plant model from the db or Laubwerk model.name
+
+    Returns
+    -------
+    preview
+    """
+
     preview_key = plant_name.replace(' ', '_').replace('.', '') + "_" + model
     if preview_key not in previews:
         # The model specific preview was not found, try the plant preview
@@ -112,6 +155,26 @@ def get_preview(plant_name, model):
 
 
 def thicket_init():
+    """Import dependencies and setup globals
+
+    Thicket depends on the Laubwerk Python SDK. The user needs to configure the
+    Laubwerk Install Path via the Thicket Addon Preferences. This function
+    restricts functionality until the setup is complete.
+
+    Check that the Laubwerk Install path is valid and import the laubwerk
+    modules and the thicket components dependent on the laubwerk module.
+
+    Setup the database and populate the preview catalog.
+
+    Parameters
+    ----------
+    none
+
+    Returns
+    -------
+    none
+    """
+
     global thicket_ready, db, plants_path, sdk_path, ThicketDB, import_lbw, laubwerk
 
     thicket_ready = False
@@ -160,6 +223,24 @@ def thicket_init():
 
 
 def is_thicket_instance(obj):
+    """Check if the object is a Thicket instance
+
+    Thicket instances point to an instance_collection containing a
+    ThicketPropGroup (thicket) with the magic property set to THICKET_GUID.
+
+    Avoid attempting to work with Thicket object before thicket_init has been
+    called successfully by requiring thicket_ready to be True.
+
+    Parameters
+    ----------
+    obj : Object
+        Typically bpy.context.active_object
+
+    Returns
+    -------
+    Boolean
+    """
+
     if not thicket_ready:
         return False
 
@@ -169,6 +250,22 @@ def is_thicket_instance(obj):
 
 
 def delete_plant_template(template):
+    """Delete a Thicket plant template with 0 users
+
+    If there are 0 users, unlink (and optionally remove) all the objects in a
+    Thicket plant collection, remove the collection, and remove any data items
+    left with 0 users (saving the user a save/reload operation to clear them
+    out.)
+
+    Parameters
+    ----------
+    template : Collection
+
+    Returns
+    -------
+    none
+    """
+
     if len(template.users_dupli_group) == 0:
         for o in template.objects:
             template.objects.unlink(o)
@@ -185,13 +282,93 @@ def delete_plant_template(template):
 
 
 def delete_plant(instance):
+    """Delete a Thicket plant instance
+
+    Remove the instance and the template if this is the last user.
+
+    Parameters
+    ----------
+    instance : Object (Collection Instance)
+
+    Returns
+    -------
+    none
+    """
+
     template = instance.instance_collection
     bpy.data.objects.remove(instance, do_unlink=True)
     delete_plant_template(template)
 
 
-# Thicket property group
+def menu_import_lbw(self, context):
+    """Laubwerk Plant import menu entry"""
+
+    global plants_path, db
+
+    if not db:
+        self.layout.label(text="Laubwerk Plant (not configured)")
+        return
+
+    op = self.layout.operator(THICKET_IO_import_lbw.bl_idname, text="Laubwerk Plant (.lbw.gz)")
+    op.filepath = str(plants_path) + os.sep
+
+
+def draw_thicket_plant_props(layout, data):
+    """Draw the plant properties UI
+
+    The function is used by both the THICKET_PT_plant_properties panel as well as
+    the THICKET_IO_import_lbw panel. This ensures a consistent UI for both, but
+    requires they have an identical set of properties.
+    """
+
+    global db
+    name = db.get_plant(data.filepath)["name"]
+    layout.template_icon(icon_value=get_preview(name, data.model).icon_id, scale=10)
+    layout.label(text="%s" % db.get_label(name))
+    layout.label(text="(%s)" % name)
+    layout.prop(data, "model")
+    layout.prop(data, "qualifier")
+
+    layout.separator()
+
+    layout.label(text="Level of Detail")
+
+    r = layout.row()
+    c = r.column()
+    c.alignment = 'EXPAND'
+    c.label(text="Viewport:")
+    c = r.column()
+    c.alignment = 'RIGHT'
+    c.prop(data, "viewport_lod", text="")
+
+    layout.prop(data, "lod_subdiv")
+    layout.prop(data, "leaf_density")
+    layout.prop(data, "leaf_amount")
+    layout.prop(data, "lod_max_level")
+    layout.prop(data, "lod_min_thick")
+
+
+################################################################################
+# Thicket Blender classes
+#
+# Subclasses of Blender objects, such as PropertyGroup, Operators, and Panels
+################################################################################
+
+
 class ThicketPropGroup(PropertyGroup):
+    """Thicket plant properties
+
+    These properties identify the Laubwerk plant by file as well as all the
+    parameters used to generate the mesh. These are attached to the plant
+    collection template twice:
+
+        * thicket: the permanent set
+        * thicket_shadow: the set used by the UI to update the plant
+
+    The properties must be identical to those used in the THICKET_IO_import_lbw
+    class as there does not appear to be a way to inherit from a common base
+    class with these properties.
+    """
     def __eq__(self, other):
         for k, v in self.items():
             if self[k] != other[k]:
@@ -265,8 +442,13 @@ class ThicketPropGroup(PropertyGroup):
     # End of common properties
 
 
-# Thicket operator to copy the model properties to the modified shadow copy
 class THICKET_OT_reset_plant(Operator):
+    """Reset UI plant properties to original
+
+    Copy the template original plan properties (thicket) to the group used for
+    the UI (thicket_shadow).
+    """
+
     bl_idname = "thicket.reset_plant"
     bl_label = "Reset Plant"
     bl_description = "Restore the UI properties to the model properties"
@@ -285,6 +467,12 @@ class THICKET_OT_reset_plant(Operator):
 
 # Thicket operator to modify (delete and replace) the backing objects
 class THICKET_OT_update_plant(Operator):
+    """Update the plant with the new properties
+
+    Regenerate the template plant using the thicket_shadow properties and point
+    all the instances to the new template, and remove the original.
+    """
+
     bl_idname = "thicket.update_plant"
     bl_label = "Update Plant"
     bl_description = "Update plant with new properties"
@@ -324,6 +512,14 @@ class THICKET_OT_update_plant(Operator):
 
 # Thicket make unique operator
 class THICKET_OT_make_unique(Operator):
+    """Make the active plant be the only user of a new plant template
+
+    Duplicate the plant template of the active instance and point the
+    instance_collection to the new template. The active instance will now be the
+    only user of a new plant template. If its properties are changed, only the
+    one instance will be updated.
+    """
+
     bl_idname = "thicket.make_unique"
     bl_label = "Make Unique"
     bl_description = "Display number of plants using this template (click to make unique)"
@@ -350,8 +546,9 @@ class THICKET_OT_make_unique(Operator):
         return {'FINISHED'}
 
 
-# Thicket operator to delete the active object, and the template if users is 0
 class THICKET_OT_delete_plant(Operator):
+    """Delete the active plant instance and the template if it is the last user"""
+
     bl_idname = "thicket.delete_plant"
     bl_label = "Delete Plant"
     bl_description = "Delete the active plant and remove the template if there are no instances remaining"
@@ -367,37 +564,16 @@ class THICKET_OT_delete_plant(Operator):
         return {'FINISHED'}
 
 
-# TODO: put this in the ThicketProps class? thicket_utils?
-def draw_thicket_plant_props(layout, data):
-    global db
-    name = db.get_plant(data.filepath)["name"]
-    layout.template_icon(icon_value=get_preview(name, data.model).icon_id, scale=10)
-    layout.label(text="%s" % db.get_label(name))
-    layout.label(text="(%s)" % name)
-    layout.prop(data, "model")
-    layout.prop(data, "qualifier")
-
-    layout.separator()
-
-    layout.label(text="Level of Detail")
-
-    r = layout.row()
-    c = r.column()
-    c.alignment = 'EXPAND'
-    c.label(text="Viewport:")
-    c = r.column()
-    c.alignment = 'RIGHT'
-    c.prop(data, "viewport_lod", text="")
-
-    layout.prop(data, "lod_subdiv")
-    layout.prop(data, "leaf_density")
-    layout.prop(data, "leaf_amount")
-    layout.prop(data, "lod_max_level")
-    layout.prop(data, "lod_min_thick")
-
-
-# Thicket Plant Properties Panel
 class THICKET_PT_plant_properties(Panel):
+    """Thicket Plant Properties Panel
+
+    Sidebar panel to display the properties of the active plant. It displays a
+    delete and make unique button, followed by a thumbnail and all the
+    properties from the ThicketPropGroup, along with a reset and update button
+    to restore the properties to the original state or regenerate the template
+    plant and updating all plants using that same template.
+    """
+
     # bl_idname = self.type
     bl_label = "Thicket Plant Properties"
     bl_space_type = "VIEW_3D"
@@ -435,8 +611,14 @@ class THICKET_PT_plant_properties(Panel):
         c.operator("thicket.update_plant", icon="NONE", text="Update")
 
 
-# Update Database Operator (called from AddonPreferences)
 class THICKET_OT_rebuild_db(Operator):
+    """Rebuild the Thicket database from the installed Laubwerk Plant Kits
+
+    Create a new database, adding all the plants found in the Laubwerk install
+    path. This will take some time depending on the configuration of the
+    computer. One plant parsing process is spawned for every available CPU.
+    """
+
     bl_idname = "thicket.rebuild_db"
     bl_label = "Rebuild Database"
     bl_description = "Process Laubwerk Plants library and update the database (may take several minutes)"
@@ -449,8 +631,6 @@ class THICKET_OT_rebuild_db(Operator):
         global db, plants_path, sdk_path
         logging.info("Rebuilding database, this may take several minutes...")
         t0 = time.time()
-        # FIXME: should be able to drop this - this isn't visible unless thicket_ready (so there is a DB)
-        # db = ThicketDB(db_path, locale, bpy.app.binary_path_python, True)  # noqa: F821
         db.build(str(plants_path), str(sdk_path))
         logging.info("Rebuilt database in %0.2fs" % (time.time()-t0))
         populate_previews()
@@ -458,32 +638,13 @@ class THICKET_OT_rebuild_db(Operator):
         return {'FINISHED'}
 
 
-# Add Plant to Database Operator (called from Import File Dialog)
-class THICKET_OT_add_plant_db(Operator):
-    bl_idname = "thicket.add_plant_db"
-    bl_label = "Add Plant to Database"
-    bl_description = "Parse a Laubwerk Plants file and add to the database"
-    bl_options = {'REGISTER', 'INTERNAL'}
-
-    filepath: bpy.props.StringProperty(subtype="FILE_PATH")
-
-    def invoke(self, context, event):
-        return context.window_manager.invoke_confirm(self, event)
-
-    def execute(self, context):
-        global db, sdk_path
-        t0 = time.time()
-        db.add_plant(self.filepath)
-        db.save()
-        self.report({'INFO'}, "%s: Added %s to database in %0.2fs" %
-                    (__name__, db.get_plant(self.filepath)["name"], time.time()-t0))
-        populate_previews()
-        context.area.tag_redraw()
-        return {'FINISHED'}
-
-
-# Addon Preferences
 class THICKET_Pref(AddonPreferences):
+    """Thicket Addon Preference Panel
+
+    Configure the location of the Laubwerk Install Path and rebuild the database
+    for the first time, or after installing a new Laubwerk Plant Pack.
+    """
+
     bl_idname = __name__
 
     def lbw_path_on_update(self, context):
@@ -522,8 +683,47 @@ class THICKET_Pref(AddonPreferences):
         row.operator("thicket.rebuild_db", icon="FILE_REFRESH")
 
 
+class THICKET_OT_add_plant_db(Operator):
+    """Add an individual plant to the Thicket database
+
+    Used to add an individual plant to the Thicket database rather than having
+    to rebuild the entire database.
+    """
+
+    bl_idname = "thicket.add_plant_db"
+    bl_label = "Add Plant to Database"
+    bl_description = "Parse a Laubwerk Plants file and add to the database"
+    bl_options = {'REGISTER', 'INTERNAL'}
+
+    filepath: bpy.props.StringProperty(subtype="FILE_PATH")
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_confirm(self, event)
+
+    def execute(self, context):
+        global db, sdk_path
+        t0 = time.time()
+        db.add_plant(self.filepath)
+        db.save()
+        self.report({'INFO'}, "%s: Added %s to database in %0.2fs" %
+                    (__name__, db.get_plant(self.filepath)["name"], time.time()-t0))
+        populate_previews()
+        context.area.tag_redraw()
+        return {'FINISHED'}
+
+
 class THICKET_IO_import_lbw(bpy.types.Operator, ImportHelper):
-    """Import a Laubwerk LBW.GZ File"""
+    """Modal File Browser to select and import a plant
+
+    Open to the default plant path and allow the user to select an lbw.gz file.
+    Display a thumbnail and plant properties to configure the plant properties.
+    Import the plant into the scene.
+
+    The properties panel uses a common draw routine with
+    THICKET_PT_plant_properties. They have to have an identical set of
+    properties for this to work.
+    """
+
     bl_idname = "import_object.lbw"
     bl_label = "Import LBW"
 
@@ -614,19 +814,7 @@ class THICKET_IO_import_lbw(bpy.types.Operator, ImportHelper):
             self.model = THICKET_IO_import_lbw.plant["default_model"]
             self.qualifier = THICKET_IO_import_lbw.plant["models"][self.model]["default_qualifier"]
 
-        # Create the UI entries.
         draw_thicket_plant_props(layout, self)
-
-
-def menu_import_lbw(self, context):
-    global plants_path, db
-
-    if not db:
-        self.layout.label(text="Laubwerk Plant (not configured)")
-        return
-
-    op = self.layout.operator(THICKET_IO_import_lbw.bl_idname, text="Laubwerk Plant (.lbw.gz)")
-    op.filepath = str(plants_path) + os.sep
 
 
 __classes__ = (
@@ -644,6 +832,8 @@ __classes__ = (
 
 
 def register():
+    """Thicket Add-on Blender register"""
+
     for c in __classes__:
         bpy.utils.register_class(c)
 
@@ -656,6 +846,8 @@ def register():
 
 
 def unregister():
+    """Thicket Add-on Blender unregister"""
+
     global previews
 
     bpy.utils.previews.remove(previews)
