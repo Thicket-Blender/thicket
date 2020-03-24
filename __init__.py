@@ -712,7 +712,7 @@ class THICKET_OT_add_plant_db(Operator):
         return {'FINISHED'}
 
 
-class THICKET_IO_import_lbw(bpy.types.Operator, ImportHelper):
+class THICKET_IO_import_lbw(Operator, ImportHelper):
     """Modal File Browser to select and import a plant
 
     Open to the default plant path and allow the user to select an lbw.gz file.
