@@ -231,11 +231,20 @@ def import_lbw(filepath, leaf_density, model, qualifier, viewport_lod,
     # Create the viewport object (low detail)
     time_local = time.time()
     if viewport_lod == 'low':
-        # TODO: remove qualifierName once the Laubwerk SDK implements the # qualifier keyword
-        lbw_mesh = lbw_model.get_mesh(qualifier=qualifier, qualifierName=qualifier,
-                                      max_branch_level=3, min_thickness=0.6,
-                                      leaf_amount=leaf_amount / 100.0, leaf_density=0.3 * (leaf_density / 100.0),
-                                      max_subdiv_level=0)
+        # TODO: remove camelCase properties once the Laubwerk SDK implements the underscore case
+        lbw_mesh = lbw_model.get_mesh(qualifier=qualifier,
+                                      max_branch_level=3,
+                                      min_thickness=0.6,
+                                      leaf_amount=leaf_amount / 100.0,
+                                      leaf_density=0.3 * (leaf_density / 100.0),
+                                      max_subdiv_level=0,
+                                      # camelCase arguments for compatibility
+                                      qualifierName=qualifier,
+                                      maxBranchLevel=3,
+                                      minThickness=0.6,
+                                      leafAmount=leaf_amount / 100.00,
+                                      leafDensity=0.3 * (leaf_density / 100.0),
+                                      maxSubDivLevel=0)
     else:
         proxy = True
         lbw_mesh = lbw_model.get_proxy()
@@ -249,11 +258,20 @@ def import_lbw(filepath, leaf_density, model, qualifier, viewport_lod,
 
     # Create the render object (high detail)
     time_local = time.time()
-    # TODO: remove qualifierName once the Laubwerk SDK implements the # qualifier keyword
-    lbw_mesh = lbw_model.get_mesh(qualifier=qualifier, qualifierName=qualifier,
-                                  max_branch_level=lod_max_level, min_thickness=lod_min_thick,
-                                  leaf_amount=leaf_amount / 100.0, leaf_density=leaf_density / 100.0,
-                                  max_subdiv_level=lod_subdiv)
+    # TODO: remove camelCase properties once the Laubwerk SDK implements the underscore case
+    lbw_mesh = lbw_model.get_mesh(qualifier=qualifier,
+                                  max_branch_level=lod_max_level,
+                                  min_thickness=lod_min_thick,
+                                  leaf_amount=leaf_amount / 100.0,
+                                  leaf_density=leaf_density / 100.0,
+                                  max_subdiv_level=lod_subdiv,
+                                  # camelCase arguments for compatibility
+                                  qualifierName=qualifier,
+                                  maxBranchLevel=lod_max_level,
+                                  minThickness=lod_min_thick,
+                                  leafAmount=leaf_amount / 100.00,
+                                  leafDensity=leaf_density / 100.0,
+                                  maxSubDivLevel=lod_subdiv)
     obj_render = lbw_to_bl_obj(lbw_plant, lbw_plant.name + " (render)", lbw_mesh, qualifier, False)
     obj_render.parent = obj_viewport
     obj_render.hide_viewport = True
