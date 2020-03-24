@@ -70,7 +70,7 @@ thicket_ready = False
 db = None
 plants_path = None
 sdk_path = None
-previews = None
+thicket_previews = None
 THICKET_GUID = '5ff1c66f282a45a488a6faa3070152a2'
 
 
@@ -94,33 +94,33 @@ def populate_previews():
     "missing_preview" key points to a generic preview.
     """
 
-    global db, previews
+    global db, thicket_previews
 
-    if previews:
-        bpy.utils.previews.remove(previews)
-    previews = bpy.utils.previews.new()
+    if thicket_previews:
+        bpy.utils.previews.remove(thicket_previews)
+    thicket_previews = bpy.utils.previews.new()
 
     t0 = time.time()
 
     thicket_path = Path(bpy.utils.user_resource('SCRIPTS', 'addons', True)) / __name__
     missing_path = thicket_path / "doc" / "missing_preview.png"
-    previews.load("missing_preview", str(missing_path), 'IMAGE')
+    thicket_previews.load("missing_preview", str(missing_path), 'IMAGE')
 
     for (filename, plant) in db.db["plants"].items():
         # Load the top plant (no model) preview
         plant_preview_key = plant["name"].replace(' ', '_').replace('.', '')
         preview_path = plant["preview"]
         if preview_path != "" and Path(preview_path).is_file():
-            previews.load(plant_preview_key, preview_path, 'IMAGE')
+            thicket_previews.load(plant_preview_key, preview_path, 'IMAGE')
 
         # Load the previews for each model of the plant
         for model in plant["models"].keys():
             preview_key = plant_preview_key + "_" + model
             preview_path = plant["models"][model]["preview"]
             if preview_path != "" and Path(preview_path).is_file():
-                previews.load(preview_key, preview_path, 'IMAGE')
+                thicket_previews.load(preview_key, preview_path, 'IMAGE')
 
-    logging.info("Added %d previews in %0.2fs" % (len(previews), time.time()-t0))
+    logging.info("Added %d previews in %0.2fs" % (len(thicket_previews), time.time()-t0))
 
 
 def get_preview(plant_name, model):
@@ -144,14 +144,14 @@ def get_preview(plant_name, model):
     """
 
     preview_key = plant_name.replace(' ', '_').replace('.', '') + "_" + model
-    if preview_key not in previews:
+    if preview_key not in thicket_previews:
         # The model specific preview was not found, try the plant preview
         logging.warning("Preview key %s not found" % preview_key)
         preview_key = plant_name.replace(' ', '_').replace('.', '')
-    if preview_key not in previews:
+    if preview_key not in thicket_previews:
         logging.warning("Preview key %s not found" % preview_key)
         preview_key = "missing_preview"
-    return previews[preview_key]
+    return thicket_previews[preview_key]
 
 
 def thicket_init():
@@ -852,9 +852,10 @@ def register():
 def unregister():
     """Thicket Add-on Blender unregister"""
 
-    global previews
+    global thicket_previews
 
-    bpy.utils.previews.remove(previews)
+    if thicket_previews:
+        bpy.utils.previews.remove(thicket_previews)
     bpy.types.TOPBAR_MT_file_import.remove(menu_import_lbw)
     for c in reversed(__classes__):
         bpy.utils.unregister_class(c)
