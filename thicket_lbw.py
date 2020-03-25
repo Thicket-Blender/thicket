@@ -301,18 +301,18 @@ def import_lbw(filepath, leaf_density, model, qualifier, viewport_lod,
     bpy.context.view_layer.objects.active = obj_inst
 
     # Set Thicket properties on the template plant collection
-    plant_col.thicket.magic = THICKET_GUID
-    plant_col.thicket.name = lbw_plant.name
-    plant_col.thicket.filepath = filepath
-    plant_col.thicket.model = lbw_model.name
-    plant_col.thicket.qualifier = qualifier
-    plant_col.thicket.viewport_lod = viewport_lod
-    plant_col.thicket.lod_subdiv = lod_subdiv
-    plant_col.thicket.leaf_density = leaf_density
-    plant_col.thicket.leaf_amount = leaf_amount
-    plant_col.thicket.lod_max_level = lod_max_level
-    plant_col.thicket.lod_min_thick = lod_min_thick
-    plant_col.thicket.copy_to(plant_col.thicket_shadow)
+    tp = plant_col.thicket
+    tp.magic = THICKET_GUID
+    tp.name = lbw_plant.name
+    tp.filepath = filepath
+    tp.model = lbw_model.name
+    tp.qualifier = qualifier
+    tp.viewport_lod = viewport_lod
+    tp.lod_subdiv = lod_subdiv
+    tp.leaf_density = leaf_density
+    tp.leaf_amount = leaf_amount
+    tp.lod_max_level = lod_max_level
+    tp.lod_min_thick = lod_min_thick
 
     logging.info('Imported "%s" in %.4fs' % (lbw_plant.name, time.time() - time_main))
     return obj_inst
