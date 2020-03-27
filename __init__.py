@@ -107,16 +107,15 @@ def populate_previews():
 
     thicket_path = Path(bpy.utils.user_resource('SCRIPTS', 'addons', True)) / __name__
     missing_path = thicket_path / "doc" / "missing_preview.png"
-    missing_preview = thicket_previews.load("missing_preview", str(missing_path), 'IMAGE')
+    thicket_previews.load("missing_preview", str(missing_path), 'IMAGE')
 
     for (filename, plant) in db.db["plants"].items():
         # Load the top plant (no model) preview
         name = plant["name"]
-        plant_preview = missing_preview
         plant_preview_key = name.replace(' ', '_').replace('.', '')
         preview_path = plant["preview"]
         if preview_path != "" and Path(preview_path).is_file():
-            plant_preview = thicket_previews.load(plant_preview_key, preview_path, 'IMAGE')
+            thicket_previews.load(plant_preview_key, preview_path, 'IMAGE')
 
         # Load the previews for each model of the plant
         for model in plant["models"].keys():
