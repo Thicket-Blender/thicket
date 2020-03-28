@@ -42,6 +42,7 @@ from bpy.types import (AddonPreferences,
 from bpy.props import (EnumProperty,
                        FloatProperty,
                        IntProperty,
+                       PointerProperty,
                        StringProperty,
                        )
 from bpy_extras.io_utils import ImportHelper
@@ -71,6 +72,8 @@ db = None
 plants_path = None
 sdk_path = None
 thicket_previews = None
+thicket_ui_mode = 'VIEW'
+thicket_ui_obj = None
 THICKET_GUID = '5ff1c66f282a45a488a6faa3070152a2'
 
 
@@ -108,7 +111,8 @@ def populate_previews():
 
     for (filename, plant) in db.db["plants"].items():
         # Load the top plant (no model) preview
-        plant_preview_key = plant["name"].replace(' ', '_').replace('.', '')
+        name = plant["name"]
+        plant_preview_key = name.replace(' ', '_').replace('.', '')
         preview_path = plant["preview"]
         if preview_path != "" and Path(preview_path).is_file():
             thicket_previews.load(plant_preview_key, preview_path, 'IMAGE')
@@ -123,7 +127,7 @@ def populate_previews():
     logging.info("Added %d previews in %0.2fs" % (len(thicket_previews), time.time()-t0))
 
 
-def get_preview(plant_name, model):
+def get_preview(plant_name, model=""):
     """Lookup plant model preview
 
     Return the best match from best to worst:
@@ -146,10 +150,10 @@ def get_preview(plant_name, model):
     preview_key = plant_name.replace(' ', '_').replace('.', '') + "_" + model
     if preview_key not in thicket_previews:
         # The model specific preview was not found, try the plant preview
-        logging.warning("Preview key %s not found" % preview_key)
+        # logging.warning("Preview key %s not found" % preview_key)
         preview_key = plant_name.replace(' ', '_').replace('.', '')
     if preview_key not in thicket_previews:
-        logging.warning("Preview key %s not found" % preview_key)
+        # logging.warning("Preview key %s not found" % preview_key)
         preview_key = "missing_preview"
     return thicket_previews[preview_key]
 
@@ -326,7 +330,10 @@ def draw_thicket_plant_props(layout, data):
 
     global db
     name = db.get_plant(data.filepath)["name"]
-    layout.template_icon(icon_value=get_preview(name, data.model).icon_id, scale=10)
+    # layout.template_icon(icon_value=get_preview(name, data.model).icon_id, scale=10)
+    # layout.template_icon_view(data, "filepath", show_labels=True, scale=10, scale_popup=10)
+    # logging.info("thicket_library selection: %s" % tp.filepath)
+
     layout.label(text="%s" % db.get_label(name))
     layout.label(text="(%s)" % name)
     layout.prop(data, "model")
@@ -363,10 +370,7 @@ class ThicketPropGroup(PropertyGroup):
 
     These properties identify the Laubwerk plant by file as well as all the
     parameters used to generate the mesh. These are attached to the plant
-    collection template twice:
-
-        * thicket: the permanent set
-        * thicket_shadow: the set used by the UI to update the plant
+    collection template and bpy.types.WindowManager as "thicket".
 
     The properties must be identical to those used in the THICKET_IO_import_lbw
     class as there does not appear to be a way to inherit from a common base
@@ -386,37 +390,53 @@ class ThicketPropGroup(PropertyGroup):
             other[k] = v
 
     def as_keywords(self, ignore):
-        keywords = dict(self)
-        for key in ignore:
-            keywords.pop(key, None)
-        # Use the Enum string (not the blender internal integer)
+        # Do each explicitly to get the default value from the property if it is not set.
+        # Just converting to a dict directly will ignore unset # properties.
+        keywords = {}
+        keywords["filepath"] = self.filepath
         keywords["model"] = self.model
         keywords["qualifier"] = self.qualifier
         keywords["viewport_lod"] = self.viewport_lod
+        keywords["lod_subdiv"] = self.lod_subdiv
+        keywords["leaf_density"] = self.leaf_density
+        keywords["leaf_amount"] = self.leaf_amount
+        keywords["lod_max_level"] = self.lod_max_level
+        keywords["lod_min_thick"] = self.lod_min_thick
         return keywords
 
     def model_callback(self, context):
-        global db
-        instance = context.active_object
-        if not is_thicket_instance(instance):
-            return []
-        tp = instance.instance_collection.thicket
+        global db, thicket_ui_mode
+
+        tp = context.window_manager.thicket
+        if thicket_ui_mode == 'VIEW':
+            tp = context.active_object.instance_collection.thicket
         plant = db.get_plant(tp.filepath)
         items = []
-        for model in plant["models"].keys():
-            items.append((model, db.get_label(model), ""))
+
+        if not plant:
+            logging.error("model_callback: plant is NoneType")
+            items.append(("default", "default", ""))
+        else:
+            for model in plant["models"].keys():
+                items.append((model, db.get_label(model), ""))
         return items
 
     def qualifier_callback(self, context):
         global db
-        instance = context.active_object
-        if not is_thicket_instance(instance):
-            return []
-        tp = instance.instance_collection.thicket
+
+        tp = context.window_manager.thicket
+        if thicket_ui_mode == 'VIEW':
+            tp = context.active_object.instance_collection.thicket
+
         plant = db.get_plant(tp.filepath)
         items = []
-        for qualifier in plant["models"][tp.model]["qualifiers"]:
-            items.append((qualifier, db.get_label(qualifier), ""))
+
+        if not plant:
+            logging.error("qualifier_callback: plant is NoneType")
+            items.append(("default", "default", ""))
+        else:
+            for qualifier in plant["models"][tp.model]["qualifiers"]:
+                items.append((qualifier, db.get_label(qualifier), ""))
         return items
 
     magic: bpy.props.StringProperty()
@@ -429,8 +449,10 @@ class ThicketPropGroup(PropertyGroup):
     filepath: bpy.props.StringProperty(subtype='FILE_PATH')
     model: EnumProperty(items=model_callback, name="Model")
     qualifier: EnumProperty(items=qualifier_callback, name="Season")
-    viewport_lod: EnumProperty(name="Viewport Detail", items=[("proxy", "Proxy", ""),
-                                                              ("low", "Partial Geometry", "")])
+    # TODO: Use 'ALL_CAPS' Enum values
+    viewport_lod: EnumProperty(name="Viewport Detail",
+                               items=[("proxy", "Proxy", ""), ("low", "Partial Geometry", "")],
+                               default="proxy")
     lod_subdiv: IntProperty(name="Subdivision", description="How round the trunk and branches appear",
                             default=3, min=0, max=5, step=1)
     leaf_density: FloatProperty(name="Leaf Density", description="How full the foliage appears",
@@ -446,11 +468,7 @@ class ThicketPropGroup(PropertyGroup):
 
 
 class THICKET_OT_reset_plant(Operator):
-    """Reset UI plant properties to original
-
-    Copy the template original plan properties (thicket) to the group used for
-    the UI (thicket_shadow).
-    """
+    """Reset UI plant properties to original"""
 
     bl_idname = "thicket.reset_plant"
     bl_label = "Reset Plant"
@@ -458,12 +476,14 @@ class THICKET_OT_reset_plant(Operator):
     bl_options = {'REGISTER', 'INTERNAL'}
 
     def execute(self, context):
+        global thicket_ui_mode
         instance = context.active_object
         if not is_thicket_instance(instance):
             logging.error("reset_plant failed: non-Thicket object: %" % instance.name)
             return
         template = instance.instance_collection
-        template.thicket.copy_to(template.thicket_shadow)
+        template.thicket.copy_to(context.window_manager.thicket)
+        thicket_ui_mode = 'VIEW'
         context.area.tag_redraw()
         return {'FINISHED'}
 
@@ -472,7 +492,7 @@ class THICKET_OT_reset_plant(Operator):
 class THICKET_OT_update_plant(Operator):
     """Update the plant with the new properties
 
-    Regenerate the template plant using the thicket_shadow properties and point
+    Regenerate the template plant using the UI properties and point
     all the instances to the new template, and remove the original.
     """
 
@@ -491,7 +511,7 @@ class THICKET_OT_update_plant(Operator):
         template = instance.instance_collection
 
         # Load new plant model
-        keywords = template.thicket_shadow.as_keywords(ignore=("magic", "name"))
+        keywords = context.window_manager.thicket.as_keywords(ignore=("magic", "name"))
         new_instance = import_lbw(**keywords)  # noqa: F821
         new_template = new_instance.instance_collection
 
@@ -567,6 +587,109 @@ class THICKET_OT_delete_plant(Operator):
         return {'FINISHED'}
 
 
+class THICKET_OT_select_plant(Operator):
+    """Change the plant of the active object"""
+
+    bl_idname = "thicket.select_plant"
+    bl_label = 'Select'
+    bl_descroption = "Change the plant of the active object"
+    bl_options = {'REGISTER', 'INTERNAL'}
+
+    filepath: StringProperty(subtype='FILE_PATH')
+    next_mode: StringProperty()
+
+    def execute(self, context):
+        global db, thicket_ui_mode
+
+        tp = context.window_manager.thicket
+        plant = db.get_plant(self.filepath)
+
+        # Store the old values and set the model and qualifier to the 0 entry (should always exist)
+        old_model = tp.model
+        old_qual = tp.qualifier
+
+        # If adding a new plant, start off with the defaults
+        if self.next_mode == 'ADD':
+            for key in tp.keys():
+                logging.info("unset %s" % key)
+                tp.property_unset(key)
+
+        # Change the filepath (which seems to trigger checks on the enum model and qualifier
+        tp.filepath = self.filepath
+
+        # Restore the old values if available, others reset to the defaults
+        if old_model in plant["models"]:
+            tp.model = old_model
+        else:
+            tp.model = plant["default_model"]
+
+        if old_qual in plant["models"][tp.model]["qualifiers"]:
+            tp.qualifier = old_qual
+        else:
+            tp.qualifier = plant["models"][tp.model]["default_qualifier"]
+
+        thicket_ui_mode = self.next_mode
+        return {'FINISHED'}
+
+
+class THICKET_OT_change_mode(Operator):
+    """Select a new plant for the UI"""
+
+    bl_idname = "thicket.change_mode"
+    bl_label = "Change Plant"
+    bl_description = "Change the Thicket Sidebar to display plant selection"
+    bl_options = {'REGISTER', 'INTERNAL'}
+
+    next_mode: StringProperty()
+
+    def execute(self, context):
+        global thicket_ui_mode
+        thicket_ui_mode = self.next_mode
+        context.area.tag_redraw()
+        return {'FINISHED'}
+
+
+class THICKET_OT_edit_plant(Operator):
+    """Copy the active plant properties to the window_manager.thicket properties"""
+
+    bl_idname = "thicket.edit_plant"
+    bl_label = "Edit Plant"
+    bl_description = "Edit the active plant"
+    bl_options = {'REGISTER', 'INTERNAL'}
+
+    @classmethod
+    def poll(self, context):
+        return is_thicket_instance(context.active_object)
+
+    def execute(self, context):
+        global thicket_ui_mode, thicket_ui_obj
+        thicket_ui_obj = context.active_object
+        context.active_object.instance_collection.thicket.copy_to(context.window_manager.thicket)
+        thicket_ui_mode = 'EDIT'
+        context.area.tag_redraw()
+        return {'FINISHED'}
+
+
+class THICKET_OT_load_plant(Operator):
+    """Load a plant into the scene with the current properties"""
+
+    bl_idname = "thicket.load_plant"
+    bl_label = "Add"
+    bl_description = "Load a plant into the scene with the current properties"""
+    bl_options = {'REGISTER', 'INTERNAL'}
+
+    def execute(self, context):
+        global thicket_ui_mode
+        tp = context.window_manager.thicket
+        keywords = tp.as_keywords(ignore=("magic", "name"))
+        import_lbw(**keywords)  # noqa: F821
+        thicket_ui_obj = context.active_object  # noqa: F841
+        context.active_object.instance_collection.thicket.copy_to(context.window_manager.thicket)
+        thicket_ui_mode = 'EDIT'
+        context.area.tag_redraw()
+        return {'FINISHED'}
+
+
 class THICKET_PT_plant_properties(Panel):
     """Thicket Plant Properties Panel
 
@@ -583,35 +706,109 @@ class THICKET_PT_plant_properties(Panel):
     bl_region_type = "UI"
     bl_category = "Thicket"
 
-    @classmethod
-    def poll(self, context):
-        return is_thicket_instance(context.active_object)
-
     def draw(self, context):
-        global db
+        global db, thicket_ui_mode, thicket_ui_obj
+
+        template = None
+        num_siblings = 0
+        tp = None
+
         instance = context.active_object
+        if (instance and is_thicket_instance(instance)):
+            template = instance.instance_collection
+            num_siblings = len(template.users_dupli_group)
+
+        if instance is not thicket_ui_obj:
+            instance = thicket_ui_obj
+            if thicket_ui_mode == 'EDIT':
+                thicket_ui_mode = 'VIEW'
+
+        if thicket_ui_mode == 'VIEW':
+            if template:
+                tp = template.thicket
+        else:
+            tp = context.window_manager.thicket
+
+        next_mode = 'EDIT'
+        if thicket_ui_mode == 'SELECT_ADD':
+            next_mode = 'ADD'
+
+        logging.debug("N Panel mode: %s, next_mode: %s" % (thicket_ui_mode, next_mode))
+
+        scale = 10.0
         layout = self.layout
-        template = instance.instance_collection
-        tp = template.thicket_shadow
-        num_siblings = len(template.users_dupli_group)
+        if thicket_ui_mode in ['SELECT', 'SELECT_ADD']:
+            # TODO:
+            #  - sort by common name
+            #  - add a filter box (not sure how this will work yet)
+            panel_w = context.region.width
+            # cell_w = int(0.75 * scale * bpy.app.render_icon_size)
+            cell_w = 175
+            num_cols = max(1, panel_w / cell_w)
+            o = layout.operator("thicket.select_plant", text="Cancel")
+            o.filepath = tp.filepath
+            o.next_mode = next_mode
 
-        r = layout.row()
-        c = r.column()
-        c.operator("thicket.delete_plant", icon='NONE', text="Delete")
-        c = r.column()
-        c.operator("thicket.make_unique", icon="NONE", text="Make Unique (%d)" % num_siblings)
-        c.enabled = num_siblings > 1
+            grid = layout.grid_flow(columns=num_cols, even_columns=True, even_rows=False)
+            # TODO: sort by label
+            for p_rec in db.db["plants"].items():
+                filepath = p_rec[0]
+                name = p_rec[1]["name"]
+                cell = grid.column().box()
+                cell.template_icon(icon_value=get_preview(name).icon_id, scale=scale)
+                cell.label(text="%s" % db.get_label(name))
+                cell.label(text="(%s)" % name)
+                o = cell.operator("thicket.select_plant")
+                o.filepath = filepath
+                o.next_mode = next_mode
+            o = layout.operator("thicket.select_plant", text="Cancel")
+            o.filepath = tp.filepath
+            o.next_mode = next_mode
+            return
 
-        draw_thicket_plant_props(layout, tp)
+        if thicket_ui_mode != 'ADD':
+            layout.operator("thicket.change_mode", text="Add Plant").next_mode = 'SELECT_ADD'
+            if template:
+                # Display Delete and Make Unique buttons only if there is an active # plant
+                r = layout.row()
+                c = r.column()
+                c.operator("thicket.delete_plant", icon='NONE', text="Delete")
+                c = r.column()
+                c.operator("thicket.make_unique", icon='NONE', text="Make Unique (%d)" % num_siblings)
+                c.enabled = num_siblings > 1
+
+        if tp is None:
+            return
+
+        plant = db.get_plant(tp.filepath)
+        name = plant["name"]
+        layout.template_icon(icon_value=get_preview(name, tp.model).icon_id, scale=scale)
+
+        col = layout.column()
+        col.enabled = thicket_ui_mode != 'VIEW'
+        if thicket_ui_mode == 'EDIT':
+            col.operator("thicket.change_mode").next_mode = 'SELECT'
+        elif thicket_ui_mode == 'ADD':
+            col.operator("thicket.change_mode").next_mode = 'SELECT_ADD'
+
+        draw_thicket_plant_props(col, tp)
 
         layout.separator()
 
         r = layout.row()
-        r.enabled = tp != template.thicket
-        c = r.column()
-        c.operator("thicket.reset_plant", icon="NONE", text="Reset")
-        c = r.column()
-        c.operator("thicket.update_plant", icon="NONE", text="Update")
+        if thicket_ui_mode == 'VIEW':
+            r.operator("thicket.edit_plant")
+        elif thicket_ui_mode == 'EDIT':
+            c = r.column()
+            c.operator("thicket.reset_plant", icon="NONE", text="Cancel")
+            c = r.column()
+            c.operator("thicket.update_plant", icon="NONE", text="Update")
+            c.enabled = tp != template.thicket
+        elif thicket_ui_mode == 'ADD':
+            c = r.column()
+            c.operator("thicket.change_mode", text="Cancel").next_mode = 'VIEW'
+            c = r.column()
+            c.operator("thicket.load_plant")
 
 
 class THICKET_OT_rebuild_db(Operator):
@@ -818,6 +1015,7 @@ class THICKET_IO_import_lbw(Operator, ImportHelper):
             self.model = THICKET_IO_import_lbw.plant["default_model"]
             self.qualifier = THICKET_IO_import_lbw.plant["models"][self.model]["default_qualifier"]
 
+        layout.template_icon(icon_value=get_preview(THICKET_IO_import_lbw.plant["name"], self.model).icon_id, scale=10)
         draw_thicket_plant_props(layout, self)
 
 
@@ -830,6 +1028,10 @@ __classes__ = (
         THICKET_OT_update_plant,
         THICKET_OT_delete_plant,
         THICKET_OT_make_unique,
+        THICKET_OT_change_mode,
+        THICKET_OT_select_plant,
+        THICKET_OT_edit_plant,
+        THICKET_OT_load_plant,
         ThicketPropGroup,
         THICKET_PT_plant_properties
 )
@@ -841,8 +1043,8 @@ def register():
     for c in __classes__:
         bpy.utils.register_class(c)
 
-    bpy.types.Collection.thicket = bpy.props.PointerProperty(type=ThicketPropGroup)
-    bpy.types.Collection.thicket_shadow = bpy.props.PointerProperty(type=ThicketPropGroup)
+    bpy.types.Collection.thicket = PointerProperty(type=ThicketPropGroup)
+    bpy.types.WindowManager.thicket = PointerProperty(type=ThicketPropGroup)
 
     bpy.types.TOPBAR_MT_file_import.append(menu_import_lbw)
 
