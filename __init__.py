@@ -329,7 +329,7 @@ def draw_thicket_plant_props(layout, data):
     """
 
     global db
-    name = db.get_plant(data.filepath)["name"]
+    name = db.get_p_rec(data.filepath)["name"]
     # layout.template_icon(icon_value=get_preview(name, data.model).icon_id, scale=10)
     # layout.template_icon_view(data, "filepath", show_labels=True, scale=10, scale_popup=10)
     # logging.info("thicket_library selection: %s" % tp.filepath)
@@ -410,7 +410,7 @@ class ThicketPropGroup(PropertyGroup):
         tp = context.window_manager.thicket
         if thicket_ui_mode == 'VIEW':
             tp = context.active_object.instance_collection.thicket
-        plant = db.get_plant(tp.filepath)
+        plant = db.get_p_rec(tp.filepath)
         items = []
 
         if not plant:
@@ -428,7 +428,7 @@ class ThicketPropGroup(PropertyGroup):
         if thicket_ui_mode == 'VIEW':
             tp = context.active_object.instance_collection.thicket
 
-        plant = db.get_plant(tp.filepath)
+        plant = db.get_p_rec(tp.filepath)
         items = []
 
         if not plant:
@@ -602,7 +602,7 @@ class THICKET_OT_select_plant(Operator):
         global db, thicket_ui_mode
 
         tp = context.window_manager.thicket
-        plant = db.get_plant(self.filepath)
+        plant = db.get_p_rec(self.filepath)
 
         # Store the old values and set the model and qualifier to the 0 entry (should always exist)
         old_model = tp.model
@@ -780,7 +780,7 @@ class THICKET_PT_plant_properties(Panel):
         if tp is None:
             return
 
-        plant = db.get_plant(tp.filepath)
+        plant = db.get_p_rec(tp.filepath)
         name = plant["name"]
         layout.template_icon(icon_value=get_preview(name, tp.model).icon_id, scale=scale)
 
@@ -907,7 +907,7 @@ class THICKET_OT_add_plant_db(Operator):
         db.add_plant(self.filepath)
         db.save()
         self.report({'INFO'}, "%s: Added %s to database in %0.2fs" %
-                    (__name__, db.get_plant(self.filepath)["name"], time.time()-t0))
+                    (__name__, db.get_p_rec(self.filepath)["name"], time.time()-t0))
         populate_previews()
         context.area.tag_redraw()
         return {'FINISHED'}
@@ -994,7 +994,7 @@ class THICKET_IO_import_lbw(Operator, ImportHelper):
             layout.label(text="Choose a Laubwerk Plant (.lbw.gz)")
             return
 
-        THICKET_IO_import_lbw.plant = db.get_plant(self.filepath)
+        THICKET_IO_import_lbw.plant = db.get_p_rec(self.filepath)
         if not THICKET_IO_import_lbw.plant:
             layout.label(text="Plant not found in database.", icon='ERROR')
             layout.label(text="Rebuild the database in")
