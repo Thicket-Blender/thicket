@@ -101,6 +101,12 @@ class ThicketDB:
         except KeyError:
             return None
 
+    def get_p_rec(self, plant_filename):
+        try:
+            return self.db["plants"][plant_filename]
+        except KeyError:
+            return None
+
     def add_plant(self, plant_filename):
         p_rec = ThicketDB.parse_plant(plant_filename)
         self.db["plants"][plant_filename] = p_rec["plant"]
