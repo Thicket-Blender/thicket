@@ -33,6 +33,70 @@ def md5sum(filename):
     return md5.hexdigest()
 
 
+class DBQualifier:
+    def __init__(self, db, name):
+        self.name = name
+        self.label = db.get_label(name)
+
+
+class DBModel:
+    def __init__(self, db, name, m_rec, plant_preview):
+        self.name = name
+        self.label = db.get_label(self.name)
+        self.qualifiers = [DBQualifier(db, q) for q in m_rec["qualifiers"]]
+        self._default_qualifier = DBQualifier(db, m_rec["default_qualifier"])
+        self.preview = m_rec["preview"]
+        if self.preview == "":
+            self.preview = plant_preview
+
+    def get_qualifier(self, name=None):
+        """ Return the requested qualifier or the default qualifier if None or not found """
+        if name is not None:
+            for q in self.qualifiers:
+                if q.name == name:
+                    return q
+        return self._default_qualifier
+
+
+class DBPlant:
+    def __init__(self, db, filepath):
+        self.filepath = filepath
+        p_rec = db._db["plants"][filepath]
+        self.md5 = p_rec["md5"]
+        self.name = p_rec["name"]
+        self.label = db.get_label(self.name)
+        preview = p_rec["preview"]
+        self.models = [DBModel(db, m, p_rec["models"][m], preview) for m in p_rec["models"]]
+        def_m = p_rec["default_model"]
+        self._default_model = DBModel(db, def_m, p_rec["models"][def_m], preview)
+        self.preview = preview
+
+    def get_model(self, name=None):
+        """ Return the requested model or the default model if None or not found """
+        if name is not None:
+            for m in self.models:
+                if m.name == name:
+                    return m
+        return self._default_model
+
+
+class DBIter:
+    def __init__(self, db):
+        self._items = []
+        self._index = 0
+
+        for filepath in db._db["plants"]:
+            self._items.append(DBPlant(db, filepath))
+        self._items.sort(key=lambda plant: plant.name)
+
+    def __next__(self):
+        if self._index < len(self._items):
+            item = self._items[self._index]
+            self._index += 1
+            return item
+        raise StopIteration
+
+
 class ThicketDB:
     """ Thicket Database Interface """
     def __init__(self, db_filename, locale="en-US", python=sys.executable, create=False):
@@ -51,6 +115,9 @@ class ThicketDB:
                 self.save()
             else:
                 raise FileNotFoundError
+
+    def __iter__(self):
+        return DBIter(self)
 
     def initialize(self):
         global SCHEMA_VERSION
@@ -95,11 +162,10 @@ class ThicketDB:
         except KeyError:
             return key
 
-    def get_plant(self, plant_filename):
-        try:
-            return self.db["plants"][plant_filename]
-        except KeyError:
+    def get_plant(self, filepath):
+        if filepath not in self.db["plants"]:
             return None
+        return DBPlant(self, filepath)
 
     def get_p_rec(self, plant_filename):
         try:
@@ -157,17 +223,16 @@ class ThicketDB:
     def read(self):
         self.print_info()
 
-        for p_rec in self.db["plants"].items():
-            f = p_rec[0]
-            plant = p_rec[1]
-            print("%s (%s)" % (plant["name"], self.get_label(plant["name"], "ja")))
-            print("\tfile: %s" % f)
-            print("\tmd5: %s" % plant['md5'])
-            print("\tdefault_model: %s (%s)" % (plant["default_model"], self.get_label(plant["default_model"], "en")))
+        for plant in self:
+            print("%s (%s)" % (plant.name, plant.label))
+            print("\tfile: %s" % plant.filepath)
+            print("\tmd5: %s" % plant.md5)
+            m = plant.get_model()
+            print("\tdefault_model: %s (%s)" % (m.name, m.label))
             print("\tmodels:")
-            for m_rec in plant["models"].items():
-                print("\t\t%s (%s) %s" % (m_rec[0], self.get_label(m_rec[1]["default_qualifier"], "en"),
-                      str(m_rec[1]["qualifiers"])))
+            for m in plant.models:
+                print("\t\t%s (%s) %s" % (m.name, m.get_qualifier().label,
+                                          [q.name for q in m.qualifiers]))
 
     # Class methods
     def parse_plant(plant_filename):
