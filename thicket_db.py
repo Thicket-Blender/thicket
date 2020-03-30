@@ -101,13 +101,13 @@ class ThicketDB:
     """ Thicket Database Interface """
     def __init__(self, db_filename, locale="en-US", python=sys.executable, create=False):
         global SCHEMA_VERSION
-        self.db_filename = db_filename
+        self._db_filename = db_filename
         self.locale = locale.replace('_', '-')
         self.python = python
         try:
             with open(db_filename, 'r', encoding='utf-8') as f:
-                self.db = json.load(f)
-            if self.db["info"]["schema_version"] != SCHEMA_VERSION:
+                self._db = json.load(f)
+            if self._db["info"]["schema_version"] != SCHEMA_VERSION:
                 logging.warning("Unknown database schema version")
         except FileNotFoundError:
             if create:
@@ -121,23 +121,23 @@ class ThicketDB:
 
     def initialize(self):
         global SCHEMA_VERSION
-        self.db = {}
-        self.db["info"] = {}
-        self.db["labels"] = {}
-        self.db["plants"] = {}
+        self._db = {}
+        self._db["info"] = {}
+        self._db["labels"] = {}
+        self._db["plants"] = {}
 
-        self.db["info"]["sdk_version"] = lbw.version
-        self.db["info"]["sdk_major"] = lbw.version_info.major
-        self.db["info"]["sdk_minor"] = lbw.version_info.minor
-        self.db["info"]["sdk_micro"] = lbw.version_info.micro
-        self.db["info"]["schema_version"] = SCHEMA_VERSION
+        self._db["info"]["sdk_version"] = lbw.version
+        self._db["info"]["sdk_major"] = lbw.version_info.major
+        self._db["info"]["sdk_minor"] = lbw.version_info.minor
+        self._db["info"]["sdk_micro"] = lbw.version_info.micro
+        self._db["info"]["schema_version"] = SCHEMA_VERSION
 
     def save(self):
-        with open(self.db_filename, 'w', encoding='utf-8') as f:
-            json.dump(self.db, f, ensure_ascii=False, indent=4)
+        with open(self._db_filename, 'w', encoding='utf-8') as f:
+            json.dump(self._db, f, ensure_ascii=False, indent=4)
 
     def print_info(self):
-        info = self.db["info"]
+        info = self._db["info"]
         print("Laubwerk Version: %s" % info["sdk_version"])
         print("\tmajor: %s" % info["sdk_major"])
         print("\tminor: %s" % info["sdk_minor"])
@@ -145,7 +145,7 @@ class ThicketDB:
         print("Loaded %d plants:" % self.plant_count())
 
     def update_labels(self, labels):
-        self.db["labels"].update(labels)
+        self._db["labels"].update(labels)
 
     def get_label(self, key, locale=None):
         if locale:
@@ -154,32 +154,26 @@ class ThicketDB:
             locale = self.locale
 
         try:
-            if locale in self.db["labels"][key]:
-                return self.db["labels"][key][locale]
-            elif locale[:2] in self.db["labels"][key]:
-                return self.db["labels"][key][locale[:2]]
+            if locale in self._db["labels"][key]:
+                return self._db["labels"][key][locale]
+            elif locale[:2] in self._db["labels"][key]:
+                return self._db["labels"][key][locale[:2]]
             return key
         except KeyError:
             return key
 
     def get_plant(self, filepath):
-        if filepath not in self.db["plants"]:
+        if filepath not in self._db["plants"]:
             return None
         return DBPlant(self, filepath)
 
-    def get_p_rec(self, plant_filename):
-        try:
-            return self.db["plants"][plant_filename]
-        except KeyError:
-            return None
-
     def add_plant(self, plant_filename):
         p_rec = ThicketDB.parse_plant(plant_filename)
-        self.db["plants"][plant_filename] = p_rec["plant"]
+        self._db["plants"][plant_filename] = p_rec["plant"]
         self.update_labels(p_rec["labels"])
 
     def plant_count(self):
-        return len(self.db["plants"])
+        return len(self._db["plants"])
 
     def build(self, plants_dir, sdk_path):
         self.initialize()
@@ -207,7 +201,7 @@ class ThicketDB:
             job = jobs.popleft()
             outs, errs = job.communicate()
             p_rec = json.loads(outs)
-            self.db["plants"][job.args[3]] = p_rec["plant"]
+            self._db["plants"][job.args[3]] = p_rec["plant"]
             self.update_labels(p_rec["labels"])
             logging.info('Added "%s"' % p_rec['plant']['name'])
 
