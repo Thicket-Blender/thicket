@@ -109,18 +109,17 @@ def populate_previews():
     missing_path = thicket_path / "doc" / "missing_preview.png"
     thicket_previews.load("missing_preview", str(missing_path), 'IMAGE')
 
-    for (filename, plant) in db.db["plants"].items():
+    for plant in db:
         # Load the top plant (no model) preview
-        name = plant["name"]
-        plant_preview_key = name.replace(' ', '_').replace('.', '')
-        preview_path = plant["preview"]
+        plant_preview_key = plant.name.replace(' ', '_').replace('.', '')
+        preview_path = plant.preview
         if preview_path != "" and Path(preview_path).is_file():
             thicket_previews.load(plant_preview_key, preview_path, 'IMAGE')
 
         # Load the previews for each model of the plant
-        for model in plant["models"].keys():
-            preview_key = plant_preview_key + "_" + model
-            preview_path = plant["models"][model]["preview"]
+        for model in plant.models:
+            preview_key = plant_preview_key + "_" + model.name
+            preview_path = model.preview
             if preview_path != "" and Path(preview_path).is_file():
                 thicket_previews.load(preview_key, preview_path, 'IMAGE')
 
@@ -329,13 +328,13 @@ def draw_thicket_plant_props(layout, data):
     """
 
     global db
-    name = db.get_p_rec(data.filepath)["name"]
+    plant = db.get_plant(data.filepath)
     # layout.template_icon(icon_value=get_preview(name, data.model).icon_id, scale=10)
     # layout.template_icon_view(data, "filepath", show_labels=True, scale=10, scale_popup=10)
     # logging.info("thicket_library selection: %s" % tp.filepath)
 
-    layout.label(text="%s" % db.get_label(name))
-    layout.label(text="(%s)" % name)
+    layout.label(text="%s" % plant.label)
+    layout.label(text="(%s)" % plant.name)
     layout.prop(data, "model")
     layout.prop(data, "qualifier")
 
@@ -410,15 +409,15 @@ class ThicketPropGroup(PropertyGroup):
         tp = context.window_manager.thicket
         if thicket_ui_mode == 'VIEW':
             tp = context.active_object.instance_collection.thicket
-        plant = db.get_p_rec(tp.filepath)
+        plant = db.get_plant(tp.filepath)
         items = []
 
         if not plant:
             logging.error("model_callback: plant is NoneType")
             items.append(("default", "default", ""))
         else:
-            for model in plant["models"].keys():
-                items.append((model, db.get_label(model), ""))
+            for m in plant.models:
+                items.append((m.name, m.label, ""))
         return items
 
     def qualifier_callback(self, context):
@@ -428,15 +427,15 @@ class ThicketPropGroup(PropertyGroup):
         if thicket_ui_mode == 'VIEW':
             tp = context.active_object.instance_collection.thicket
 
-        plant = db.get_p_rec(tp.filepath)
+        plant = db.get_plant(tp.filepath)
         items = []
 
         if not plant:
             logging.error("qualifier_callback: plant is NoneType")
             items.append(("default", "default", ""))
         else:
-            for qualifier in plant["models"][tp.model]["qualifiers"]:
-                items.append((qualifier, db.get_label(qualifier), ""))
+            for q in plant.get_model(tp.model).qualifiers:
+                items.append((q.name, q.label, ""))
         return items
 
     magic: bpy.props.StringProperty()
@@ -602,7 +601,7 @@ class THICKET_OT_select_plant(Operator):
         global db, thicket_ui_mode
 
         tp = context.window_manager.thicket
-        plant = db.get_p_rec(self.filepath)
+        plant = db.get_plant(self.filepath)
 
         # Store the old values and set the model and qualifier to the 0 entry (should always exist)
         old_model = tp.model
@@ -618,15 +617,9 @@ class THICKET_OT_select_plant(Operator):
         tp.filepath = self.filepath
 
         # Restore the old values if available, others reset to the defaults
-        if old_model in plant["models"]:
-            tp.model = old_model
-        else:
-            tp.model = plant["default_model"]
-
-        if old_qual in plant["models"][tp.model]["qualifiers"]:
-            tp.qualifier = old_qual
-        else:
-            tp.qualifier = plant["models"][tp.model]["default_qualifier"]
+        model = plant.get_model(old_model)
+        tp.model = model.name
+        tp.qualifier = model.get_qualifier(old_qual).name
 
         thicket_ui_mode = self.next_mode
         return {'FINISHED'}
@@ -739,7 +732,6 @@ class THICKET_PT_plant_properties(Panel):
         layout = self.layout
         if thicket_ui_mode in ['SELECT', 'SELECT_ADD']:
             # TODO:
-            #  - sort by common name
             #  - add a filter box (not sure how this will work yet)
             panel_w = context.region.width
             # cell_w = int(0.75 * scale * bpy.app.render_icon_size)
@@ -750,16 +742,13 @@ class THICKET_PT_plant_properties(Panel):
             o.next_mode = next_mode
 
             grid = layout.grid_flow(columns=num_cols, even_columns=True, even_rows=False)
-            # TODO: sort by label
-            for p_rec in db.db["plants"].items():
-                filepath = p_rec[0]
-                name = p_rec[1]["name"]
+            for plant in db:
                 cell = grid.column().box()
-                cell.template_icon(icon_value=get_preview(name).icon_id, scale=scale)
-                cell.label(text="%s" % db.get_label(name))
-                cell.label(text="(%s)" % name)
+                cell.template_icon(icon_value=get_preview(plant.name).icon_id, scale=scale)
+                cell.label(text="%s" % plant.label)
+                cell.label(text="(%s)" % plant.name)
                 o = cell.operator("thicket.select_plant")
-                o.filepath = filepath
+                o.filepath = plant.filepath
                 o.next_mode = next_mode
             o = layout.operator("thicket.select_plant", text="Cancel")
             o.filepath = tp.filepath
@@ -780,9 +769,8 @@ class THICKET_PT_plant_properties(Panel):
         if tp is None:
             return
 
-        plant = db.get_p_rec(tp.filepath)
-        name = plant["name"]
-        layout.template_icon(icon_value=get_preview(name, tp.model).icon_id, scale=scale)
+        plant = db.get_plant(tp.filepath)
+        layout.template_icon(icon_value=get_preview(plant.name, tp.model).icon_id, scale=scale)
 
         col = layout.column()
         col.enabled = thicket_ui_mode != 'VIEW'
@@ -907,7 +895,7 @@ class THICKET_OT_add_plant_db(Operator):
         db.add_plant(self.filepath)
         db.save()
         self.report({'INFO'}, "%s: Added %s to database in %0.2fs" %
-                    (__name__, db.get_p_rec(self.filepath)["name"], time.time()-t0))
+                    (__name__, db.get_plant(self.filepath).name, time.time()-t0))
         populate_previews()
         context.area.tag_redraw()
         return {'FINISHED'}
@@ -931,15 +919,15 @@ class THICKET_IO_import_lbw(Operator, ImportHelper):
     def model_callback(self, context):
         global db
         items = []
-        for model in THICKET_IO_import_lbw.plant["models"].keys():
-            items.append((model, db.get_label(model), ""))
+        for m in THICKET_IO_import_lbw.plant.models:
+            items.append((m.name, m.label, ""))
         return items
 
     def qualifier_callback(self, context):
         global db
         items = []
-        for qualifier in THICKET_IO_import_lbw.plant["models"][self.model]["qualifiers"]:
-            items.append((qualifier, db.get_label(qualifier), ""))
+        for q in THICKET_IO_import_lbw.plant.get_model(self.model).qualifiers:
+            items.append((q.name, q.label, ""))
         return items
 
     filter_glob: StringProperty(default="*.lbw;*.lbw.gz", options={'HIDDEN'})
@@ -994,7 +982,7 @@ class THICKET_IO_import_lbw(Operator, ImportHelper):
             layout.label(text="Choose a Laubwerk Plant (.lbw.gz)")
             return
 
-        THICKET_IO_import_lbw.plant = db.get_p_rec(self.filepath)
+        THICKET_IO_import_lbw.plant = db.get_plant(self.filepath)
         if not THICKET_IO_import_lbw.plant:
             layout.label(text="Plant not found in database.", icon='ERROR')
             layout.label(text="Rebuild the database in")
@@ -1012,10 +1000,10 @@ class THICKET_IO_import_lbw(Operator, ImportHelper):
             return
 
         if new_file:
-            self.model = THICKET_IO_import_lbw.plant["default_model"]
-            self.qualifier = THICKET_IO_import_lbw.plant["models"][self.model]["default_qualifier"]
+            self.model = THICKET_IO_import_lbw.plant.get_model().name
+            self.qualifier = THICKET_IO_import_lbw.plant.get_model(self.model).get_qualifier().name
 
-        layout.template_icon(icon_value=get_preview(THICKET_IO_import_lbw.plant["name"], self.model).icon_id, scale=10)
+        layout.template_icon(icon_value=get_preview(THICKET_IO_import_lbw.plant.name, self.model).icon_id, scale=10)
         draw_thicket_plant_props(layout, self)
 
 
