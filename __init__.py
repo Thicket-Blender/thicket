@@ -413,7 +413,6 @@ class ThicketPropGroup(PropertyGroup):
         items = []
 
         if not plant:
-            logging.error("model_callback: plant is NoneType")
             items.append(("default", "default", ""))
         else:
             for m in plant.models:
@@ -431,7 +430,6 @@ class ThicketPropGroup(PropertyGroup):
         items = []
 
         if not plant:
-            logging.error("qualifier_callback: plant is NoneType")
             items.append(("default", "default", ""))
         else:
             for q in plant.get_model(tp.model).qualifiers:
@@ -610,7 +608,6 @@ class THICKET_OT_select_plant(Operator):
         # If adding a new plant, start off with the defaults
         if self.next_mode == 'ADD':
             for key in tp.keys():
-                logging.info("unset %s" % key)
                 tp.property_unset(key)
 
         # Change the filepath (which seems to trigger checks on the enum model and qualifier
