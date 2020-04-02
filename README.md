@@ -2,38 +2,44 @@
 ## Laubwerk Plants Add-on for Blender
 Thicket is a [Blender](http://www.blender.org) Add-on to import [Laubwerk Plants](http://www.laubwerk.com) high resolution plant and tree models.
 
-Thicket is a community project developed using the Laubwerk Python3 SDK. While not affiliated with or officially supported by Laubwerk GmbH, this project would not be possible without Laubwerk's efforts to answer questions and address issues during the development of Thicket.
+Thicket is an open source community developed project using the Laubwerk Python SDK. While not affiliated with or officially supported by Laubwerk GmbH, this project would not be possible without Laubwerk's efforts to answer questions and address issues during the development of Thicket.
 
 Using Laubwerk's level of detail controls, Thicket keeps the Blender viewport responsive and renderings photo-realistic, like this shot of a Japanese Maple (Acer Palmatum).
 
 ![doc/acerp-cycles.png](doc/acerp-cycles.png)
 
 ## Features
-Thicket generates separate viewport and render models, supporting various levels of detail for each. The viewport can display a low poly proxy (convex hull) or a low detail model in any of Blender's viewport modes. The rendered model geometry is generated using various level of detail controls.
+Thicket generates separate viewport and render models, supporting various levels of detail for each. The viewport can display a low poly proxy (convex hull) or a partial geometry model in any of Blender's viewport modes. The rendered model geometry is generated using various level of detail controls.
 
+* Sidebar "N Panel" UI
+  * Visual plant selection (gallery)
+  * Update existing plants
+  * Update all identical instances at once
+  * Make instances unique
+  * Smart delete to manage scene size
 * Separate viewport and render models
 * Collection instancing
-* Material Nodes
+* Material nodes
 * Viewport model level of detail
   * Proxy (Convex Hull)
-  * Low poly model
+  * Partial geometry
 * Render model level of detail
   * Subdivision
-  * Branching level
   * Leaf density
+  * Leaf amount
+  * Branching level
   * Branch thickness
-* Sidebar `Thicket` panel to change these options after import
 
 ![doc/thicket-banner-2048.png](doc/thicket-banner-2048.png)
 
 ## Install
 Thicket is in active development toward the initial 1.0 release, which will
-include installers for download. Until then, please follow these steps to try it
+release packages for download. Until then, please follow these steps to try it
 out.
 
 * Download and install the prerequisites
   * [Blender](http://www.blender.org/) 2.80 or later. The plugin is known to run with [Blender 2.82](http://www.blender.org/features/past-releases/2-82/).
-  * Laubwerk Python3 SDK 1.0.32 or later, provided by all Laubwerk Plant Kits, including the [Plants Kit Freebie](http://www.laubwerk.com/store/plants-kit-freebie).
+  * Laubwerk Python SDK 1.0.32 or later, provided by all Laubwerk Plant Kits, including the [Plants Kit Freebie](http://www.laubwerk.com/store/plants-kit-freebie).
 * Installation options
   * Latest from GitHub
     * Exit Blender
@@ -60,30 +66,35 @@ out.
   * When it completes, the number of plants in the database is displayed
 * Thicket is now ready to use (see Usage)
 
-![doc/thicket-prefs-half.png](doc/thicket-prefs-half.png)
+![doc/thicket-prefs.png](doc/thicket-prefs.png)
 
 ## Usage
-Thicket will eventually present a searchable plat library using thumbnail images. Until then, you can import plant models using `File -> Import -> Laubwerk Plant (.lbw.gz)`.
+### N Panel
+Thicket adds a Blender N Panel to Add, Edit, and Delete plants. Access the panel by pressing `n` and clicking on the `Thicket` tab.
 
-![doc/thicket-import-menu-full-half.png](doc/thicket-import-menu-full-half.png)
+![doc/thicket-panel-add-only.png](doc/thicket-panel-add-only.png)
 
-The file dialog will default to the Laubwerk Plants installation path, presenting you with a listing of plant names as directories. Open a plant directory, and select the similarly named lbw.gz file, such as `Acer_palmatum.lbw.gz`.
+### Add Plant
+To add a plant, click `Add Plant` and select from the gallery presented. You can
+resize the panel to show up to 5 columns of plants.
 
-![doc/thicket-filebrowser-half.png](doc/thicket-filebrowser-half.png)
+![doc/thicket-panel-select.png](doc/thicket-panel-select.png)
 
-The image preview will update when you change the model variant and age. You can also configure season and level of detail using the Viewport and Render settings.
+Once selected, the panel presents the plant model, season, and level of detail options.
+
+![doc/thicket-panel-add.png](doc/thicket-panel-add.png)
+
+The image preview will update when you change the `Model` variant and age. You can configure the season and level of detail properties:
 
 Plant Model
 * Model: Select variant and age. There are typically 3 variants of each plant,
   as well as 3 ages for each variant.
 * Season: Affect plant's foliage, color, and flowers.
 
-Viewport Settings
-* Display Proxy: Control the model displayed in the viewport
-  * True: low poly proxy (convex hull)
-  * False: low detail full geometry model
-
-Render Settings
+Level of Detail Settings
+* Viewport: Control the model displayed in the viewport
+  * Proxy: low poly proxy (convex hull)
+  * Partial Geometry: low detail version of the render model
 * Subdivision: Control the number of edges in a branch cross-section (0 is square)
 * Leaf Density: Control how full the foliage appears
 * Leaf Amount: Control the number of leaves used to reach the specified density
@@ -91,31 +102,42 @@ Render Settings
 * Maximum Level: Limit the number of branching levels off the trunk
 * Minimum Thickness: Eliminate branches smaller than this value
 
-For example. Importing Acer Palmatum with `Display Proxy` checked, loads the
-convex hull into the viewport:
-![doc/thicket-import-proxy-half.png](doc/thicket-import-proxy-half.png)
+You can return the gallery to select a different plant with `Change Plant`, add the current plant with `Add`, and cancel the operation with `Cancel`.
 
-Importing the same plant with `Display Proxy` unchecked loads a low detail
-version of the full geometry into the viewport:
-![doc/thicket-import-noproxy-half.png](doc/thicket-import-noproxy-half.png)
+Adding Acer Palmatum with Viewport `Proxy` selected, loads the convex hull into the viewport:
 
-The rendered model would be the same for each, resulting in the following
-rendered image:
-![doc/thicket-import-render-half.png](doc/thicket-import-render-half.png)
+![doc/thicket-import-proxy.png](doc/thicket-import-proxy.png)
+
+Importing the same plant with Viewport `Partial Geometry` selected loads a low detail
+version of the render model into the viewport:
+
+![doc/thicket-panel-view.png](doc/thicket-panel-view.png)
+
+The rendered model is the same for each, resulting in the following rendered image:
+
+![doc/thicket-import-render.png](doc/thicket-import-render.png)
+
+### Edit Plant
+To edit the properties after a plant is added, select the plant in the viewport and press `Edit Plant` under the thumbnail in the panel. Here, you can change the plant and any of the options. Pressing `Update` will replace the selected plant's template, changing all plants using the same template. To change only the selected plant object, press `Make Unique (#)`. The number of "sibling" plants (plants with the same template) is indicated by `(#)` in the `Make Unique (#)` label.
+
+![doc/thicket-panel-view.png](doc/thicket-panel-edit.png)
+
+### Delete Plants
+To delete a plant, avoid using `x`. Instead, select the plant and press `Delete` in the panel. This will remove the plant instance from the viewport and will also remove the template plant when the last instance is removed. This will help keep your Blender file as small as possible.
 
 ## Collections and Instancing
-Thicket organizes each import into a top level collection named "Thicket" which is excluded from the View Layer by default. Each plant is a collection consisting of the viewport object and the render object as a child of the viewport object. Object visibility settings specify which object is visible in the viewport, and which is visible for rendering. At import time, a Collection Instance of the plant collection is added to the main scene collection. This is the object that is visible after import.
+Thicket creates a template for each plant added, and places them in a top level collection named "Thicket" which is excluded from the View Layer by default. Each template is a collection consisting of the viewport object and the render object as a child of the viewport object. Object visibility settings determine which object is visible in the viewport, and which is visible for rendering. At import time, a Collection Instance of the template collection is added to the main scene collection. This is the object that is visible after import.
 
-The collection model is shown in the image below by checking the Thicket
-collection and expanding the plant collection and object hierarchy:
-![doc/thicket-collections-half.png](doc/thicket-collections-half.png)
+The object model is shown in the image below by checking the Thicket collection and expanding the template collection and object hierarchy:
 
-The collection instance can be duplicated `Shift+D` to add a second identical plant to the scene, without doubling the memory used. Because Collection Instances are displayed in the viewport, modifying the original collection in the Thicket collection will be reflected in all the instances.
+![doc/thicket-collections.png](doc/thicket-collections.png)
 
-In short, leave the Thicket collection unchecked and duplicate the Collection Instance in the scene to make memory efficient copies of plants.
+The collection instance can be duplicated with `Shift+D` to add a second identical plant instance to the scene, without doubling the memory used. Because Collection Instances are displayed in the viewport, modifying the template in the Thicket collection will be reflected in all the instances (this is what Editing and Updating a plant with the Thicket N Panel does).
+
+In short, leave the Thicket collection unchecked and duplicate the Collection Instance in the scene to make memory efficient copies of plants you can update in groups. To make a plant unique, select it, press `Edit Plant`, and then `Make Unique (#)`.
 
 ## Report an Issue
-If you think you have found a problem or a bug with Thicket, please [Check Existing Issues](/../../issues) to see if someone has already reported it. If not, please [Create a New Issue](/../../issues/new/choose), providing as much detail as possible to help us recreate the problem.
+Thicket is an open source project that is not affiliated with Laubwerk GmbH. If you think you have found a problem or a bug with Thicket, please [Check Existing Issues](/../../issues) to see if someone has already reported it. If not, please [Create a New Issue](/../../issues/new/choose), providing as much detail as possible to help us recreate the problem. Please do not contact Laubwerk directly.
 
 ## Contributing ##
 See [CONTRIBUTING](CONTRIBUTING.md) for more information.
