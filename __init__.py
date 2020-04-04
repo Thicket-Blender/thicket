@@ -73,6 +73,7 @@ thicket_previews = None
 thicket_ui_mode = 'VIEW'
 thicket_ui_obj = None
 THICKET_GUID = '5ff1c66f282a45a488a6faa3070152a2'
+THICKET_SCALE = 10
 
 
 ###############################################################################
@@ -304,44 +305,6 @@ def delete_plant(instance):
     delete_plant_template(template)
 
 
-def draw_thicket_plant_props(layout, data):
-    """Draw the plant properties UI
-
-    The function is used by both the THICKET_PT_plant_properties panel as well as
-    the THICKET_IO_import_lbw panel. This ensures a consistent UI for both, but
-    requires they have an identical set of properties.
-    """
-
-    global db
-    plant = db.get_plant(data.filepath)
-    # layout.template_icon(icon_value=get_preview(name, data.model).icon_id, scale=10)
-    # layout.template_icon_view(data, "filepath", show_labels=True, scale=10, scale_popup=10)
-    # logging.info("thicket_library selection: %s" % tp.filepath)
-
-    layout.label(text="%s" % plant.label)
-    layout.label(text="(%s)" % plant.name)
-    layout.prop(data, "model")
-    layout.prop(data, "qualifier")
-
-    layout.separator()
-
-    layout.label(text="Level of Detail")
-
-    r = layout.row()
-    c = r.column()
-    c.alignment = 'EXPAND'
-    c.label(text="Viewport:")
-    c = r.column()
-    c.alignment = 'RIGHT'
-    c.prop(data, "viewport_lod", text="")
-
-    layout.prop(data, "lod_subdiv")
-    layout.prop(data, "leaf_density")
-    layout.prop(data, "leaf_amount")
-    layout.prop(data, "lod_max_level")
-    layout.prop(data, "lod_min_thick")
-
-
 ################################################################################
 # Thicket Blender classes
 #
@@ -450,6 +413,8 @@ class THICKET_OT_reset_plant(Operator):
     bl_description = "Restore the UI properties to the model properties"
     bl_options = {'REGISTER', 'INTERNAL'}
 
+    next_mode: StringProperty()
+
     def execute(self, context):
         global thicket_ui_mode
         instance = context.active_object
@@ -458,7 +423,7 @@ class THICKET_OT_reset_plant(Operator):
             return
         template = instance.instance_collection
         template.thicket.copy_to(context.window_manager.thicket)
-        thicket_ui_mode = 'VIEW'
+        thicket_ui_mode = self.next_mode
         context.area.tag_redraw()
         return {'FINISHED'}
 
@@ -476,7 +441,10 @@ class THICKET_OT_update_plant(Operator):
     bl_description = "Update plant with new properties"
     bl_options = {'REGISTER', 'INTERNAL'}
 
+    next_mode: StringProperty()
+
     def execute(self, context):
+        global thicket_ui_mode
         instance = context.active_object
         if not is_thicket_instance(instance):
             logging.error("update_plant failed: non-Thicket object: %" % instance.name)
@@ -495,15 +463,15 @@ class THICKET_OT_update_plant(Operator):
             i.instance_collection = new_template
             i.name = template.name
 
-        # Remove the instance collection created
+        # Remove the new instance collection and the old template
         delete_plant(new_instance)
-        # Remove the old template
         delete_plant_template(template)
 
         # Restore the active object
         instance.select_set(True)
         bpy.context.view_layer.objects.active = instance
 
+        thicket_ui_mode = self.next_mode
         context.area.tag_redraw()
         return {'FINISHED'}
 
@@ -625,6 +593,8 @@ class THICKET_OT_edit_plant(Operator):
     bl_description = "Edit the active plant"
     bl_options = {'REGISTER', 'INTERNAL'}
 
+    next_mode: StringProperty()
+
     @classmethod
     def poll(self, context):
         return is_thicket_instance(context.active_object)
@@ -633,7 +603,7 @@ class THICKET_OT_edit_plant(Operator):
         global thicket_ui_mode, thicket_ui_obj
         thicket_ui_obj = context.active_object
         context.active_object.instance_collection.thicket.copy_to(context.window_manager.thicket)
-        thicket_ui_mode = 'EDIT'
+        thicket_ui_mode = self.next_mode
         context.area.tag_redraw()
         return {'FINISHED'}
 
@@ -646,6 +616,8 @@ class THICKET_OT_load_plant(Operator):
     bl_description = "Load a plant into the scene with the current properties"""
     bl_options = {'REGISTER', 'INTERNAL'}
 
+    next_mode: StringProperty()
+
     def execute(self, context):
         global thicket_ui_mode
         tp = context.window_manager.thicket
@@ -653,7 +625,7 @@ class THICKET_OT_load_plant(Operator):
         import_lbw(**keywords)  # noqa: F821
         thicket_ui_obj = context.active_object  # noqa: F841
         context.active_object.instance_collection.thicket.copy_to(context.window_manager.thicket)
-        thicket_ui_mode = 'EDIT'
+        thicket_ui_mode = self.next_mode
         context.area.tag_redraw()
         return {'FINISHED'}
 
@@ -674,8 +646,106 @@ class THICKET_PT_plant_properties(Panel):
     bl_region_type = "UI"
     bl_category = "Thicket"
 
+    def next_mode(self, op):
+        global thicket_ui_mode
+        # modes: ADD, EDIT, SELECT, SELECT_ADD, VIEW
+        ops = ['ADD', 'CANCEL', 'CHANGE', 'CONFIRM', 'DELETE', 'EDIT', 'MAKE_UNIQUE']
+        m = thicket_ui_mode
+        nm = m
+
+        if op not in ops:
+            logging.error("Unknown ui mode transition operator: %s" % (op))
+            return nm
+
+        if m == 'ADD':
+            if op == 'CANCEL':
+                nm = 'VIEW'
+            elif op == 'CHANGE':
+                nm = 'SELECT_ADD'
+            elif op == 'CONFIRM':
+                nm = 'VIEW'
+            elif op == 'DELETE':
+                nm = 'VIEW'
+        elif m == 'EDIT':
+            if op == 'ADD':
+                nm = 'SELECT_ADD'
+            if op == 'CANCEL':
+                nm = 'VIEW'
+            elif op == 'CHANGE':
+                nm = 'SELECT'
+            elif op == 'CONFIRM':
+                nm = 'VIEW'
+            elif op == 'DELETE':
+                nm = 'VIEW'
+        elif m == 'SELECT':
+            if op == 'CANCEL':
+                nm = 'VIEW'
+            elif op == 'CONFIRM':
+                nm = 'EDIT'
+        elif m == 'SELECT_ADD':
+            if op == 'CANCEL':
+                nm = 'VIEW'
+            elif op == 'CONFIRM':
+                nm = 'ADD'
+        elif m == 'VIEW':
+            if op == 'ADD':
+                nm = 'SELECT_ADD'
+            elif op == 'EDIT':
+                nm = 'EDIT'
+
+        return nm
+
+    def draw_gallery(self, context, tp):
+        global THICKET_SCALE
+        layout = self.layout
+        # TODO:
+        #  - add a filter box (not sure how this will work yet)
+        panel_w = context.region.width
+        # cell_w = int(0.75 * scale * bpy.app.render_icon_size)
+        cell_w = 175
+        num_cols = max(1, panel_w / cell_w)
+        o = layout.operator("thicket.change_mode", text="Cancel")
+        o.next_mode = self.next_mode('CANCEL')
+
+        grid = layout.grid_flow(columns=num_cols, even_columns=True, even_rows=False)
+        for plant in db:
+            cell = grid.column().box()
+            cell.template_icon(icon_value=get_preview(plant.name).icon_id, scale=THICKET_SCALE)
+            cell.label(text="%s" % plant.label)
+            cell.label(text="(%s)" % plant.name)
+            o = cell.operator("thicket.select_plant")
+            o.filepath = plant.filepath
+            o.next_mode = self.next_mode('CONFIRM')
+        o = layout.operator("thicket.change_mode", text="Cancel")
+        o.next_mode = self.next_mode('CANCEL')
+
+    def draw_props(self, layout, plant, tp):
+        """Draw the plant properties UI"""
+
+        layout.label(text="%s" % plant.label)
+        layout.label(text="(%s)" % plant.name)
+        layout.prop(tp, "model")
+        layout.prop(tp, "qualifier")
+
+        layout.separator()
+
+        layout.label(text="Level of Detail")
+        r = layout.row()
+        c = r.column()
+        c.alignment = 'EXPAND'
+        c.label(text="Viewport:")
+        c = r.column()
+        c.alignment = 'RIGHT'
+        c.prop(tp, "viewport_lod", text="")
+
+        layout.prop(tp, "lod_subdiv")
+        layout.prop(tp, "leaf_density")
+        layout.prop(tp, "leaf_amount")
+        layout.prop(tp, "lod_max_level")
+        layout.prop(tp, "lod_min_thick")
+
     def draw(self, context):
-        global db, thicket_ui_mode, thicket_ui_obj
+        global db, thicket_ui_mode, thicket_ui_obj, THICKET_SCALE
 
         template = None
         num_siblings = 0
@@ -698,81 +768,60 @@ class THICKET_PT_plant_properties(Panel):
         else:
             tp = context.window_manager.thicket
 
-        next_mode = 'EDIT'
-        if thicket_ui_mode == 'SELECT_ADD':
-            next_mode = 'ADD'
-
-        logging.debug("N Panel mode: %s, next_mode: %s" % (thicket_ui_mode, next_mode))
-
-        scale = 10.0
-        layout = self.layout
         if thicket_ui_mode in ['SELECT', 'SELECT_ADD']:
-            # TODO:
-            #  - add a filter box (not sure how this will work yet)
-            panel_w = context.region.width
-            # cell_w = int(0.75 * scale * bpy.app.render_icon_size)
-            cell_w = 175
-            num_cols = max(1, panel_w / cell_w)
-            o = layout.operator("thicket.select_plant", text="Cancel")
-            o.filepath = tp.filepath
-            o.next_mode = next_mode
-
-            grid = layout.grid_flow(columns=num_cols, even_columns=True, even_rows=False)
-            for plant in db:
-                cell = grid.column().box()
-                cell.template_icon(icon_value=get_preview(plant.name).icon_id, scale=scale)
-                cell.label(text="%s" % plant.label)
-                cell.label(text="(%s)" % plant.name)
-                o = cell.operator("thicket.select_plant")
-                o.filepath = plant.filepath
-                o.next_mode = next_mode
-            o = layout.operator("thicket.select_plant", text="Cancel")
-            o.filepath = tp.filepath
-            o.next_mode = next_mode
+            self.draw_gallery(context, tp)
             return
 
-        if thicket_ui_mode != 'ADD':
-            layout.operator("thicket.change_mode", text="Add Plant").next_mode = 'SELECT_ADD'
-            if template:
-                # Display Delete and Make Unique buttons only if there is an active # plant
-                r = layout.row()
-                c = r.column()
-                c.operator("thicket.delete_plant", icon='NONE', text="Delete")
-                c = r.column()
-                c.operator("thicket.make_unique", icon='NONE', text="Make Unique (%d)" % num_siblings)
-                c.enabled = num_siblings > 1
+        layout = self.layout
 
+        # Draw Add and Delete in VIEW mode only
+        if thicket_ui_mode == 'VIEW':
+            o = layout.operator("thicket.change_mode", text="Add Plant")
+            o.next_mode = self.next_mode('ADD')
+            if template:
+                layout.operator("thicket.delete_plant", icon='NONE', text="Delete")
+
+        # If tp is not set, there is not active plant or no plant being added. Nothing else to draw.
         if tp is None:
             return
 
         plant = db.get_plant(tp.filepath)
-        layout.template_icon(icon_value=get_preview(plant.name, tp.model).icon_id, scale=scale)
+        layout.template_icon(icon_value=get_preview(plant.name, tp.model).icon_id, scale=THICKET_SCALE)
+        if thicket_ui_mode == 'VIEW':
+            o = layout.operator("thicket.edit_plant")
+            o.next_mode = self.next_mode('EDIT')
+        elif thicket_ui_mode in ['ADD', 'EDIT']:
+            o = layout.operator("thicket.change_mode")
+            o.next_mode = self.next_mode('CHANGE')
+            if thicket_ui_mode == 'EDIT':
+                r = layout.row()
+                r.operator("thicket.make_unique", icon='NONE', text="Make Unique (%d)" % num_siblings)
+                r.enabled = num_siblings > 1
 
         col = layout.column()
         col.enabled = thicket_ui_mode != 'VIEW'
-        if thicket_ui_mode == 'EDIT':
-            col.operator("thicket.change_mode").next_mode = 'SELECT'
-        elif thicket_ui_mode == 'ADD':
-            col.operator("thicket.change_mode").next_mode = 'SELECT_ADD'
+        self.draw_props(col, plant, tp)
 
-        draw_thicket_plant_props(col, tp)
+        if thicket_ui_mode == 'VIEW':
+            return
 
         layout.separator()
-
         r = layout.row()
-        if thicket_ui_mode == 'VIEW':
-            r.operator("thicket.edit_plant")
-        elif thicket_ui_mode == 'EDIT':
+        if thicket_ui_mode == 'EDIT':
             c = r.column()
-            c.operator("thicket.reset_plant", icon="NONE", text="Cancel")
+            o = c.operator("thicket.reset_plant", icon="NONE", text="Cancel")
+            o.next_mode = self.next_mode('CANCEL')
             c = r.column()
-            c.operator("thicket.update_plant", icon="NONE", text="Update")
+            o = c.operator("thicket.update_plant", icon="NONE", text="Update")
+            o.next_mode = self.next_mode('CONFIRM')
             c.enabled = tp != template.thicket
         elif thicket_ui_mode == 'ADD':
             c = r.column()
-            c.operator("thicket.change_mode", text="Cancel").next_mode = 'VIEW'
+            o = c.operator("thicket.change_mode", text="Cancel")
+            o.next_mode = self.next_mode('CANCEL')
             c = r.column()
-            c.operator("thicket.load_plant")
+            o = c.operator("thicket.load_plant")
+            o.next_mode = self.next_mode('CONFIRM')
 
 
 class THICKET_OT_rebuild_db(Operator):
