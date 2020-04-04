@@ -682,14 +682,15 @@ class THICKET_PT_plant_properties(Panel):
         tp = None
 
         instance = context.active_object
-        if (instance and is_thicket_instance(instance)):
-            template = instance.instance_collection
-            num_siblings = len(template.users_dupli_group)
-
         if instance is not thicket_ui_obj:
-            instance = thicket_ui_obj
+            thicket_ui_obj = None
             if thicket_ui_mode == 'EDIT':
                 thicket_ui_mode = 'VIEW'
+
+        if (instance and is_thicket_instance(instance)):
+            thicket_ui_obj = instance
+            template = instance.instance_collection
+            num_siblings = len(template.users_dupli_group)
 
         if thicket_ui_mode == 'VIEW':
             if template:
