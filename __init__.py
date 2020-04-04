@@ -28,7 +28,6 @@ Kits. It requires the Laubwerk Python SDK included with all Laubwerk Plant Kits.
 """
 
 import logging
-import os
 from pathlib import Path, PurePath
 import sys
 import time
@@ -45,7 +44,6 @@ from bpy.props import (EnumProperty,
                        PointerProperty,
                        StringProperty,
                        )
-from bpy_extras.io_utils import ImportHelper
 from bpy.app.translations import locale
 import bpy.utils.previews
 
@@ -306,19 +304,6 @@ def delete_plant(instance):
     delete_plant_template(template)
 
 
-def menu_import_lbw(self, context):
-    """Laubwerk Plant import menu entry"""
-
-    global plants_path, db
-
-    if not db:
-        self.layout.label(text="Laubwerk Plant (not configured)")
-        return
-
-    op = self.layout.operator(THICKET_IO_import_lbw.bl_idname, text="Laubwerk Plant (.lbw.gz)")
-    op.filepath = str(plants_path) + os.sep
-
-
 def draw_thicket_plant_props(layout, data):
     """Draw the plant properties UI
 
@@ -437,12 +422,6 @@ class ThicketPropGroup(PropertyGroup):
         return items
 
     magic: bpy.props.StringProperty()
-
-    # WARNING: Properties from here to the closing comment for ThicketPropGroup
-    # and THICKET_IO_import_lbw must be identical. A common draw routine is used
-    # for the Plant Properties Panel and for the import dialog panel. Class
-    # inheritance would preferable, but this does not appear to be possible with
-    # the Blender Python interface.
     filepath: bpy.props.StringProperty(subtype='FILE_PATH')
     model: EnumProperty(items=model_callback, name="Model")
     qualifier: EnumProperty(items=qualifier_callback, name="Season")
@@ -461,7 +440,6 @@ class ThicketPropGroup(PropertyGroup):
                                default=5, min=0, max=10, step=1)
     lod_min_thick: FloatProperty(name="Min Branch Thickness", description="Min thickness of trunk or branches",
                                  default=0.1, min=0.1, max=10000.0, step=1.0)
-    # End of common properties
 
 
 class THICKET_OT_reset_plant(Operator):
@@ -869,146 +847,9 @@ class THICKET_Pref(AddonPreferences):
         row.operator("thicket.rebuild_db", icon="FILE_REFRESH")
 
 
-class THICKET_OT_add_plant_db(Operator):
-    """Add an individual plant to the Thicket database
-
-    Used to add an individual plant to the Thicket database rather than having
-    to rebuild the entire database.
-    """
-
-    bl_idname = "thicket.add_plant_db"
-    bl_label = "Add Plant to Database"
-    bl_description = "Parse a Laubwerk Plants file and add to the database"
-    bl_options = {'REGISTER', 'INTERNAL'}
-
-    filepath: bpy.props.StringProperty(subtype="FILE_PATH")
-
-    def invoke(self, context, event):
-        return context.window_manager.invoke_confirm(self, event)
-
-    def execute(self, context):
-        global db, sdk_path
-        t0 = time.time()
-        db.add_plant(self.filepath)
-        db.save()
-        self.report({'INFO'}, "%s: Added %s to database in %0.2fs" %
-                    (__name__, db.get_plant(self.filepath).name, time.time()-t0))
-        populate_previews()
-        context.area.tag_redraw()
-        return {'FINISHED'}
-
-
-class THICKET_IO_import_lbw(Operator, ImportHelper):
-    """Modal File Browser to select and import a plant
-
-    Open to the default plant path and allow the user to select an lbw.gz file.
-    Display a thumbnail and plant properties to configure the plant properties.
-    Import the plant into the scene.
-
-    The properties panel uses a common draw routine with
-    THICKET_PT_plant_properties. They have to have an identical set of
-    properties for this to work.
-    """
-
-    bl_idname = "import_object.lbw"
-    bl_label = "Import LBW"
-
-    def model_callback(self, context):
-        global db
-        items = []
-        for m in THICKET_IO_import_lbw.plant.models:
-            items.append((m.name, m.label, ""))
-        return items
-
-    def qualifier_callback(self, context):
-        global db
-        items = []
-        for q in THICKET_IO_import_lbw.plant.get_model(self.model).qualifiers:
-            items.append((q.name, q.label, ""))
-        return items
-
-    filter_glob: StringProperty(default="*.lbw;*.lbw.gz", options={'HIDDEN'})
-    oldpath: StringProperty(name="Old Path", subtype="FILE_PATH")
-
-    # WARNING: Properties from here to the closing comment for ThicketPropGroup
-    # and THICKET_IO_import_lbw must be identical. A common draw routine is used
-    # for the Plant Properties Panel and for the import dialog panel. Class
-    # inheritance would preferable, but this does not appear to be possible with
-    # the Blender Python interface.
-    filepath: StringProperty(name="File Path", subtype="FILE_PATH")
-    viewport_lod: EnumProperty(name="Viewport Detail", items=[("proxy", "Proxy", ""),
-                                                              ("low", "Partial Geometry", "")])
-    model: EnumProperty(items=model_callback, name="Model")
-    qualifier: EnumProperty(items=qualifier_callback, name="Season")
-    lod_subdiv: IntProperty(name="Subdivision", description="How round the trunk and branches appear",
-                            default=3, min=0, max=5, step=1)
-    leaf_density: FloatProperty(name="Leaf Density", description="How full the foliage appears",
-                                default=100.0, min=0.01, max=100.0, subtype='PERCENTAGE')
-    leaf_amount: FloatProperty(name="Leaf Amount", description="How many leaves used for leaf density "
-                               "(smaller number means larger leaves)",
-                               default=100.0, min=0.01, max=100.0, subtype='PERCENTAGE')
-    lod_max_level: IntProperty(name="Branching Level", description="Max branching levels off the trunk",
-                               default=5, min=0, max=10, step=1)
-    lod_min_thick: FloatProperty(name="Min Branch Thickness", description="Min thickness of trunk or branches",
-                                 default=0.1, min=0.1, max=10000.0, step=1.0)
-    # End of common properties
-
-    # Class variable
-    plant = None
-
-    def execute(self, context):
-        keywords = self.as_keywords(ignore=("filter_glob", "oldpath"))
-        import_lbw(**keywords)  # noqa: F821
-        return {'FINISHED'}
-
-    def invoke(self, context, event):
-        context.window_manager.fileselect_add(self)
-        return {'RUNNING_MODAL'}
-
-    def draw(self, context):
-        global db
-        layout = self.layout
-        new_file = False
-
-        if not self.oldpath == self.filepath:
-            self.oldpath = self.filepath
-            new_file = True
-
-        if not Path(self.filepath).is_file():
-            # Path is most likely a directory
-            layout.label(text="Choose a Laubwerk Plant (.lbw.gz)")
-            return
-
-        THICKET_IO_import_lbw.plant = db.get_plant(self.filepath)
-        if not THICKET_IO_import_lbw.plant:
-            layout.label(text="Plant not found in database.", icon='ERROR')
-            layout.label(text="Rebuild the database in")
-            layout.label(text="Addon Preferences.")
-            layout.separator()
-            layout.label(text="You may add this plant individually.")
-            op = layout.operator("thicket.add_plant_db", icon="IMPORT")
-            op.filepath = self.filepath
-            # Because this plant was not in the database, the model and
-            # qualifier properties are empty. We need to force reloading them
-            # after it is added to the DB. Force this by setting oldpath to the
-            # empty string, which will trigger draw() to treat this as a new
-            # file.
-            self.oldpath = ""
-            return
-
-        if new_file:
-            self.model = THICKET_IO_import_lbw.plant.get_model().name
-            self.qualifier = THICKET_IO_import_lbw.plant.get_model(self.model).get_qualifier().name
-
-        layout.template_icon(icon_value=get_preview(THICKET_IO_import_lbw.plant.name, self.model).icon_id, scale=10)
-        draw_thicket_plant_props(layout, self)
-
-
 __classes__ = (
-        THICKET_IO_import_lbw,
         THICKET_Pref,
         THICKET_OT_rebuild_db,
-        THICKET_OT_add_plant_db,
         THICKET_OT_reset_plant,
         THICKET_OT_update_plant,
         THICKET_OT_delete_plant,
@@ -1031,8 +872,6 @@ def register():
     bpy.types.Collection.thicket = PointerProperty(type=ThicketPropGroup)
     bpy.types.WindowManager.thicket = PointerProperty(type=ThicketPropGroup)
 
-    bpy.types.TOPBAR_MT_file_import.append(menu_import_lbw)
-
     thicket_init()
 
 
@@ -1043,7 +882,6 @@ def unregister():
 
     if thicket_previews:
         bpy.utils.previews.remove(thicket_previews)
-    bpy.types.TOPBAR_MT_file_import.remove(menu_import_lbw)
     for c in reversed(__classes__):
         bpy.utils.unregister_class(c)
 
