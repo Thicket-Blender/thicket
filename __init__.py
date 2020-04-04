@@ -461,7 +461,7 @@ class THICKET_OT_update_plant(Operator):
         # Update the instance_collection reference in the instances
         for i in template.users_dupli_group:
             i.instance_collection = new_template
-            i.name = template.name
+            i.name = new_template.name
 
         # Remove the new instance collection and the old template
         delete_plant(new_instance)
