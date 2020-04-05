@@ -104,13 +104,13 @@ def populate_previews():
 
     t0 = time.time()
 
-    thicket_path = Path(bpy.utils.user_resource('SCRIPTS', 'addons', True)) / __name__
+    thicket_path = Path(bpy.utils.user_resource('SCRIPTS', "addons", True)) / __name__
     missing_path = thicket_path / "doc" / "missing_preview.png"
     thicket_previews.load("missing_preview", str(missing_path), 'IMAGE')
 
     for plant in db:
         # Load the top plant (no model) preview
-        plant_preview_key = plant.name.replace(' ', '_').replace('.', '')
+        plant_preview_key = plant.name.replace(" ", "_").replace(".", "")
         preview_path = plant.preview
         if preview_path != "" and Path(preview_path).is_file():
             thicket_previews.load(plant_preview_key, preview_path, 'IMAGE')
@@ -145,11 +145,11 @@ def get_preview(plant_name, model=""):
     preview
     """
 
-    preview_key = plant_name.replace(' ', '_').replace('.', '') + "_" + model
+    preview_key = plant_name.replace(" ", "_").replace(".", "") + "_" + model
     if preview_key not in thicket_previews:
         # The model specific preview was not found, try the plant preview
         # logging.warning("Preview key %s not found" % preview_key)
-        preview_key = plant_name.replace(' ', '_').replace('.', '')
+        preview_key = plant_name.replace(" ", "_").replace(".", "")
     if preview_key not in thicket_previews:
         # logging.warning("Preview key %s not found" % preview_key)
         preview_key = "missing_preview"
@@ -361,7 +361,7 @@ class ThicketPropGroup(PropertyGroup):
         items = []
 
         if not plant:
-            items.append(("default", "default", ""))
+            items.append(('DEFAULT', "default", ""))
         else:
             for m in plant.models:
                 items.append((m.name, m.label, ""))
@@ -388,10 +388,9 @@ class ThicketPropGroup(PropertyGroup):
     filepath: bpy.props.StringProperty(subtype='FILE_PATH')
     model: EnumProperty(items=model_callback, name="Model")
     qualifier: EnumProperty(items=qualifier_callback, name="Season")
-    # TODO: Use 'ALL_CAPS' Enum values
     viewport_lod: EnumProperty(name="Viewport Detail",
-                               items=[("proxy", "Proxy", ""), ("low", "Partial Geometry", "")],
-                               default="proxy")
+                               items=[('PROXY', "Proxy", ""), ('LOW', "Partial Geometry", "")],
+                               default='PROXY')
     lod_subdiv: IntProperty(name="Subdivision", description="How round the trunk and branches appear",
                             default=3, min=0, max=5, step=1)
     leaf_density: FloatProperty(name="Leaf Density", description="How full the foliage appears",
@@ -499,7 +498,7 @@ class THICKET_OT_make_unique(Operator):
 
         # Create a copy of the template and use the new one
         new_template = template.copy()
-        bpy.data.collections['Thicket'].children.link(new_template)
+        bpy.data.collections["Thicket"].children.link(new_template)
         instance.instance_collection = new_template
 
     def execute(self, context):
@@ -534,7 +533,7 @@ class THICKET_OT_select_plant(Operator):
     """Change the plant of the active object"""
 
     bl_idname = "thicket.select_plant"
-    bl_label = 'Select'
+    bl_label = "Select"
     bl_descroption = "Change the plant of the active object"
     bl_options = {'REGISTER', 'INTERNAL'}
 

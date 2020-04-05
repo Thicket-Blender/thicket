@@ -156,7 +156,7 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, qualifier=None, proxy_color=None):
     # assume this rather than a separate alpha image.
     alpha_path = lbw_mat.alpha_texture
     logging.debug("Alpha Texture: %s" % lbw_mat.alpha_texture)
-    if alpha_path != '':
+    if alpha_path != "":
         # Enable leaf clipping in Eevee
         mat.blend_method = 'CLIP'
         # TODO: mat.transparent_shadow_method = 'CLIP' ?
@@ -179,7 +179,7 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, qualifier=None, proxy_color=None):
 
     logging.debug("Subsurface Texture: %s" % lbw_mat.subsurface_texture)
     sub_path = lbw_mat.subsurface_texture
-    if sub_path != '':
+    if sub_path != "":
         node_sub = nodes.new(type='ShaderNodeTexImage')
         node_sub.location = 0, NH
         node_sub.image = bpy.data.images.load(sub_path)
@@ -196,7 +196,7 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, qualifier=None, proxy_color=None):
     # Bump Texture
     logging.debug("Bump Texture: %s" % lbw_mat.get_front().bump_texture)
     bump_path = lbw_mat.get_front().bump_texture
-    if bump_path != '':
+    if bump_path != "":
         node_bumpimg = nodes.new(type='ShaderNodeTexImage')
         node_bumpimg.location = 0, 0
         node_bumpimg.image = bpy.data.images.load(bump_path)
@@ -230,7 +230,7 @@ def import_lbw(filepath, leaf_density, model, qualifier, viewport_lod,
 
     # Create the viewport object (low detail)
     time_local = time.time()
-    if viewport_lod == 'low':
+    if viewport_lod == 'LOW':
         lbw_mesh = lbw_model.get_mesh(qualifier=qualifier,
                                       max_branch_level=min(3, lod_max_level),
                                       min_thickness=max(0.3, lod_min_thick),
@@ -240,7 +240,7 @@ def import_lbw(filepath, leaf_density, model, qualifier, viewport_lod,
     else:
         proxy = True
         lbw_mesh = lbw_model.get_proxy()
-        if viewport_lod != 'proxy':
+        if viewport_lod != 'PROXY':
             logging.warn("Unknown viewport_lod: %s" % viewport_lod)
 
     obj_viewport = lbw_to_bl_obj(lbw_plant, lbw_plant.name, lbw_mesh, qualifier, proxy)

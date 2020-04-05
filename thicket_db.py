@@ -25,7 +25,7 @@ SCHEMA_VERSION = 1
 
 def md5sum(filename):
     md5 = hashlib.md5()
-    with open(filename, mode='rb') as f:
+    with open(filename, mode="rb") as f:
         buf = f.read(4096)
         while buf:
             md5.update(buf)
@@ -102,10 +102,10 @@ class ThicketDB:
     def __init__(self, db_filename, locale="en-US", python=sys.executable, create=False):
         global SCHEMA_VERSION
         self._db_filename = db_filename
-        self.locale = locale.replace('_', '-')
+        self.locale = locale.replace("_", "-")
         self.python = python
         try:
-            with open(db_filename, 'r', encoding='utf-8') as f:
+            with open(db_filename, "r", encoding="utf-8") as f:
                 self._db = json.load(f)
             if self._db["info"]["schema_version"] != SCHEMA_VERSION:
                 logging.warning("Unknown database schema version")
@@ -133,7 +133,7 @@ class ThicketDB:
         self._db["info"]["schema_version"] = SCHEMA_VERSION
 
     def save(self):
-        with open(self._db_filename, 'w', encoding='utf-8') as f:
+        with open(self._db_filename, "w", encoding="utf-8") as f:
             json.dump(self._db, f, ensure_ascii=False, indent=4)
 
     def print_info(self):
@@ -149,7 +149,7 @@ class ThicketDB:
 
     def get_label(self, key, locale=None):
         if locale:
-            locale = locale.replace('_', '-')
+            locale = locale.replace("_", "-")
         else:
             locale = self.locale
 
@@ -203,7 +203,7 @@ class ThicketDB:
             p_rec = json.loads(outs)
             self._db["plants"][job.args[3]] = p_rec["plant"]
             self.update_labels(p_rec["labels"])
-            logging.info('Added "%s"' % p_rec['plant']['name'])
+            logging.info('Added "%s"' % p_rec["plant"]["name"])
 
         if len(plant_files) > 0:
             logging.error("Exited worker loop with %d plant files remaining" % len(plant_files))
@@ -238,7 +238,7 @@ class ThicketDB:
         plant["name"] = p.name
         plant["md5"] = md5sum(plant_filename)
         plant["default_model"] = p.default_model.name
-        preview_stem = p.name.replace(' ', '_').replace('.', '')
+        preview_stem = p.name.replace(" ", "_").replace(".", "")
         preview_path = Path(plant_filename).parent.absolute() / (preview_stem + ".png")
         if not preview_path.is_file():
             logging.warning("Preview not found: %s" % preview_path)
@@ -301,17 +301,17 @@ Commands:
   parse_plant         read a plant file and print the plant record json (requires -f -s)
 '''))
 
-    argParse.add_argument('cmd', choices=['read', 'build', 'parse_plant'])
-    argParse.add_argument('-d', help='database filename')
-    argParse.add_argument('-f', help='Laubwerk Plant filename (lbw.gz)')
-    argParse.add_argument('-l', choices=['DEBUG', 'INFO', 'WARN', 'ERROR', 'CRITICAL'],
-                          default='INFO', help='Logging level')
-    argParse.add_argument('-p', help='Laubwerk Plants path')
-    argParse.add_argument('-s', help='Laubwerk Python SDK path')
+    argParse.add_argument("cmd", choices=["read", "build", "parse_plant"])
+    argParse.add_argument("-d", help="database filename")
+    argParse.add_argument("-f", help="Laubwerk Plant filename (lbw.gz)")
+    argParse.add_argument("-l", choices=["DEBUG", "INFO", "WARN", "ERROR", "CRITICAL"],
+                          default="INFO", help="Logging level")
+    argParse.add_argument("-p", help="Laubwerk Plants path")
+    argParse.add_argument("-s", help="Laubwerk Python SDK path")
 
     args = argParse.parse_args()
 
-    logging.basicConfig(format='%(levelname)s: thicket: %(message)s', level=args.l)
+    logging.basicConfig(format="%(levelname)s: thicket: %(message)s", level=args.l)
 
     if args.s:
         # If the SDK path was specified, attempt to import the Laubwerk SDK The
@@ -324,13 +324,13 @@ Commands:
         import laubwerk as lbw
 
     cmd = args.cmd
-    if cmd == 'read' and args.d:
+    if cmd == "read" and args.d:
         db = ThicketDB(args.d, create=False)
         db.read()
-    elif cmd == 'build' and args.d and args.p and lbw:
+    elif cmd == "build" and args.d and args.p and lbw:
         db = ThicketDB(args.d, create=True)
         db.build(args.p, args.s)
-    elif cmd == 'parse_plant' and args.f and lbw:
+    elif cmd == "parse_plant" and args.f and lbw:
         ThicketDB.parse_plant_json(args.f)
     else:
         argParse.print_help()
