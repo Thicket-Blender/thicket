@@ -53,15 +53,15 @@ logging.basicConfig(format='%(levelname)s: thicket: %(message)s', level=logging.
 bl_info = {
     "name": "Thicket: Laubwerk Plants Add-on for Blender",
     "author": "Darren Hart",
-    "version": (0, 1, 9),
+    "version": (0, 2, 0),
     "blender": (2, 80, 0),
-    "location": "File > Import",
+    "location": "View3D > Sidebar > Thicket",
     "description": "Import Laubwerk Plants (.lbw.gz)",
-    "warning": "",
-    'wiki_url': 'https://github.com/dvhart/lbwbl/blob/master/README.md',
-    'tracker_url': 'https://github.com/dvhart/lbwbl/issues',
-    'link': 'https://github.com/dvhart/lbwbl',
-    "category": "Import"
+    "warning": "This is an unofficial development release",
+    "wiki_url": "https://github.com/dvhart/lbwbl/blob/master/README.md",
+    "tracker_url": "https://github.com/dvhart/lbwbl/issues",
+    "support": 'COMMUNITY',
+    "category": "Import-Export"
 }
 
 
