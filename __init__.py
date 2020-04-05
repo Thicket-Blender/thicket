@@ -58,8 +58,8 @@ bl_info = {
     "location": "View3D > Sidebar > Thicket",
     "description": "Import Laubwerk Plants (.lbw.gz)",
     "warning": "This is an unofficial development release",
-    "wiki_url": "https://github.com/dvhart/lbwbl/blob/master/README.md",
-    "tracker_url": "https://github.com/dvhart/lbwbl/issues",
+    "wiki_url": "https://github.com/Thicket-Blender/thicket/blob/master/README.md",
+    "tracker_url": "https://github.com/Thicket-Blender/thicket/issues",
     "support": 'COMMUNITY',
     "category": "Import-Export"
 }
