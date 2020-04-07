@@ -629,6 +629,20 @@ class THICKET_OT_load_plant(Operator):
         return {'FINISHED'}
 
 
+class THICKET_OT_clear_search(Operator):
+    """Select a new plant for the UI"""
+
+    bl_idname = "thicket.clear_search"
+    bl_label = "Clear Search"
+    bl_description = "Clear the Thicket search string"
+    bl_options = {'REGISTER', 'INTERNAL'}
+
+    def execute(self, context):
+        context.window_manager.thicket_search = ""
+        context.area.tag_redraw()
+        return {'FINISHED'}
+
+
 class THICKET_PT_plant_properties(Panel):
     """Thicket Plant Properties Panel
 
@@ -706,12 +720,22 @@ class THICKET_PT_plant_properties(Panel):
         o = layout.operator("thicket.change_mode", text="Cancel")
         o.next_mode = self.next_mode('CANCEL')
 
+        # Search box to filter on name and common name (label)
+        r = layout.row()
+        r.prop(context.window_manager, "thicket_search", icon='VIEWZOOM', text="")
+        r.operator("thicket.clear_search", text="", icon='CANCEL')
+
         grid = layout.grid_flow(columns=num_cols, even_columns=True, even_rows=False)
         for plant in db:
+            search = context.window_manager.thicket_search.lower()
+            name = plant.name
+            label = plant.label
+            if search not in name.lower() and search not in label.lower():
+                continue
             cell = grid.column().box()
-            cell.template_icon(icon_value=get_preview(plant.name).icon_id, scale=THICKET_SCALE)
-            cell.label(text="%s" % plant.label)
-            cell.label(text="(%s)" % plant.name)
+            cell.template_icon(icon_value=get_preview(name).icon_id, scale=THICKET_SCALE)
+            cell.label(text="%s" % label)
+            cell.label(text="(%s)" % name)
             o = cell.operator("thicket.select_plant")
             o.filepath = plant.filepath
             o.next_mode = self.next_mode('CONFIRM')
@@ -907,6 +931,7 @@ __classes__ = (
         THICKET_OT_select_plant,
         THICKET_OT_edit_plant,
         THICKET_OT_load_plant,
+        THICKET_OT_clear_search,
         ThicketPropGroup,
         THICKET_PT_plant_properties
 )
@@ -920,6 +945,7 @@ def register():
 
     bpy.types.Collection.thicket = PointerProperty(type=ThicketPropGroup)
     bpy.types.WindowManager.thicket = PointerProperty(type=ThicketPropGroup)
+    bpy.types.WindowManager.thicket_search = StringProperty(description="Filter by botanical or common name")
 
     thicket_init()
 
