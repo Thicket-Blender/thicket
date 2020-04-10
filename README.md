@@ -40,6 +40,7 @@ out.
 * Download and install the prerequisites
   * [Blender](http://www.blender.org/) 2.80 or later. The plugin is known to run with [Blender 2.82](http://www.blender.org/features/past-releases/2-82/).
   * Laubwerk Python SDK 1.0.32 or later, provided by all Laubwerk Plant Kits, including the [Plants Kit Freebie](http://www.laubwerk.com/store/plants-kit-freebie).
+    * Choose the "Custom" installation method and ensure the "Python Extension" component is checked.
 * Installation options
   * Latest from GitHub
     * Exit Blender
