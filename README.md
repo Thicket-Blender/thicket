@@ -75,8 +75,7 @@ Thicket adds a Blender N Panel to Add, Edit, and Delete plants. Access the panel
 ![doc/thicket-panel-add-only.png](doc/thicket-panel-add-only.png)
 
 ### Add Plant
-To add a plant, click `Add Plant` and select from the gallery presented. You can
-resize the panel to show up to 5 columns of plants.
+To add a plant, click `Add Plant` and select from the gallery presented. You can resize the panel to show up to 5 columns of plants. You can filter the results by entering a search term (clear the search by pressing the cancel icon to the right of the search field).
 
 ![doc/thicket-panel-select.png](doc/thicket-panel-select.png)
 
