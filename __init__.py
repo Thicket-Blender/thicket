@@ -48,8 +48,6 @@ from bpy.app.translations import locale
 import bpy.utils.previews
 
 
-logging.basicConfig(format='%(levelname)s: thicket: %(message)s', level=logging.INFO)
-
 bl_info = {
     "name": "Thicket: Laubwerk Plants Add-on for Blender",
     "author": "Darren Hart",
@@ -184,12 +182,19 @@ def thicket_init():
     plants_path = None
     sdk_path = None
 
+    prefs = bpy.context.preferences.addons[__name__].preferences
+
+    logging.basicConfig(format='%(levelname)s: thicket: %(message)s', level=prefs.log_level or logging.INFO)
+    logging.debug("Log level: %s (%d)" % (prefs.log_level, prefs["log_level"]))
+
     valid_lbw_path = False
-    lbw_path = bpy.context.preferences.addons[__name__].preferences.lbw_path
+    lbw_path = prefs.lbw_path
 
     if lbw_path != "" and Path(lbw_path).is_dir():
         plants_path = Path(lbw_path) / "Plants"
+        logging.debug("Plants path: '%s'" % plants_path)
         sdk_path = Path(lbw_path) / "Python"
+        logging.debug("SDK path: '%s'" % sdk_path)
         if plants_path.is_dir() and sdk_path.is_dir():
             valid_lbw_path = True
 
@@ -899,6 +904,14 @@ class THICKET_Pref(AddonPreferences):
         update=lbw_path_on_update
         )
 
+    log_level: EnumProperty(name="Log Level",
+                            items=[('DEBUG', "Debug", "", logging.DEBUG),
+                                   ('INFO', "Info", "", logging.INFO),
+                                   ('WARNING', "Warning", "", logging.WARNING),
+                                   ('ERROR', "Error", "", logging.ERROR),
+                                   ('CRITICAL', "Critical", "", logging.CRITICAL)],
+                            default='INFO')
+
     def draw(self, context):
         global db, thicket_ready
 
@@ -923,6 +936,10 @@ class THICKET_Pref(AddonPreferences):
         col = row.column()
         col.enabled = thicket_ready
         col.operator("thicket.rebuild_db", icon="FILE_REFRESH")
+
+        box = self.layout.box()
+        box.label(text="Advanced Settings")
+        box.prop(self, "log_level")
 
 
 __classes__ = (
