@@ -120,7 +120,7 @@ def populate_previews():
             if preview_path != "" and Path(preview_path).is_file():
                 thicket_previews.load(preview_key, preview_path, 'IMAGE')
 
-    logging.info("Added %d previews in %0.2fs" % (len(thicket_previews), time.time()-t0))
+    logging.debug("Added %d previews in %0.2fs" % (len(thicket_previews), time.time()-t0))
 
 
 def get_preview(plant_name, model=""):
@@ -146,10 +146,10 @@ def get_preview(plant_name, model=""):
     preview_key = plant_name.replace(" ", "_").replace(".", "") + "_" + model
     if preview_key not in thicket_previews:
         # The model specific preview was not found, try the plant preview
-        # logging.warning("Preview key %s not found" % preview_key)
+        logging.debug("Preview key %s not found" % preview_key)
         preview_key = plant_name.replace(" ", "_").replace(".", "")
     if preview_key not in thicket_previews:
-        # logging.warning("Preview key %s not found" % preview_key)
+        logging.debug("Preview key %s not found" % preview_key)
         preview_key = "missing_preview"
     return thicket_previews[preview_key]
 
@@ -208,28 +208,41 @@ def thicket_init():
         sys.path.append(str(sdk_path))
 
     if "laubwerk" not in sys.modules:
-        import laubwerk
+        try:
+            import laubwerk
+        except ImportError:
+            logging.critical("Failed to load laubwerk module")
+            return
 
     if "thicket_lbw" not in sys.modules:
-        from .thicket_lbw import import_lbw
+        try:
+            from .thicket_lbw import import_lbw
+        except ImportError:
+            logging.critical("Failed to load thicket_lbw.import_lbw")
+            return
 
     if "thicket_db" not in sys.modules:
-        from .thicket_db import ThicketDB
+        try:
+            from .thicket_db import ThicketDB
+        except ImportError:
+            logging.critical("Failed to import thicket_db.ThicketDB")
+            return
 
     db_path = Path(bpy.utils.user_resource('SCRIPTS', "addons", True)) / __name__ / "thicket.db"
     try:
         db = ThicketDB(db_path, locale, bpy.app.binary_path_python)
     except FileNotFoundError:
-        logging.warning("Database not found, creating empty database")
+        logging.info("Database not found, creating empty database")
         db_dir = Path(PurePath(db_path).parent)
         db_dir.mkdir(parents=True, exist_ok=True)
         db = ThicketDB(db_path, locale, bpy.app.binary_path_python, True)
+
+    populate_previews()
 
     thicket_ready = True
     logging.info("Laubwerk Install Path: %s" % lbw_path)
     logging.info(laubwerk.version)
     logging.info("Database (%d plants): %s" % (db.plant_count(), db_path))
-    populate_previews()
     logging.info("Ready")
 
 
@@ -455,7 +468,7 @@ class THICKET_OT_update_plant(Operator):
             logging.error("update_plant failed: non-Thicket object: %" % instance.name)
             return
         instance = context.active_object
-        logging.info("Update plant: %s" % instance.name)
+        logging.debug("Updating plant: %s" % instance.name)
         template = instance.instance_collection
 
         # Load new plant model
@@ -499,7 +512,7 @@ class THICKET_OT_make_unique(Operator):
     def make_unique(self, instance):
         template = instance.instance_collection
         if len(template.users_dupli_group) == 1:
-            logging.info("%s already is unique" % instance.name)
+            logging.warning("%s already is unique" % instance.name)
             return
 
         # Create a copy of the template and use the new one
