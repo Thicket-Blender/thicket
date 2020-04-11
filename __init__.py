@@ -143,11 +143,13 @@ def get_preview(plant_name, model=""):
     preview
     """
 
-    preview_key = plant_name.replace(" ", "_").replace(".", "") + "_" + model
-    if preview_key not in thicket_previews:
-        # The model specific preview was not found, try the plant preview
-        logging.debug("Preview key %s not found" % preview_key)
-        preview_key = plant_name.replace(" ", "_").replace(".", "")
+    preview_key = plant_name.replace(" ", "_").replace(".", "")
+    if model != "":
+        preview_key = plant_name.replace(" ", "_").replace(".", "") + "_" + model
+        if preview_key not in thicket_previews:
+            # The model specific preview was not found, try the plant preview
+            logging.debug("Preview key %s not found" % preview_key)
+            preview_key = plant_name.replace(" ", "_").replace(".", "")
     if preview_key not in thicket_previews:
         logging.debug("Preview key %s not found" % preview_key)
         preview_key = "missing_preview"
