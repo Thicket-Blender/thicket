@@ -900,9 +900,11 @@ class THICKET_Pref(AddonPreferences):
 
         box = self.layout.box()
         box.label(text="Laubwerk Plants Library")
-        row = box.row()
-        row.alert = not thicket_ready
-        row.prop(self, "lbw_path")
+        col = box.column()
+        col.alert = not thicket_ready
+        col.prop(self, "lbw_path")
+        if not thicket_ready:
+            col.label(text="Verify the 'Install Path' includes both a 'Plants' and a 'Python' directory.")
 
         lbw_version = "Laubwerk Version: N/A"
         db_status = "No database found"
@@ -910,14 +912,13 @@ class THICKET_Pref(AddonPreferences):
             lbw_version = laubwerk.version
             db_status = "Database contains %d plants" % db.plant_count()
 
+        box.label(text=lbw_version)
         row = box.row()
-        row.enabled = thicket_ready
-        row.label(text=lbw_version)
-
-        row = box.row()
-        row.enabled = thicket_ready
-        row.label(text=db_status)
-        row.operator("thicket.rebuild_db", icon="FILE_REFRESH")
+        col = row.column()
+        col.label(text=db_status)
+        col = row.column()
+        col.enabled = thicket_ready
+        col.operator("thicket.rebuild_db", icon="FILE_REFRESH")
 
 
 __classes__ = (
