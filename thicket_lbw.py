@@ -173,13 +173,13 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, qualifier=None, proxy_color=None):
             logging.warning("Diffuse Texture: %s" % lbw_mat.get_front().diffuse_texture)
 
     # Subsurface Texture
-    logging.debug("Subsurface Color: %s" % str(lbw_mat.subsurface_color))
     if lbw_mat.subsurface_color:
+        logging.debug("Subsurface Color: %s" % str(lbw_mat.subsurface_color))
         node_dif.inputs['Subsurface Color'].default_value = lbw_mat.subsurface_color + (1.0,)
 
-    logging.debug("Subsurface Texture: %s" % lbw_mat.subsurface_texture)
     sub_path = lbw_mat.subsurface_texture
     if sub_path != "":
+        logging.debug("Subsurface Texture: %s" % lbw_mat.subsurface_texture)
         node_sub = nodes.new(type='ShaderNodeTexImage')
         node_sub.location = 0, NH
         node_sub.image = bpy.data.images.load(sub_path)
@@ -194,9 +194,9 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, qualifier=None, proxy_color=None):
             logging.warning("Subsurface Depth > 0. Not supported.")
 
     # Bump Texture
-    logging.debug("Bump Texture: %s" % lbw_mat.get_front().bump_texture)
     bump_path = lbw_mat.get_front().bump_texture
     if bump_path != "":
+        logging.debug("Bump Texture: %s" % lbw_mat.get_front().bump_texture)
         node_bumpimg = nodes.new(type='ShaderNodeTexImage')
         node_bumpimg.location = 0, 0
         node_bumpimg.image = bpy.data.images.load(bump_path)
@@ -210,9 +210,12 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, qualifier=None, proxy_color=None):
         links.new(node_bumpimg.outputs['Color'], node_bump.inputs['Height'])
         links.new(node_bump.outputs['Normal'], node_dif.inputs['Normal'])
 
-    logging.debug("Displacement Texture: %s" % lbw_mat.displacement_texture)
-    logging.debug("Normal Texture: %s" % lbw_mat.get_front().normal_texture)
-    logging.debug("Specular Texture: %s" % lbw_mat.get_front().specular_texture)
+    if lbw_mat.displacement_texture:
+        logging.debug("Displacement Texture: %s" % lbw_mat.displacement_texture)
+    if lbw_mat.get_front().normal_texture:
+        logging.debug("Normal Texture: %s" % lbw_mat.get_front().normal_texture)
+    if lbw_mat.get_front().specular_texture:
+        logging.debug("Specular Texture: %s" % lbw_mat.get_front().specular_texture)
 
     return mat
 
@@ -221,6 +224,8 @@ def import_lbw(filepath, leaf_density, model, qualifier, viewport_lod,
                lod_min_thick, lod_max_level, lod_subdiv, leaf_amount):
     time_main = time.time()
     lbw_plant = laubwerk.load(filepath)
+    # TODO: This should be debug, but we cannot silence the SDK [debug] message
+    # which appear without context without this appearing in the log first
     logging.info('Importing "%s"' % lbw_plant.name)
     lbw_model = next((m for m in lbw_plant.models if m.name == model), lbw_plant.default_model)
     if not lbw_model.name == model:
@@ -241,12 +246,12 @@ def import_lbw(filepath, leaf_density, model, qualifier, viewport_lod,
         proxy = True
         lbw_mesh = lbw_model.get_proxy()
         if viewport_lod != 'PROXY':
-            logging.warn("Unknown viewport_lod: %s" % viewport_lod)
+            logging.warning("Unknown viewport_lod: %s" % viewport_lod)
 
     obj_viewport = lbw_to_bl_obj(lbw_plant, lbw_plant.name, lbw_mesh, qualifier, proxy)
     obj_viewport.hide_render = True
     obj_viewport.show_name = True
-    logging.info("Generated low resolution viewport object in %.4fs" % (time.time() - time_local))
+    logging.debug("Generated low resolution viewport object in %.4fs" % (time.time() - time_local))
 
     # Create the render object (high detail)
     time_local = time.time()
@@ -260,7 +265,7 @@ def import_lbw(filepath, leaf_density, model, qualifier, viewport_lod,
     obj_render.parent = obj_viewport
     obj_render.hide_viewport = True
     obj_render.hide_select = True
-    logging.info("Generated high resolution render object in %.4fs" % (time.time() - time_local))
+    logging.debug("Generated high resolution render object in %.4fs" % (time.time() - time_local))
 
     # Setup collection hierarchy
     thicket_col = new_collection("Thicket", bpy.context.scene.collection, singleton=True, exclude=True)
