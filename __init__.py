@@ -360,10 +360,11 @@ class ThicketPropGroup(PropertyGroup):
             other[k] = v
 
     def as_keywords(self, ignore):
+        global db
         # Do each explicitly to get the default value from the property if it is not set.
         # Just converting to a dict directly will ignore unset # properties.
         keywords = {}
-        keywords["filepath"] = self.filepath
+        keywords["filepath"] = db.get_plant(name=self.name).filepath
         keywords["model"] = self.model
         keywords["qualifier"] = self.qualifier
         keywords["viewport_lod"] = self.viewport_lod
@@ -380,7 +381,7 @@ class ThicketPropGroup(PropertyGroup):
         tp = context.window_manager.thicket
         if thicket_ui_mode == 'VIEW':
             tp = context.active_object.instance_collection.thicket
-        plant = db.get_plant(tp.filepath)
+        plant = db.get_plant(name=tp.name)
         items = []
 
         if not plant:
@@ -397,7 +398,7 @@ class ThicketPropGroup(PropertyGroup):
         if thicket_ui_mode == 'VIEW':
             tp = context.active_object.instance_collection.thicket
 
-        plant = db.get_plant(tp.filepath)
+        plant = db.get_plant(name=tp.name)
         items = []
 
         if not plant:
@@ -407,8 +408,8 @@ class ThicketPropGroup(PropertyGroup):
                 items.append((q.name, q.label, ""))
         return items
 
+    # name is provided by the PropertyGroup and used to store the unique Laubwerk Plant name
     magic: bpy.props.StringProperty()
-    filepath: bpy.props.StringProperty(subtype='FILE_PATH')
     model: EnumProperty(items=model_callback, name="Model")
     qualifier: EnumProperty(items=qualifier_callback, name="Season")
     viewport_lod: EnumProperty(name="Viewport Detail",
@@ -567,7 +568,7 @@ class THICKET_OT_select_plant(Operator):
         global db, thicket_ui_mode
 
         tp = context.window_manager.thicket
-        plant = db.get_plant(self.filepath)
+        plant = db.get_plant(filepath=self.filepath)
 
         # Store the old values and set the model and qualifier to the 0 entry (should always exist)
         old_model = tp.model
@@ -576,10 +577,9 @@ class THICKET_OT_select_plant(Operator):
         # If adding a new plant, start off with the defaults
         if self.next_mode == 'ADD':
             for key in tp.keys():
-                tp.property_unset(key)
+                tp.pop(key)
 
-        # Change the filepath (which seems to trigger checks on the enum model and qualifier
-        tp.filepath = self.filepath
+        tp.name = plant.name
 
         # Restore the old values if available, others reset to the defaults
         model = plant.get_model(old_model)
@@ -831,7 +831,7 @@ class THICKET_PT_plant_properties(Panel):
         if tp is None:
             return
 
-        plant = db.get_plant(tp.filepath)
+        plant = db.get_plant(name=tp.name)
         layout.template_icon(icon_value=get_preview(plant.name, tp.model).icon_id, scale=THICKET_SCALE)
         if thicket_ui_mode == 'VIEW':
             o = layout.operator("thicket.edit_plant")
