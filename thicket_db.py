@@ -162,10 +162,20 @@ class ThicketDB:
         except KeyError:
             return key
 
-    def get_plant(self, filepath):
-        if filepath not in self._db["plants"]:
-            return None
-        return DBPlant(self, filepath)
+    def get_plant(self, filepath=None, name=None):
+        if filepath:
+            if filepath not in self._db["plants"]:
+                filepath = None
+
+        if filepath is None and name:
+            for f in self._db["plants"]:
+                if self._db["plants"][f]["name"] == name:
+                    filepath = f
+
+        if filepath:
+            return DBPlant(self, filepath)
+
+        return None
 
     def add_plant(self, plant_filename):
         p_rec = ThicketDB.parse_plant(plant_filename)
