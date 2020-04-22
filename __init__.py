@@ -269,7 +269,7 @@ def thicket_init():
     except FileNotFoundError:
         logging.info("Database not found, creating empty database")
 
-    if db is None:
+    if db is None or db.plant_count() == 0:
         thicket_status = ThicketStatus.REBUILD_DB
         db_dir = Path(PurePath(db_path).parent)
         db_dir.mkdir(parents=True, exist_ok=True)
@@ -874,6 +874,11 @@ class THICKET_PT_plant_properties(Panel):
             return
 
         plant = db.get_plant(name=tp.name)
+        if plant is None:
+            layout.label(text="Plant not found in database")
+            layout.operator("thicket.rebuild_db", icon="FILE_REFRESH")
+            return
+
         layout.template_icon(icon_value=get_preview(plant.name, tp.model).icon_id, scale=THICKET_SCALE)
         if thicket_ui_mode == 'VIEW':
             o = layout.operator("thicket.edit_plant")
