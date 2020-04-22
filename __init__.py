@@ -27,6 +27,8 @@ Thicket adds import and level-of-detail support to Blender for Laubwerk Plant
 Kits. It requires the Laubwerk Python SDK included with all Laubwerk Plant Kits.
 """
 
+from enum import Enum, unique
+from functools import total_ordering
 import logging
 from pathlib import Path, PurePath
 import sys
@@ -63,7 +65,27 @@ bl_info = {
 }
 
 
-thicket_ready = False
+@total_ordering
+@unique
+class ThicketStatus(Enum):
+    def __eq__(self, other):
+        if self.__class__ is other.__class__:
+            return self.value == other.value
+        return NotImplemented
+
+    def __lt__(self, other):
+        if self.__class__ is other.__class__:
+            return self.value < other.value
+        return NotImplemented
+
+    INIT = 0
+    LBW_VALID = 10
+    IMPORTED = 20
+    REBUILD_DB = 30
+    READY = 40
+
+
+thicket_status = ThicketStatus.INIT
 db = None
 plants_path = None
 sdk_path = None
@@ -177,9 +199,9 @@ def thicket_init():
     none
     """
 
-    global thicket_ready, db, plants_path, sdk_path, ThicketDB, import_lbw, laubwerk
+    global thicket_status, db, plants_path, sdk_path, ThicketDB, import_lbw, laubwerk
 
-    thicket_ready = False
+    thicket_status = ThicketStatus.INIT
     db = None
     plants_path = None
     sdk_path = None
@@ -208,6 +230,9 @@ def thicket_init():
         logging.warning("Invalid Laubwerk Install Path: '%s'" % lbw_path)
         return
 
+    thicket_status = ThicketStatus.LBW_VALID
+    logging.info("Laubwerk Install Path: %s" % lbw_path)
+
     if str(sdk_path) not in sys.path:
         sys.path.append(str(sdk_path))
 
@@ -227,25 +252,33 @@ def thicket_init():
 
     if "thicket_db" not in sys.modules:
         try:
-            from .thicket_db import ThicketDB
+            from .thicket_db import ThicketDB, ThicketDBOldSchemaError
         except ImportError:
             logging.critical("Failed to import thicket_db.ThicketDB")
             return
 
+    thicket_status = ThicketStatus.IMPORTED
+    logging.info(laubwerk.version)
+
     db_path = Path(bpy.utils.user_resource('SCRIPTS', "addons", True)) / __name__ / "thicket.db"
     try:
         db = ThicketDB(db_path, locale, bpy.app.binary_path_python)
+    except ThicketDBOldSchemaError:
+        logging.warning("Old database schema found, creating empty database")
+        db_path.unlink()
     except FileNotFoundError:
         logging.info("Database not found, creating empty database")
+
+    if db is None:
+        thicket_status = ThicketStatus.REBUILD_DB
         db_dir = Path(PurePath(db_path).parent)
         db_dir.mkdir(parents=True, exist_ok=True)
         db = ThicketDB(db_path, locale, bpy.app.binary_path_python, True)
+        return
 
     populate_previews()
 
-    thicket_ready = True
-    logging.info("Laubwerk Install Path: %s" % lbw_path)
-    logging.info(laubwerk.version)
+    thicket_status = ThicketStatus.READY
     logging.info("Database (%d plants): %s" % (db.plant_count(), db_path))
     logging.info("Ready")
 
@@ -257,7 +290,7 @@ def is_thicket_instance(obj):
     ThicketPropGroup (thicket) with the magic property set to THICKET_GUID.
 
     Avoid attempting to work with Thicket object before thicket_init has been
-    called successfully by requiring thicket_ready to be True.
+    called successfully by requiring thicket_status to be READY.
 
     Parameters
     ----------
@@ -269,7 +302,7 @@ def is_thicket_instance(obj):
     Boolean
     """
 
-    if not thicket_ready:
+    if thicket_status != ThicketStatus.READY:
         return False
 
     if obj and obj.instance_collection and obj.instance_collection.thicket.magic == THICKET_GUID:
@@ -791,7 +824,18 @@ class THICKET_PT_plant_properties(Panel):
         layout.prop(tp, "lod_min_thick")
 
     def draw(self, context):
-        global db, thicket_ui_mode, thicket_ui_obj, THICKET_SCALE
+        global db, thicket_status, thicket_ui_mode, thicket_ui_obj, THICKET_SCALE
+
+        layout = self.layout
+
+        # Check for Thicket initialization problems
+        if thicket_status == ThicketStatus.REBUILD_DB:
+            layout.label(text="Please rebuild the database")
+            layout.operator("thicket.rebuild_db", icon="FILE_REFRESH")
+            return
+        elif thicket_status < ThicketStatus.READY:
+            layout.label(text="See Thicket Add-on Preferences")
+            return
 
         template = None
         num_siblings = 0
@@ -817,8 +861,6 @@ class THICKET_PT_plant_properties(Panel):
         if thicket_ui_mode in ['SELECT', 'SELECT_ADD']:
             self.draw_gallery(context, tp)
             return
-
-        layout = self.layout
 
         # Draw Add and Delete in VIEW mode only
         if thicket_ui_mode == 'VIEW':
@@ -892,7 +934,7 @@ class THICKET_OT_rebuild_db(Operator):
         t0 = time.time()
         db.build(str(plants_path), str(sdk_path))
         logging.info("Rebuilt database in %0.2fs" % (time.time()-t0))
-        populate_previews()
+        thicket_init()
         context.area.tag_redraw()
         return {'FINISHED'}
 
@@ -930,28 +972,32 @@ class THICKET_Pref(AddonPreferences):
                             default='INFO')
 
     def draw(self, context):
-        global db, thicket_ready
+        global db, thicket_status
 
         box = self.layout.box()
         box.label(text="Laubwerk Plants Library")
         col = box.column()
-        col.alert = not thicket_ready
+        col.alert = thicket_status < ThicketStatus.LBW_VALID
         col.prop(self, "lbw_path")
-        if not thicket_ready:
+        if col.alert:
             col.label(text="Verify the 'Install Path' includes both a 'Plants' and a 'Python' directory.")
 
         lbw_version = "Laubwerk Version: N/A"
         db_status = "No database found"
-        if thicket_ready:
+        if thicket_status >= ThicketStatus.LBW_VALID:
             lbw_version = laubwerk.version
+        if thicket_status == ThicketStatus.REBUILD_DB:
+            db_status = "Please rebuild the database"
+        if thicket_status > ThicketStatus.REBUILD_DB:
             db_status = "Database contains %d plants" % db.plant_count()
 
         box.label(text=lbw_version)
         row = box.row()
+        row.alert = thicket_status == ThicketStatus.REBUILD_DB
         col = row.column()
         col.label(text=db_status)
         col = row.column()
-        col.enabled = thicket_ready
+        col.enabled = thicket_status > ThicketStatus.IMPORTED
         col.operator("thicket.rebuild_db", icon="FILE_REFRESH")
 
         box = self.layout.box()
