@@ -97,6 +97,11 @@ class DBIter:
         raise StopIteration
 
 
+class ThicketDBOldSchemaError(Exception):
+    # TODO: include current and read schema version
+    pass
+
+
 class ThicketDB:
     """ Thicket Database Interface """
     def __init__(self, db_filename, locale="en-US", python=sys.executable, create=False):
@@ -107,8 +112,9 @@ class ThicketDB:
         try:
             with open(db_filename, "r", encoding="utf-8") as f:
                 self._db = json.load(f)
-            if self._db["info"]["schema_version"] != SCHEMA_VERSION:
+            if self._db["info"]["schema_version"] < SCHEMA_VERSION:
                 logging.warning("Unknown database schema version")
+                raise ThicketDBOldSchemaError
         except FileNotFoundError:
             if create:
                 self.initialize()
