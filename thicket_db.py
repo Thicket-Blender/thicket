@@ -20,7 +20,7 @@ except ImportError:
 
 # <pep8 compliant>
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 def md5sum(filename):
@@ -59,11 +59,11 @@ class DBModel:
 
 
 class DBPlant:
-    def __init__(self, db, filepath):
-        self.filepath = filepath
-        p_rec = db._db["plants"][filepath]
+    def __init__(self, db, name):
+        self.name = name
+        p_rec = db._db["plants"][name]
         self.md5 = p_rec["md5"]
-        self.name = p_rec["name"]
+        self.filepath = p_rec["filepath"]
         self.label = db.get_label(self.name)
         preview = p_rec["preview"]
         self.models = [DBModel(db, m, p_rec["models"][m], preview) for m in p_rec["models"]]
@@ -85,8 +85,8 @@ class DBIter:
         self._items = []
         self._index = 0
 
-        for filepath in db._db["plants"]:
-            self._items.append(DBPlant(db, filepath))
+        for name in db._db["plants"]:
+            self._items.append(DBPlant(db, name))
         self._items.sort(key=lambda plant: plant.name)
 
     def __next__(self):
@@ -169,23 +169,23 @@ class ThicketDB:
             return key
 
     def get_plant(self, filepath=None, name=None):
-        if filepath:
-            if filepath not in self._db["plants"]:
-                filepath = None
+        if name:
+            if name not in self._db["plants"]:
+                name = None
 
-        if filepath is None and name:
-            for f in self._db["plants"]:
-                if self._db["plants"][f]["name"] == name:
-                    filepath = f
+        if name is None and filepath:
+            for n in self._db["plants"]:
+                if self._db["plants"][n]["filepath"] == filepath:
+                    name = n
 
-        if filepath:
-            return DBPlant(self, filepath)
+        if name:
+            return DBPlant(self, name)
 
         return None
 
-    def add_plant(self, plant_filename):
-        p_rec = ThicketDB.parse_plant(plant_filename)
-        self._db["plants"][plant_filename] = p_rec["plant"]
+    def add_plant(self, filepath):
+        p_rec = ThicketDB.parse_plant(filepath)
+        self._db["plants"][p_rec["name"]] = p_rec["plant"]
         self.update_labels(p_rec["labels"])
 
     def plant_count(self):
@@ -217,7 +217,7 @@ class ThicketDB:
             job = jobs.popleft()
             outs, errs = job.communicate()
             p_rec = json.loads(outs)
-            self._db["plants"][job.args[3]] = p_rec["plant"]
+            self._db["plants"][p_rec["plant"]["name"]] = p_rec["plant"]
             self.update_labels(p_rec["labels"])
             logging.info('Added "%s"' % p_rec["plant"]["name"])
 
@@ -245,17 +245,18 @@ class ThicketDB:
                                           [q.name for q in m.qualifiers]))
 
     # Class methods
-    def parse_plant(plant_filename):
-        logging.debug("Parsing: %s" % plant_filename)
-        p = lbw.load(plant_filename)
+    def parse_plant(filepath):
+        logging.debug("Parsing: %s" % filepath)
+        p = lbw.load(filepath)
         p_rec = {}
 
         plant = {}
         plant["name"] = p.name
-        plant["md5"] = md5sum(plant_filename)
+        plant["filepath"] = filepath
+        plant["md5"] = md5sum(filepath)
         plant["default_model"] = p.default_model.name
         preview_stem = p.name.replace(" ", "_").replace(".", "")
-        preview_path = Path(plant_filename).parent.absolute() / (preview_stem + ".png")
+        preview_path = Path(filepath).parent.absolute() / (preview_stem + ".png")
         if not preview_path.is_file():
             logging.warning("Preview not found: %s" % preview_path)
             preview_path = ""
@@ -283,7 +284,7 @@ class ThicketDB:
             m_rec["index"] = i
             m_rec["qualifiers"] = seasons
             m_rec["default_qualifier"] = m.default_qualifier
-            preview_path = Path(plant_filename).parent.absolute() / "models" / (preview_stem + "_" + m.name + ".png")
+            preview_path = Path(filepath).parent.absolute() / "models" / (preview_stem + "_" + m.name + ".png")
             if not preview_path.is_file():
                 logging.warning("Preview not found: %s" % preview_path)
                 preview_path = ""
@@ -301,8 +302,8 @@ class ThicketDB:
         p_rec["labels"] = labels
         return p_rec
 
-    def parse_plant_json(plant_filename):
-        p_rec = ThicketDB.parse_plant(plant_filename)
+    def parse_plant_json(filepath):
+        p_rec = ThicketDB.parse_plant(filepath)
         print(json.dumps(p_rec))
 
 
