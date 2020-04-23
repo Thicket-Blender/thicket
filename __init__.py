@@ -185,6 +185,8 @@ def thicket_init():
     sdk_path = None
 
     prefs = bpy.context.preferences.addons[__name__].preferences
+    if not "log_level" in prefs.keys():
+        prefs.log_level = 'INFO'
 
     logging.basicConfig(format='%(levelname)s: thicket: %(message)s', level=prefs.log_level or logging.INFO)
     logging.debug("Log level: %s (%d)" % (prefs.log_level, prefs["log_level"]))
