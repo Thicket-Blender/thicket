@@ -33,10 +33,6 @@ Thicket generates separate viewport and render models, supporting various levels
 ![doc/thicket-banner-2048.png](doc/thicket-banner-2048.png)
 
 ## Install
-Thicket is in active development toward the initial 1.0 release, which will
-release packages for download. Until then, please follow these steps to try it
-out.
-
 * Download and install the prerequisites
   * [Blender](http://www.blender.org/) 2.80 or later. The plugin is known to run with [Blender 2.82](http://www.blender.org/features/past-releases/2-82/).
   * Laubwerk Python SDK 1.0.32 or later, provided by all Laubwerk Plant Kits, including the [Plants Kit Freebie](http://www.laubwerk.com/store/plants-kit-freebie).
