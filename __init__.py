@@ -236,26 +236,23 @@ def thicket_init():
     if str(sdk_path) not in sys.path:
         sys.path.append(str(sdk_path))
 
-    if "laubwerk" not in sys.modules:
-        try:
-            import laubwerk
-        except ImportError:
-            logging.critical("Failed to load laubwerk module")
-            return
+    try:
+        import laubwerk
+    except ImportError:
+        logging.critical("Failed to load laubwerk module")
+        return
 
-    if "thicket_lbw" not in sys.modules:
-        try:
-            from .thicket_lbw import import_lbw
-        except ImportError:
-            logging.critical("Failed to load thicket_lbw.import_lbw")
-            return
+    try:
+        from .thicket_lbw import import_lbw
+    except ImportError:
+        logging.critical("Failed to load thicket_lbw.import_lbw")
+        return
 
-    if "thicket_db" not in sys.modules:
-        try:
-            from .thicket_db import ThicketDB, ThicketDBOldSchemaError
-        except ImportError:
-            logging.critical("Failed to import thicket_db.ThicketDB")
-            return
+    try:
+        from .thicket_db import ThicketDB, ThicketDBOldSchemaError
+    except ImportError:
+        logging.critical("Failed to import thicket_db.ThicketDB")
+        return
 
     thicket_status = ThicketStatus.IMPORTED
     logging.info(laubwerk.version)
