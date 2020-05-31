@@ -368,17 +368,16 @@ def delete_plant(instance):
 class ThicketPropGroup(PropertyGroup):
     """Thicket plant properties
 
-    These properties identify the Laubwerk plant by file as well as all the
+    These properties identify the Laubwerk plant by name as well as all the
     parameters used to generate the mesh. These are attached to the plant
     collection template and bpy.types.WindowManager as "thicket".
-
-    The properties must be identical to those used in the THICKET_IO_import_lbw
-    class as there does not appear to be a way to inherit from a common base
-    class with these properties.
     """
     def __eq__(self, other):
         for k, v in self.items():
-            if self[k] != other[k]:
+            try:
+                if self[k] != other[k]:
+                    return False
+            except KeyError:
                 return False
         return True
 
@@ -392,7 +391,7 @@ class ThicketPropGroup(PropertyGroup):
     def as_keywords(self, ignore):
         global db
         # Do each explicitly to get the default value from the property if it is not set.
-        # Just converting to a dict directly will ignore unset # properties.
+        # Just converting to a dict directly will ignore unset properties.
         keywords = {}
         keywords["filepath"] = db.get_plant(name=self.name).filepath
         keywords["model"] = self.model
