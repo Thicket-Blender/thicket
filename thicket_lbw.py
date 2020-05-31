@@ -235,23 +235,26 @@ def import_lbw(filepath, leaf_density, model, qualifier, viewport_lod,
 
     # Create the viewport object (low detail)
     time_local = time.time()
-    if viewport_lod == 'LOW':
+    lbw_mesh = None
+    if viewport_lod == 'PROXY':
+        proxy = True
+        lbw_mesh = lbw_model.get_proxy()
+    elif viewport_lod == 'LOW':
         lbw_mesh = lbw_model.get_mesh(qualifier=qualifier,
                                       max_branch_level=min(3, lod_max_level),
                                       min_thickness=max(0.3, lod_min_thick),
                                       leaf_amount=0.66 * leaf_amount / 100.0,
                                       leaf_density=0.5 * leaf_density / 100.0,
                                       max_subdiv_level=0)
-    else:
-        proxy = True
-        lbw_mesh = lbw_model.get_proxy()
-        if viewport_lod != 'PROXY':
-            logging.warning("Unknown viewport_lod: %s" % viewport_lod)
+    elif viewport_lod != 'FULL':
+        logging.warning("Unknown viewport_lod: %s" % viewport_lod)
 
-    obj_viewport = lbw_to_bl_obj(lbw_plant, lbw_plant.name, lbw_mesh, qualifier, proxy)
-    obj_viewport.hide_render = True
-    obj_viewport.show_name = True
-    logging.debug("Generated low resolution viewport object in %.4fs" % (time.time() - time_local))
+    obj_viewport = None
+    if lbw_mesh:
+        obj_viewport = lbw_to_bl_obj(lbw_plant, lbw_plant.name, lbw_mesh, qualifier, proxy)
+        obj_viewport.hide_render = True
+        obj_viewport.show_name = True
+        logging.debug("Generated low resolution viewport object in %.4fs" % (time.time() - time_local))
 
     # Create the render object (high detail)
     time_local = time.time()
@@ -262,21 +265,27 @@ def import_lbw(filepath, leaf_density, model, qualifier, viewport_lod,
                                   leaf_density=leaf_density / 100.0,
                                   max_subdiv_level=lod_subdiv)
     obj_render = lbw_to_bl_obj(lbw_plant, lbw_plant.name + " (render)", lbw_mesh, qualifier, False)
-    obj_render.parent = obj_viewport
-    obj_render.hide_viewport = True
-    obj_render.hide_select = True
     logging.debug("Generated high resolution render object in %.4fs" % (time.time() - time_local))
+
+    # Setup viewport and render visibility
+    if obj_viewport:
+        obj_render.parent = obj_viewport
+        obj_render.hide_viewport = True
+        obj_render.hide_select = True
+    else:
+        obj_render.show_name = True
 
     # Setup collection hierarchy
     thicket_col = new_collection("Thicket", bpy.context.scene.collection, singleton=True, exclude=True)
-    plant_col = new_collection(obj_viewport.name, thicket_col)
+    plant_col = new_collection(lbw_plant.name, thicket_col)
 
     # Add objects to the plant collection
-    plant_col.objects.link(obj_viewport)
+    if obj_viewport:
+        plant_col.objects.link(obj_viewport)
     plant_col.objects.link(obj_render)
 
     # Create an instance of the plant collection in the active collection
-    obj_inst = bpy.data.objects.new(name=obj_viewport.name, object_data=None)
+    obj_inst = bpy.data.objects.new(name=lbw_plant.name, object_data=None)
     obj_inst.instance_collection = plant_col
     obj_inst.instance_type = 'COLLECTION'
     obj_inst.show_name = True
