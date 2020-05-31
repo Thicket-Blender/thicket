@@ -220,8 +220,7 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, qualifier=None, proxy_color=None):
     return mat
 
 
-def import_lbw(filepath, leaf_density, model, qualifier, viewport_lod, render_lod,
-               lod_min_thick, lod_max_level, lod_subdiv, leaf_amount):
+def import_lbw(filepath, model, viewport_lod, render_lod, mesh_args):
     time_main = time.time()
     lbw_plant = laubwerk.load(filepath)
     # TODO: This should be debug, but we cannot silence the SDK [debug] message
@@ -240,18 +239,20 @@ def import_lbw(filepath, leaf_density, model, qualifier, viewport_lod, render_lo
         proxy = True
         lbw_mesh = lbw_model.get_proxy()
     elif viewport_lod == 'LOW':
-        lbw_mesh = lbw_model.get_mesh(qualifier=qualifier,
-                                      max_branch_level=min(3, lod_max_level),
-                                      min_thickness=max(0.3, lod_min_thick),
-                                      leaf_amount=0.66 * leaf_amount / 100.0,
-                                      leaf_density=0.5 * leaf_density / 100.0,
+        mbl = 3 if "max_branch_level" not in mesh_args else min(3, mesh_args["max_branch_level"])
+        mt = 0.3 if "min_thickness" not in mesh_args else max(0.3, mesh_args["min_thickness"])
+        lbw_mesh = lbw_model.get_mesh(qualifier=mesh_args["qualifier"],
+                                      max_branch_level=mbl,
+                                      min_thickness=mt,
+                                      leaf_amount=0.66 * mesh_args["leaf_amount"],
+                                      leaf_density=0.5 * mesh_args["leaf_density"],
                                       max_subdiv_level=0)
     elif viewport_lod != 'FULL':
         logging.warning("Unknown viewport_lod: %s" % viewport_lod)
 
     obj_viewport = None
     if lbw_mesh:
-        obj_viewport = lbw_to_bl_obj(lbw_plant, lbw_plant.name, lbw_mesh, qualifier, proxy)
+        obj_viewport = lbw_to_bl_obj(lbw_plant, lbw_plant.name, lbw_mesh, mesh_args["qualifier"], proxy)
         obj_viewport.hide_render = True
         obj_viewport.show_name = True
         logging.debug("Generated low resolution viewport object in %.4fs" % (time.time() - time_local))
@@ -263,13 +264,9 @@ def import_lbw(filepath, leaf_density, model, qualifier, viewport_lod, render_lo
     else:
         if not render_lod == 'FULL':
             logging.warning("Unknown render_lod: %s" % render_lod)
-        lbw_mesh = lbw_model.get_mesh(qualifier=qualifier,
-                                      max_branch_level=lod_max_level,
-                                      min_thickness=lod_min_thick,
-                                      leaf_amount=leaf_amount / 100.0,
-                                      leaf_density=leaf_density / 100.0,
-                                      max_subdiv_level=lod_subdiv)
-    obj_render = lbw_to_bl_obj(lbw_plant, lbw_plant.name + " (render)", lbw_mesh, qualifier, render_lod == 'PROXY')
+        lbw_mesh = lbw_model.get_mesh(**mesh_args)
+    obj_render = lbw_to_bl_obj(lbw_plant, lbw_plant.name + " (render)", lbw_mesh, mesh_args["qualifier"],
+                               render_lod == 'PROXY')
     logging.debug("Generated high resolution render object in %.4fs" % (time.time() - time_local))
 
     # Setup viewport and render visibility
@@ -308,14 +305,18 @@ def import_lbw(filepath, leaf_density, model, qualifier, viewport_lod, render_lo
     tp.magic = THICKET_GUID
     tp.name = lbw_plant.name
     tp.model = lbw_model.name
-    tp.qualifier = qualifier
+    tp.qualifier = mesh_args["qualifier"]
+    tp.leaf_density = mesh_args["leaf_density"] * 100
     tp.viewport_lod = viewport_lod
     tp.render_lod = render_lod
-    tp.lod_subdiv = lod_subdiv
-    tp.leaf_density = leaf_density
-    tp.leaf_amount = leaf_amount
-    tp.lod_max_level = lod_max_level
-    tp.lod_min_thick = lod_min_thick
+    tp.use_lod_max_level = "max_branch_level" in mesh_args
+    if tp.use_lod_max_level:
+        tp.lod_max_level = mesh_args["max_branch_level"]
+    tp.use_lod_min_thick = "min_thickness" in mesh_args
+    if tp.use_lod_min_thick:
+        tp.lod_min_thick = mesh_args["min_thickness"]
+    tp.lod_subdiv = mesh_args["max_subdiv_level"]
+    tp.leaf_amount = mesh_args["leaf_amount"] * 100
 
     logging.info('Imported "%s" in %.4fs' % (lbw_plant.name, time.time() - time_main))
     return obj_inst
