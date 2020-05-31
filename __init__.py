@@ -442,7 +442,9 @@ class ThicketPropGroup(PropertyGroup):
     model: EnumProperty(items=model_callback, name="Model")
     qualifier: EnumProperty(items=qualifier_callback, name="Season")
     viewport_lod: EnumProperty(name="Viewport Detail",
-                               items=[('PROXY', "Proxy", ""), ('LOW', "Partial Geometry", "")],
+                               items=[('PROXY', "Proxy", ""),
+                                      ('LOW', "Partial Geometry", ""),
+                                      ('FULL', "Full Geometry", "")],
                                default='PROXY')
     lod_subdiv: IntProperty(name="Subdivision", description="How round the trunk and branches appear",
                             default=3, min=0, max=5, step=1)
