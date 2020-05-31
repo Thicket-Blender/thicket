@@ -220,7 +220,7 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, qualifier=None, proxy_color=None):
     return mat
 
 
-def import_lbw(filepath, leaf_density, model, qualifier, viewport_lod,
+def import_lbw(filepath, leaf_density, model, qualifier, viewport_lod, render_lod,
                lod_min_thick, lod_max_level, lod_subdiv, leaf_amount):
     time_main = time.time()
     lbw_plant = laubwerk.load(filepath)
@@ -236,7 +236,7 @@ def import_lbw(filepath, leaf_density, model, qualifier, viewport_lod,
     # Create the viewport object (low detail)
     time_local = time.time()
     lbw_mesh = None
-    if viewport_lod == 'PROXY':
+    if viewport_lod == 'PROXY' and not render_lod == 'PROXY':
         proxy = True
         lbw_mesh = lbw_model.get_proxy()
     elif viewport_lod == 'LOW':
@@ -258,13 +258,18 @@ def import_lbw(filepath, leaf_density, model, qualifier, viewport_lod,
 
     # Create the render object (high detail)
     time_local = time.time()
-    lbw_mesh = lbw_model.get_mesh(qualifier=qualifier,
-                                  max_branch_level=lod_max_level,
-                                  min_thickness=lod_min_thick,
-                                  leaf_amount=leaf_amount / 100.0,
-                                  leaf_density=leaf_density / 100.0,
-                                  max_subdiv_level=lod_subdiv)
-    obj_render = lbw_to_bl_obj(lbw_plant, lbw_plant.name + " (render)", lbw_mesh, qualifier, False)
+    if render_lod == 'PROXY':
+        lbw_mesh = lbw_model.get_proxy()
+    else:
+        if not render_lod == 'FULL':
+            logging.warning("Unknown render_lod: %s" % render_lod)
+        lbw_mesh = lbw_model.get_mesh(qualifier=qualifier,
+                                      max_branch_level=lod_max_level,
+                                      min_thickness=lod_min_thick,
+                                      leaf_amount=leaf_amount / 100.0,
+                                      leaf_density=leaf_density / 100.0,
+                                      max_subdiv_level=lod_subdiv)
+    obj_render = lbw_to_bl_obj(lbw_plant, lbw_plant.name + " (render)", lbw_mesh, qualifier, render_lod == 'PROXY')
     logging.debug("Generated high resolution render object in %.4fs" % (time.time() - time_local))
 
     # Setup viewport and render visibility
@@ -305,6 +310,7 @@ def import_lbw(filepath, leaf_density, model, qualifier, viewport_lod,
     tp.model = lbw_model.name
     tp.qualifier = qualifier
     tp.viewport_lod = viewport_lod
+    tp.render_lod = render_lod
     tp.lod_subdiv = lod_subdiv
     tp.leaf_density = leaf_density
     tp.leaf_amount = leaf_amount

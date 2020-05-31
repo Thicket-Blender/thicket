@@ -40,7 +40,8 @@ from bpy.types import (AddonPreferences,
                        Panel,
                        PropertyGroup
                        )
-from bpy.props import (EnumProperty,
+from bpy.props import (BoolProperty,
+                       EnumProperty,
                        FloatProperty,
                        IntProperty,
                        PointerProperty,
@@ -397,6 +398,7 @@ class ThicketPropGroup(PropertyGroup):
         keywords["model"] = self.model
         keywords["qualifier"] = self.qualifier
         keywords["viewport_lod"] = self.viewport_lod
+        keywords["render_lod"] = self.render_lod
         keywords["lod_subdiv"] = self.lod_subdiv
         keywords["leaf_density"] = self.leaf_density
         keywords["leaf_amount"] = self.leaf_amount
@@ -437,6 +439,10 @@ class ThicketPropGroup(PropertyGroup):
                 items.append((q.name, q.label, ""))
         return items
 
+    def render_lod_update(self, context):
+        if self.render_lod == 'PROXY':
+            self.viewport_lod = 'PROXY'
+
     # name is provided by the PropertyGroup and used to store the unique Laubwerk Plant name
     magic: bpy.props.StringProperty()
     model: EnumProperty(items=model_callback, name="Model")
@@ -446,6 +452,10 @@ class ThicketPropGroup(PropertyGroup):
                                       ('LOW', "Partial Geometry", ""),
                                       ('FULL', "Full Geometry", "")],
                                default='PROXY')
+    render_lod: EnumProperty(name="Render", description="Render level of detail",
+                             items=[('PROXY', "Proxy", ""),
+                                    ('FULL', "Full Geometry", "")],
+                             default='FULL', update=render_lod_update)
     lod_subdiv: IntProperty(name="Subdivision", description="How round the trunk and branches appear",
                             default=3, min=0, max=5, step=1)
     leaf_density: FloatProperty(name="Leaf Density", description="How full the foliage appears",
@@ -808,6 +818,7 @@ class THICKET_PT_plant_properties(Panel):
 
         layout.label(text="Level of Detail")
         r = layout.row()
+        r.enabled = not tp.render_lod == 'PROXY'
         c = r.column()
         c.alignment = 'EXPAND'
         c.label(text="Viewport:")
@@ -815,11 +826,14 @@ class THICKET_PT_plant_properties(Panel):
         c.alignment = 'RIGHT'
         c.prop(tp, "viewport_lod", text="")
 
-        layout.prop(tp, "lod_subdiv")
-        layout.prop(tp, "leaf_density")
-        layout.prop(tp, "leaf_amount")
-        layout.prop(tp, "lod_max_level")
-        layout.prop(tp, "lod_min_thick")
+        layout.prop(tp, "render_lod")
+        c = layout.column()
+        c.enabled = tp.render_lod == 'FULL'
+        c.prop(tp, "lod_subdiv")
+        c.prop(tp, "leaf_density")
+        c.prop(tp, "leaf_amount")
+        c.prop(tp, "lod_max_level")
+        c.prop(tp, "lod_min_thick")
 
     def draw(self, context):
         global db, thicket_status, thicket_ui_mode, thicket_ui_obj, THICKET_SCALE
