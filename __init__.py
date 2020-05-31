@@ -447,7 +447,7 @@ class ThicketPropGroup(PropertyGroup):
     magic: bpy.props.StringProperty()
     model: EnumProperty(items=model_callback, name="Model")
     qualifier: EnumProperty(items=qualifier_callback, name="Season")
-    viewport_lod: EnumProperty(name="Viewport Detail",
+    viewport_lod: EnumProperty(name="Viewport",
                                items=[('PROXY', "Proxy", ""),
                                       ('LOW', "Partial Geometry", ""),
                                       ('FULL', "Full Geometry", "")],
@@ -456,14 +456,14 @@ class ThicketPropGroup(PropertyGroup):
                              items=[('PROXY', "Proxy", ""),
                                     ('FULL', "Full Geometry", "")],
                              default='FULL', update=render_lod_update)
-    lod_subdiv: IntProperty(name="Subdivision", description="How round the trunk and branches appear",
+    lod_subdiv: IntProperty(name="Max Subdivisions", description="How round the trunk and branches appear",
                             default=3, min=0, max=5, step=1)
     leaf_density: FloatProperty(name="Leaf Density", description="How full the foliage appears",
                                 default=100.0, min=0.01, max=100.0, subtype='PERCENTAGE')
     leaf_amount: FloatProperty(name="Leaf Amount", description="How many leaves used for leaf density "
                                "(smaller number means larger leaves)",
                                default=100.0, min=0.01, max=100.0, subtype='PERCENTAGE')
-    lod_max_level: IntProperty(name="Branching Level", description="Max branching levels off the trunk",
+    lod_max_level: IntProperty(name="Max Branching Level", description="Max branching levels off the trunk",
                                default=5, min=0, max=10, step=1)
     lod_min_thick: FloatProperty(name="Min Branch Thickness", description="Min thickness of trunk or branches",
                                  default=0.1, min=0.1, max=10000.0, step=1.0)
@@ -809,31 +809,23 @@ class THICKET_PT_plant_properties(Panel):
     def draw_props(self, layout, plant, tp):
         """Draw the plant properties UI"""
 
-        layout.label(text="%s" % plant.label)
-        layout.label(text="(%s)" % plant.name)
         layout.prop(tp, "model")
         layout.prop(tp, "qualifier")
+        layout.prop(tp, "leaf_density")
 
         layout.separator()
 
         layout.label(text="Level of Detail")
         r = layout.row()
         r.enabled = not tp.render_lod == 'PROXY'
-        c = r.column()
-        c.alignment = 'EXPAND'
-        c.label(text="Viewport:")
-        c = r.column()
-        c.alignment = 'RIGHT'
-        c.prop(tp, "viewport_lod", text="")
-
+        r.prop(tp, "viewport_lod")
         layout.prop(tp, "render_lod")
         c = layout.column()
         c.enabled = tp.render_lod == 'FULL'
-        c.prop(tp, "lod_subdiv")
-        c.prop(tp, "leaf_density")
-        c.prop(tp, "leaf_amount")
         c.prop(tp, "lod_max_level")
         c.prop(tp, "lod_min_thick")
+        c.prop(tp, "lod_subdiv")
+        c.prop(tp, "leaf_amount")
 
     def draw(self, context):
         global db, thicket_status, thicket_ui_mode, thicket_ui_obj, THICKET_SCALE
@@ -880,6 +872,7 @@ class THICKET_PT_plant_properties(Panel):
             o.next_mode = self.next_mode('ADD')
             if template:
                 layout.operator("thicket.delete_plant", icon='NONE', text="Delete")
+            layout.separator()
 
         # If tp is not set, there is not active plant or no plant being added. Nothing else to draw.
         if tp is None:
@@ -891,6 +884,8 @@ class THICKET_PT_plant_properties(Panel):
             layout.operator("thicket.rebuild_db", icon="FILE_REFRESH")
             return
 
+        layout.label(text="%s" % plant.label)
+        layout.label(text="(%s)" % plant.name)
         layout.template_icon(icon_value=get_preview(plant.name, tp.model).icon_id, scale=THICKET_SCALE)
         if thicket_ui_mode == 'VIEW':
             o = layout.operator("thicket.edit_plant")
