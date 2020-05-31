@@ -200,7 +200,7 @@ def thicket_init():
     none
     """
 
-    global thicket_status, db, plants_path, sdk_path, ThicketDB, import_lbw, laubwerk
+    global thicket_status, db, plants_path, sdk_path, ThicketDB, thicket_lbw, laubwerk
 
     thicket_status = ThicketStatus.INIT
     db = None
@@ -244,9 +244,9 @@ def thicket_init():
         return
 
     try:
-        from .thicket_lbw import import_lbw
+        from . import thicket_lbw
     except ImportError:
-        logging.critical("Failed to load thicket_lbw.import_lbw")
+        logging.critical("Failed to load thicket_lbw")
         return
 
     try:
@@ -389,22 +389,18 @@ class ThicketPropGroup(PropertyGroup):
         for k, v in self.items():
             other[k] = v
 
-    def as_keywords(self, ignore):
-        global db
-        # Do each explicitly to get the default value from the property if it is not set.
-        # Just converting to a dict directly will ignore unset properties.
-        keywords = {}
-        keywords["filepath"] = db.get_plant(name=self.name).filepath
-        keywords["model"] = self.model
-        keywords["qualifier"] = self.qualifier
-        keywords["viewport_lod"] = self.viewport_lod
-        keywords["render_lod"] = self.render_lod
-        keywords["lod_subdiv"] = self.lod_subdiv
-        keywords["leaf_density"] = self.leaf_density
-        keywords["leaf_amount"] = self.leaf_amount
-        keywords["lod_max_level"] = self.lod_max_level
-        keywords["lod_min_thick"] = self.lod_min_thick
-        return keywords
+    def import_lbw(self):
+        filepath = db.get_plant(name=self.name).filepath
+        mesh_args = {}
+        mesh_args["qualifier"] = self.qualifier
+        mesh_args["leaf_density"] = self.leaf_density / 100.0
+        if self.use_lod_max_level:
+            mesh_args["max_branch_level"] = self.lod_max_level
+        if self.use_lod_min_thick:
+            mesh_args["min_thickness"] = self.lod_min_thick
+        mesh_args["max_subdiv_level"] = self.lod_subdiv
+        mesh_args["leaf_amount"] = self.leaf_amount / 100.0
+        return thicket_lbw.import_lbw(filepath, self.model, self.viewport_lod, self.render_lod, mesh_args)
 
     def model_callback(self, context):
         global db, thicket_ui_mode
@@ -447,6 +443,8 @@ class ThicketPropGroup(PropertyGroup):
     magic: bpy.props.StringProperty()
     model: EnumProperty(items=model_callback, name="Model")
     qualifier: EnumProperty(items=qualifier_callback, name="Season")
+    leaf_density: FloatProperty(name="Leaf Density", description="How full the foliage appears",
+                                default=100.0, min=0.01, max=100.0, subtype='PERCENTAGE')
     viewport_lod: EnumProperty(name="Viewport",
                                items=[('PROXY', "Proxy", ""),
                                       ('LOW', "Partial Geometry", ""),
@@ -456,17 +454,17 @@ class ThicketPropGroup(PropertyGroup):
                              items=[('PROXY', "Proxy", ""),
                                     ('FULL', "Full Geometry", "")],
                              default='FULL', update=render_lod_update)
+    use_lod_max_level: BoolProperty(name="", description="Manually specify Max Branching Level", default=False)
+    lod_max_level: IntProperty(name="Max Branching Level", description="Max branching levels off the trunk",
+                               default=5, min=0, max=10, step=1)
+    use_lod_min_thick: BoolProperty(name="", description="Manually specify Min Branch Thickness", default=False)
+    lod_min_thick: FloatProperty(name="Min Branch Thickness", description="Min thickness of trunk or branches",
+                                 default=0.1, min=0.1, max=10000.0, step=1.0)
     lod_subdiv: IntProperty(name="Max Subdivisions", description="How round the trunk and branches appear",
                             default=3, min=0, max=5, step=1)
-    leaf_density: FloatProperty(name="Leaf Density", description="How full the foliage appears",
-                                default=100.0, min=0.01, max=100.0, subtype='PERCENTAGE')
     leaf_amount: FloatProperty(name="Leaf Amount", description="How many leaves used for leaf density "
                                "(smaller number means larger leaves)",
                                default=100.0, min=0.01, max=100.0, subtype='PERCENTAGE')
-    lod_max_level: IntProperty(name="Max Branching Level", description="Max branching levels off the trunk",
-                               default=5, min=0, max=10, step=1)
-    lod_min_thick: FloatProperty(name="Min Branch Thickness", description="Min thickness of trunk or branches",
-                                 default=0.1, min=0.1, max=10000.0, step=1.0)
 
 
 class THICKET_OT_reset_plant(Operator):
@@ -518,8 +516,7 @@ class THICKET_OT_update_plant(Operator):
         template = instance.instance_collection
 
         # Load new plant model
-        keywords = context.window_manager.thicket.as_keywords(ignore=("magic", "name"))
-        new_instance = import_lbw(**keywords)  # noqa: F821
+        new_instance = context.window_manager.thicket.import_lbw()
         new_template = new_instance.instance_collection
 
         # Update the instance_collection reference in the instances
@@ -684,10 +681,8 @@ class THICKET_OT_load_plant(Operator):
     def execute(self, context):
         global thicket_ui_mode
         tp = context.window_manager.thicket
-        keywords = tp.as_keywords(ignore=("magic", "name"))
-        import_lbw(**keywords)  # noqa: F821
-        thicket_ui_obj = context.active_object  # noqa: F841
-        context.active_object.instance_collection.thicket.copy_to(context.window_manager.thicket)
+        thicket_ui_obj = tp.import_lbw()
+        thicket_ui_obj.instance_collection.thicket.copy_to(context.window_manager.thicket)
         thicket_ui_mode = self.next_mode
         context.area.tag_redraw()
         return {'FINISHED'}
@@ -820,10 +815,24 @@ class THICKET_PT_plant_properties(Panel):
         r.enabled = not tp.render_lod == 'PROXY'
         r.prop(tp, "viewport_lod")
         layout.prop(tp, "render_lod")
+
         c = layout.column()
         c.enabled = tp.render_lod == 'FULL'
-        c.prop(tp, "lod_max_level")
-        c.prop(tp, "lod_min_thick")
+
+        r = c.row()
+        c2 = r.column()
+        c2.prop(tp, "use_lod_max_level")
+        c2 = r.column()
+        c2.enabled = tp.use_lod_max_level
+        c2.prop(tp, "lod_max_level")
+
+        r = c.row()
+        c2 = r.column()
+        c2.prop(tp, "use_lod_min_thick")
+        c2 = r.column()
+        c2.enabled = tp.use_lod_min_thick
+        c2.prop(tp, "lod_min_thick")
+
         c.prop(tp, "lod_subdiv")
         c.prop(tp, "leaf_amount")
 
