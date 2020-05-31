@@ -903,6 +903,11 @@ class THICKET_PT_plant_properties(Panel):
         self.draw_props(col, plant, tp)
 
         if thicket_ui_mode == 'VIEW':
+            v = template.all_objects[0].data
+            r = template.all_objects[len(template.all_objects) - 1].data
+            layout.separator()
+            layout.label(text="Viewport: Verts:%s | Faces:%s" % (f"{len(v.vertices):,}",  f"{len(v.polygons):,}"))
+            layout.label(text="Render: Verts:%s | Faces:%s" % (f"{len(r.vertices):,}",  f"{len(r.polygons):,}"))
             return
 
         layout.separator()
