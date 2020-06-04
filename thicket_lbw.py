@@ -251,6 +251,7 @@ def import_lbw(filepath, model, viewport_lod, render_lod, mesh_args):
         vp_mesh_args["leaf_amount"] = 0.66 * mesh_args["leaf_amount"]
         vp_mesh_args["leaf_density"] = 0.5 * mesh_args["leaf_density"]
         vp_mesh_args["max_subdiv_level"] = 0
+        logging.debug("viewport get_mesh(%s)" % str(vp_mesh_args))
         lbw_mesh = lbw_model.get_mesh(**vp_mesh_args)
     elif viewport_lod != 'FULL':
         logging.warning("Unknown viewport_lod: %s" % viewport_lod)
@@ -269,6 +270,7 @@ def import_lbw(filepath, model, viewport_lod, render_lod, mesh_args):
     else:
         if not render_lod == 'FULL':
             logging.warning("Unknown render_lod: %s" % render_lod)
+        logging.debug("render get_mesh(%s)" % str(mesh_args))
         lbw_mesh = lbw_model.get_mesh(**mesh_args)
     obj_render = lbw_to_bl_obj(lbw_plant, lbw_plant.name + " (render)", lbw_mesh, mesh_args["qualifier"],
                                render_lod == 'PROXY')
