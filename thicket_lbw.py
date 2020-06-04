@@ -29,11 +29,11 @@ import laubwerk
 
 from . import THICKET_GUID
 
-VP_MAX_BRANCH_LEVEL = 3
-VP_MIN_THICKNESS = 0.3
+VP_MAX_BRANCH_LEVEL = 4
+VP_MIN_THICKNESS = 0.1
+
 
 def new_collection(name, parent, singleton=False, exclude=False):
-
     if singleton and name in bpy.data.collections:
         return bpy.data.collections[name]
     col = bpy.data.collections.new(name)
@@ -253,7 +253,7 @@ def import_lbw(filepath, model, viewport_lod, render_lod, mesh_args):
         vp_mesh_args["max_subdiv_level"] = 0
         lbw_mesh = lbw_model.get_mesh(**vp_mesh_args)
     elif viewport_lod != 'FULL':
-            logging.warning("Unknown viewport_lod: %s" % viewport_lod)
+        logging.warning("Unknown viewport_lod: %s" % viewport_lod)
 
     obj_viewport = None
     if lbw_mesh:
