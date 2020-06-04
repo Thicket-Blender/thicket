@@ -29,6 +29,8 @@ import laubwerk
 
 from . import THICKET_GUID
 
+VP_MAX_BRANCH_LEVEL = 3
+VP_MIN_THICKNESS = 0.3
 
 def new_collection(name, parent, singleton=False, exclude=False):
 
@@ -239,16 +241,19 @@ def import_lbw(filepath, model, viewport_lod, render_lod, mesh_args):
         proxy = True
         lbw_mesh = lbw_model.get_proxy()
     elif viewport_lod == 'LOW':
-        mbl = 3 if "max_branch_level" not in mesh_args else min(3, mesh_args["max_branch_level"])
-        mt = 0.3 if "min_thickness" not in mesh_args else max(0.3, mesh_args["min_thickness"])
-        lbw_mesh = lbw_model.get_mesh(qualifier=mesh_args["qualifier"],
-                                      max_branch_level=mbl,
-                                      min_thickness=mt,
-                                      leaf_amount=0.66 * mesh_args["leaf_amount"],
-                                      leaf_density=0.5 * mesh_args["leaf_density"],
-                                      max_subdiv_level=0)
+        vp_mesh_args = mesh_args.copy()
+        vp_mesh_args["max_branch_level"] = VP_MAX_BRANCH_LEVEL
+        if "max_branch_level" in mesh_args:
+            vp_mesh_args["max_branch_level"] = min(VP_MAX_BRANCH_LEVEL, mesh_args["max_branch_level"])
+        vp_mesh_args["min_thickness"] = VP_MIN_THICKNESS
+        if "min_thickness" in mesh_args:
+            vp_mesh_args["min_thickness"] = max(VP_MIN_THICKNESS, mesh_args["min_thickness"])
+        vp_mesh_args["leaf_amount"] = 0.66 * mesh_args["leaf_amount"]
+        vp_mesh_args["leaf_density"] = 0.5 * mesh_args["leaf_density"]
+        vp_mesh_args["max_subdiv_level"] = 0
+        lbw_mesh = lbw_model.get_mesh(**vp_mesh_args)
     elif viewport_lod != 'FULL':
-        logging.warning("Unknown viewport_lod: %s" % viewport_lod)
+            logging.warning("Unknown viewport_lod: %s" % viewport_lod)
 
     obj_viewport = None
     if lbw_mesh:
