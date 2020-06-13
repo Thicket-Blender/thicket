@@ -4,51 +4,44 @@ Thicket is a [Blender](http://www.blender.org) Add-on to import [Laubwerk Plants
 
 Thicket is an open source community developed project using the Laubwerk Python SDK. While not affiliated with or officially supported by Laubwerk GmbH, this project would not be possible without Laubwerk's efforts to answer questions and address issues during the development of Thicket.
 
-Using Laubwerk's level of detail controls, Thicket keeps the Blender viewport responsive and renderings photo-realistic, like this shot of a Japanese Maple (Acer Palmatum).
+Using Laubwerk's level of detail controls, Thicket keeps the Blender viewport responsive and renderings photo-realistic. Cycles render of a Japanese Maple (Acer Palmatum):
 
 ![doc/acerp-cycles.png](doc/acerp-cycles.png)
 
 ## Features
-Thicket generates separate viewport and render models, supporting various levels of detail for each. The viewport can display a low poly proxy (convex hull) or a partial geometry model in any of Blender's viewport modes. The rendered model geometry is generated using various level of detail controls.
+Thicket provides a visual plant selection gallery and options to configure the plant model variant, age, and leaf density. It generates separate viewport and render models, supporting various levels of detail for each. The viewport can display a low poly proxy (convex hull), partial or full geometry models in any of Blender's viewport modes. The rendered model geometry is generated using various level of detail controls.
 
 * Sidebar "N Panel" UI
-  * Visual plant selection (gallery)
+  * Visual plant selection gallery
   * Update existing plants
   * Update all identical instances at once
   * Make instances unique
   * Smart delete to manage scene size
+* Plant model options
 * Separate viewport and render models
-* Collection instancing
+* Render level of detail controls
 * Material nodes
-* Viewport model level of detail
-  * Proxy (Convex Hull)
-  * Partial geometry
-* Render model level of detail
-  * Subdivision
-  * Leaf density
-  * Leaf amount
-  * Branching level
-  * Branch thickness
+* Collection instancing
 
 ![doc/thicket-banner-2048.png](doc/thicket-banner-2048.png)
 
 ## Install
 * Download and install the prerequisites
   * [Blender](http://www.blender.org/) 2.80 or later. The plugin is known to run with [Blender 2.82](http://www.blender.org/features/past-releases/2-82/).
-  * Laubwerk Python SDK 1.0.32 or later, provided by all Laubwerk Plant Kits, including the [Plants Kit Freebie](http://www.laubwerk.com/store/plants-kit-freebie).
+  * Laubwerk Python SDK 1.0.33 or later, provided by all Laubwerk Plant Kits, including the [Plants Kit Freebie](http://www.laubwerk.com/store/plants-kit-freebie).
     * Choose the "Custom" installation method and ensure the "Python Extension" component is checked.
 * Installation options
-  * Latest from GitHub
+  * From a release Zip file (most users)
+    * Download the latest release zip file from the [Releases Tab](/../../releases/)
+    * Start Blender
+    * Choose `Edit -> Preferences -> Add-ons -> Install`
+    * Select the zip file and click `Install Add-on`
+  * Latest from GitHub (for testers and developers)
     * Exit Blender
     * Clone the `thicket` git repository into the Blender `addons` folder:
       * Mac: `~/Library/Blender/2.80/scripts/addons/thicket`
       * Windows: `%AppData%\Blender Foundation\Blender\2.80\scripts\addons\thicket`
     * Start Blender
-  * From a release Zip file
-    * Download the latest release zip file from the [Releases Tab](/../../releases/)
-    * Start Blender
-    * Choose `Edit -> Preferences -> Add-ons -> Install`
-    * Select the zip file and click `Install Add-on`
 * Configure Thicket
   * Choose `Edit -> Preferences...`
   * Select the `Add-ons` tab and search for `thicket`
@@ -74,29 +67,36 @@ To add a plant, click `Add Plant` and select from the gallery presented. You can
 
 ![doc/thicket-panel-select.png](doc/thicket-panel-select.png)
 
-Once selected, the panel presents the plant model, season, and level of detail options.
+Once selected, the panel presents the plant model, season, leaf density, and level of detail options.
 
 ![doc/thicket-panel-add.png](doc/thicket-panel-add.png)
 
-The image preview will update when you change the `Model` variant and age. You can configure the season and level of detail properties:
+<image align="right" src="doc/thicket-panel-add-zoom.png">
 
-Plant Model
-* Model: Select variant and age. There are typically 3 variants of each plant,
-  as well as 3 ages for each variant.
-* Season: Affect plant's foliage, color, and flowers.
+The image preview will update when you change the `Model` variant and age. You can also configure the season, leaf sensity, and level of detail properties:
 
-Level of Detail Settings
-* Viewport: Control the model displayed in the viewport
-  * Proxy: low poly proxy (convex hull)
-  * Partial Geometry: low detail version of the render model
-* Subdivision: Control the number of edges in a branch cross-section (0 is square)
-* Leaf Density: Control how full the foliage appears
-* Leaf Amount: Control the number of leaves used to reach the specified density
-  (fewer leaves results in larger individual leaves)
-* Maximum Level: Limit the number of branching levels off the trunk
-* Minimum Thickness: Eliminate branches smaller than this value
+### Plant Model
+**Model:** Select variant and age<br>
+**Season:** Affect foliage, color, and flowers<br>
+**Leaf Density:** Control how full the foliage appears<br>
 
-You can return the gallery to select a different plant with `Change Plant`, add the current plant with `Add`, and cancel the operation with `Cancel`.
+### Level of Detail
+**Viewport:** Control the model displayed in the viewport
+* Proxy: low poly proxy (convex hull)
+* Partial Geometry: low detail version of the render model
+* Full Geometry: high detail render model
+
+**Render:** Control the rendered model
+* Proxy: low poly proxy (convex hull, forces viewport to Proxy)
+* Full Geometry: high detail render model
+
+**Max Branching Level:** Limit the number of branching levels off the trunk (uncheck to use the plant default)<br>
+**Min Branch Thickness:** Eliminate branches smaller than this value (uncheck to use the plant default)<br>
+**Max Subdivisions:** Control the max number of edges in a branch cross-section (1 is square)<br>
+**Leaf Amount:** Control the number of leaves used to reach the specified leaf density (fewer leaves result in larger individual leaves)<br>
+
+You can return to the gallery to select a different plant with `Change Plant`, add the current plant with `Add`, or cancel the operation with `Cancel`.
+<br clear="right"><br>
 
 Adding Acer Palmatum with Viewport `Proxy` selected, loads the convex hull into the viewport:
 
