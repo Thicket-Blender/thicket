@@ -334,7 +334,7 @@ Commands:
     argParse.add_argument("cmd", choices=["read", "build", "parse_plant"])
     argParse.add_argument("-d", help="database filename")
     argParse.add_argument("-f", help="Laubwerk Plant filename (lbw.gz)")
-    argParse.add_argument("-l", choices=["DEBUG", "INFO", "WARN", "ERROR", "CRITICAL"],
+    argParse.add_argument("-l", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
                           default="INFO", help="Logging level")
     argParse.add_argument("-p", help="Laubwerk Plants path")
     argParse.add_argument("-s", help="Laubwerk Python SDK path")
