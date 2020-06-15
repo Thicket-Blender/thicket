@@ -31,6 +31,7 @@ from enum import Enum, unique
 from functools import total_ordering
 import logging
 from pathlib import Path, PurePath
+import platform
 import sys
 import time
 
@@ -66,30 +67,15 @@ bl_info = {
 }
 
 
-@total_ordering
-@unique
-class ThicketStatus(Enum):
-    def __eq__(self, other):
-        if self.__class__ is other.__class__:
-            return self.value == other.value
-        return NotImplemented
-
-    def __lt__(self, other):
-        if self.__class__ is other.__class__:
-            return self.value < other.value
-        return NotImplemented
-
-    INIT = 0
-    LBW_VALID = 10
-    IMPORTED = 20
-    REBUILD_DB = 30
-    READY = 40
+class ThicketStatus:
+    lbw_plants_valid = False
+    lbw_sdk_valid = False
+    imported = False
+    ready = False
 
 
-thicket_status = ThicketStatus.INIT
+thicket_status = ThicketStatus()
 db = None
-plants_path = None
-sdk_path = None
 thicket_previews = None
 thicket_ui_mode = 'VIEW'
 thicket_ui_obj = None
@@ -182,11 +168,11 @@ def get_preview(plant_name, model=""):
 def thicket_init():
     """Import dependencies and setup globals
 
-    Thicket depends on the Laubwerk Python SDK. The user needs to configure the
-    Laubwerk Install Path via the Thicket Addon Preferences. This function
-    restricts functionality until the setup is complete.
+    Thicket depends on the Laubwerk Python Extension (SDK). The user needs to
+    configure the Laubwerk installation paths via the Thicket Addon Preferences.
+    This function restricts functionality until the setup is complete.
 
-    Check that the Laubwerk Install path is valid and import the laubwerk
+    Check the Laubwerk installation paths are valid and import the laubwerk
     modules and the thicket components dependent on the laubwerk module.
 
     Setup the database and populate the preview catalog.
@@ -200,12 +186,10 @@ def thicket_init():
     none
     """
 
-    global thicket_status, db, plants_path, sdk_path, ThicketDB, thicket_lbw, laubwerk
+    global thicket_status, db, ThicketDB, thicket_lbw, laubwerk
 
-    thicket_status = ThicketStatus.INIT
+    thicket_status = ThicketStatus()
     db = None
-    plants_path = None
-    sdk_path = None
 
     prefs = bpy.context.preferences.addons[__name__].preferences
     if "log_level" not in prefs.keys():
@@ -214,28 +198,20 @@ def thicket_init():
     logging.basicConfig(format='%(levelname)s: thicket: %(message)s', level=prefs.log_level or logging.INFO)
     logging.debug("Log level: %s (%d)" % (prefs.log_level, prefs["log_level"]))
 
-    valid_lbw_path = False
-    lbw_path = prefs.lbw_path
+    if prefs.lbw_plants_path != "" and Path(prefs.lbw_plants_path).is_dir():
+        logging.info("Laubwerk Plants Path: '%s'" % prefs.lbw_plants_path)
+        thicket_status.lbw_plants_valid = True
+    else:
+        logging.warning("Invalid Laubwerk Plants Path: '%s'" % prefs.lbw_plants_path)
 
-    if lbw_path != "" and Path(lbw_path).is_dir():
-        plants_path = Path(lbw_path) / "Plants"
-        logging.debug("Plants path: '%s'" % plants_path)
-        sdk_path = Path(lbw_path) / "Python"
-        logging.debug("SDK path: '%s'" % sdk_path)
-        if plants_path.is_dir() and sdk_path.is_dir():
-            valid_lbw_path = True
-
-    if not valid_lbw_path:
-        plants_path = None
-        sdk_path = None
-        logging.warning("Invalid Laubwerk Install Path: '%s'" % lbw_path)
+    if prefs.lbw_sdk_path != "" and Path(prefs.lbw_sdk_path).is_dir():
+        logging.info("Laubwerk Python Extension Path: '%s'" % prefs.lbw_sdk_path)
+    else:
+        logging.warning("Invalid Laubwerk Python Extension Path: '%s'" % prefs.lbw_sdk_path)
         return
 
-    thicket_status = ThicketStatus.LBW_VALID
-    logging.info("Laubwerk Install Path: %s" % lbw_path)
-
-    if str(sdk_path) not in sys.path:
-        sys.path.append(str(sdk_path))
+    if str(prefs.lbw_sdk_path) not in sys.path:
+        sys.path.append(str(prefs.lbw_sdk_path))
 
     try:
         import laubwerk
@@ -248,6 +224,10 @@ def thicket_init():
     except ImportError:
         logging.critical("Failed to load thicket_lbw")
         return
+    thicket_status.lbw_sdk_valid = True
+
+    if not thicket_status.lbw_plants_valid:
+        return
 
     try:
         from .thicket_db import ThicketDB, ThicketDBOldSchemaError
@@ -255,7 +235,7 @@ def thicket_init():
         logging.critical("Failed to import thicket_db.ThicketDB")
         return
 
-    thicket_status = ThicketStatus.IMPORTED
+    thicket_status.imported = True
     logging.info(laubwerk.version)
 
     db_path = Path(bpy.utils.user_resource('SCRIPTS', "addons", True)) / __name__ / "thicket.db"
@@ -268,7 +248,6 @@ def thicket_init():
         logging.info("Database not found, creating empty database")
 
     if db is None or db.plant_count() == 0:
-        thicket_status = ThicketStatus.REBUILD_DB
         db_dir = Path(PurePath(db_path).parent)
         db_dir.mkdir(parents=True, exist_ok=True)
         db = ThicketDB(db_path, locale, bpy.app.binary_path_python, True)
@@ -276,7 +255,7 @@ def thicket_init():
 
     populate_previews()
 
-    thicket_status = ThicketStatus.READY
+    thicket_status.ready = True
     logging.info("Database (%d plants): %s" % (db.plant_count(), db_path))
     logging.info("Ready")
 
@@ -300,7 +279,7 @@ def is_thicket_instance(obj):
     Boolean
     """
 
-    if thicket_status != ThicketStatus.READY:
+    if not thicket_status.ready:
         return False
 
     if obj and obj.instance_collection and obj.instance_collection.thicket.magic == THICKET_GUID:
@@ -842,12 +821,12 @@ class THICKET_PT_plant_properties(Panel):
         layout = self.layout
 
         # Check for Thicket initialization problems
-        if thicket_status == ThicketStatus.REBUILD_DB:
-            layout.label(text="Please rebuild the database")
-            layout.operator("thicket.rebuild_db", icon="FILE_REFRESH")
-            return
-        elif thicket_status < ThicketStatus.READY:
-            layout.label(text="See Thicket Add-on Preferences")
+        if not thicket_status.ready:
+            if thicket_status.imported:
+                layout.label(text="Please rebuild the database")
+                layout.operator("thicket.rebuild_db", icon="FILE_REFRESH")
+            else:
+                layout.label(text="See Thicket Add-on Preferences")
             return
 
         template = None
@@ -955,10 +934,11 @@ class THICKET_OT_rebuild_db(Operator):
         return context.window_manager.invoke_confirm(self, event)
 
     def execute(self, context):
-        global db, plants_path, sdk_path
+        global db
         logging.info("Rebuilding database, this may take several minutes...")
         t0 = time.time()
-        db.build(str(plants_path), str(sdk_path))
+        prefs = context.preferences.addons[__name__].preferences
+        db.build(str(prefs.lbw_plants_path), str(prefs.lbw_sdk_path))
         logging.info("Rebuilt database in %0.2fs" % (time.time()-t0))
         thicket_init()
         context.area.tag_redraw()
@@ -968,24 +948,44 @@ class THICKET_OT_rebuild_db(Operator):
 class THICKET_Pref(AddonPreferences):
     """Thicket Addon Preference Panel
 
-    Configure the location of the Laubwerk Install Path and rebuild the database
-    for the first time, or after installing a new Laubwerk Plant Pack.
+    Configure the location of the Laubwerk installation paths and rebuild the
+    database for the first time, or after installing a new Laubwerk Plant Pack.
     """
 
     bl_idname = __name__
 
-    def lbw_path_on_update(self, context):
-        logging.debug("Blender relative Laubwerk Install path: '%s'" % self.lbw_path)
-        if self.lbw_path != "":
-            self["lbw_path"] = str(Path(bpy.path.abspath(self.lbw_path)).resolve())
-            logging.debug("Absolute Laubwerk Install path: '%s'" % self.lbw_path)
-        thicket_init()
+    default_plants_path = ""
+    default_sdk_path = ""
+    if platform.system() == "Windows":
+        default_plants_path = "C:\Program Files\Laubwerk\Plants"
+        default_sdk_path = "C:\Program Files\Laubwerk\Python"
+    if platform.system() == "Darwin":
+        default_plants_path = "/Library/Application Support/Laubwerk/Plants"
+        default_sdk_path = "/Library/Application Support/Laubwerk/Python"
 
-    lbw_path: StringProperty(
-        name="Install Path",
+    def lbw_path_on_update(self, context):
+        if self.lbw_sdk_path != "":
+            self["lbw_sdk_path"] = str(Path(bpy.path.abspath(self.lbw_sdk_path)).resolve())
+            logging.debug("Absolute Laubwerk Python Extension path: '%s'" % self.lbw_sdk_path)
+        if self.lbw_plants_path != "":
+            self["lbw_plants_path"] = str(Path(bpy.path.abspath(self.lbw_plants_path)).resolve())
+            logging.debug("Absolute Laubwerk Plants path: '%s'" % self.lbw_plants_path)
+        if self.lbw_sdk_path != "" and self.lbw_plants_path != "":
+            thicket_init()
+
+    lbw_sdk_path: StringProperty(
+        name="Python Extension",
         subtype="DIR_PATH",
-        description="absolute path to Laubwerk installation containing Plants and Python folders",
-        default="",
+        description="absolute path to Laubwerk Python Extension directory (default: %s)" % default_sdk_path,
+        default=default_sdk_path,
+        update=lbw_path_on_update
+        )
+
+    lbw_plants_path: StringProperty(
+        name="Plants",
+        subtype="DIR_PATH",
+        description="absolute path to Laubwerk Plants directory (default: %s)" % default_plants_path,
+        default=default_plants_path,
         update=lbw_path_on_update
         )
 
@@ -1001,29 +1001,37 @@ class THICKET_Pref(AddonPreferences):
         global db, thicket_status
 
         box = self.layout.box()
-        box.label(text="Laubwerk Plants Library")
-        col = box.column()
-        col.alert = thicket_status < ThicketStatus.LBW_VALID
-        col.prop(self, "lbw_path")
+        box.label(text="Laubwerk Installation")
+
+        row = box.row()
+        col = row.column()
+        col.alert = not thicket_status.lbw_plants_valid
+        col.prop(self, "lbw_plants_path")
         if col.alert:
-            col.label(text="Verify the 'Install Path' includes both a 'Plants' and a 'Python' directory.")
+            col.label(text="Path is not a directory")
+
+        row = box.row()
+        col = row.column()
+        col.alert = not thicket_status.lbw_sdk_valid
+        col.prop(self, "lbw_sdk_path")
+        if col.alert:
+            col.label(text="Failed to load Laubwerk Python Extension from this path")
 
         lbw_version = "Laubwerk Version: N/A"
-        db_status = "No database found"
-        if thicket_status >= ThicketStatus.LBW_VALID:
+        if thicket_status.lbw_sdk_valid:
             lbw_version = laubwerk.version
-        if thicket_status == ThicketStatus.REBUILD_DB:
-            db_status = "Please rebuild the database"
-        if thicket_status > ThicketStatus.REBUILD_DB:
+
+        db_status = "Please rebuild the database"
+        if thicket_status.ready:
             db_status = "Database contains %d plants" % db.plant_count()
 
         box.label(text=lbw_version)
         row = box.row()
-        row.alert = thicket_status == ThicketStatus.REBUILD_DB
+        row.alert = thicket_status.imported and not thicket_status.ready
         col = row.column()
         col.label(text=db_status)
         col = row.column()
-        col.enabled = thicket_status > ThicketStatus.IMPORTED
+        col.enabled = thicket_status.imported
         col.operator("thicket.rebuild_db", icon="FILE_REFRESH")
 
         box = self.layout.box()
