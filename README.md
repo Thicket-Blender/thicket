@@ -48,8 +48,7 @@ Thicket provides a visual plant selection gallery and options to configure the p
   * Check the box to enable the row `Import-Export: Thicket: Laubwerk Plants Add-on for Blender`
     * If you have more than one version installed, be sure to only enable one at a time
   * Click the arrow to expand the add-on preferences
-  * Enter the Laubwerk install path. The box will be red until a valid path is
-    entered, then the Laubwerk SDK version will be displayed below the path.
+  * Enter the Laubwerk Plants and Python Extension installation paths (these will be pre-populated with the platform defaults). The boxes will be red until valid paths are entered, then the Laubwerk SDK version will be displayed below.
   * Click `Rebuild Database`. This will take a few minutes depending on your computer and the number of Laubwerk Plants Kits installed.
   * When it completes, the number of plants in the database is displayed
 * Thicket is now ready to use (see Usage)
