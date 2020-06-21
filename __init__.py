@@ -458,7 +458,7 @@ class THICKET_OT_reset_plant(Operator):
         global thicket_ui_mode
         instance = context.active_object
         if not is_thicket_instance(instance):
-            logging.error("reset_plant failed: non-Thicket object: %" % instance.name)
+            logging.error("reset_plant failed: non-Thicket object: %s" % instance.name)
             return
         template = instance.instance_collection
         template.thicket.copy_to(context.window_manager.thicket)
@@ -486,7 +486,7 @@ class THICKET_OT_update_plant(Operator):
         global thicket_ui_mode
         instance = context.active_object
         if not is_thicket_instance(instance):
-            logging.error("update_plant failed: non-Thicket object: %" % instance.name)
+            logging.error("update_plant failed: non-Thicket object: %s" % instance.name)
             return
         instance = context.active_object
         logging.debug("Updating plant: %s" % instance.name)
@@ -543,7 +543,7 @@ class THICKET_OT_make_unique(Operator):
     def execute(self, context):
         instance = context.active_object
         if not is_thicket_instance(instance):
-            logging.error("make_unique failed: non-Thicket object: %" % instance.name)
+            logging.error("make_unique failed: non-Thicket object: %s" % instance.name)
             return
         self.make_unique(instance)
         context.area.tag_redraw()
@@ -561,7 +561,7 @@ class THICKET_OT_delete_plant(Operator):
     def execute(self, context):
         instance = context.active_object
         if not is_thicket_instance(instance):
-            logging.error("delete_plant failed: non-Thicket object: %" % instance.name)
+            logging.error("delete_plant failed: non-Thicket object: %s" % instance.name)
             return
         delete_plant(instance)
         context.area.tag_redraw()
