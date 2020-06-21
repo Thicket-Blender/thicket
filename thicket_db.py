@@ -278,8 +278,8 @@ class ThicketDB:
         labels = {}
         p_labels = {}
         # Store only the first label per locale
-        for l in p.labels.items():
-            p_labels[l[0]] = l[1][0]
+        for label in p.labels.items():
+            p_labels[label[0]] = label[1][0]
         labels[p.name] = p_labels
 
         models = {}
@@ -305,8 +305,8 @@ class ThicketDB:
             models[m.name] = m_rec
             m_labels = {}
             # FIXME: highly redundant
-            for l in m.labels.items():
-                m_labels[l[0]] = l[1][0]
+            for label in m.labels.items():
+                m_labels[label[0]] = label[1][0]
             labels[m.name] = m_labels
             i = i + 1
         plant["models"] = models
