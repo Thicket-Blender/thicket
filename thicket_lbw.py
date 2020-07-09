@@ -145,13 +145,30 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, qualifier=None, proxy_color=None):
     if proxy_color:
         return mat
 
-    # Diffuse Texture (FIXME: Assumes one sided)
+    # Diffuse Texture
     logging.debug("Diffuse Texture: %s" % lbw_mat.get_front().diffuse_texture)
     diffuse_path = lbw_mat.get_front().diffuse_texture
     node_img = nodes.new(type='ShaderNodeTexImage')
     node_img.location = 0, 2 * NH
     node_img.image = bpy.data.images.load(diffuse_path)
-    links.new(node_img.outputs[0], node_dif.inputs[0])
+
+    # Handle Two-Sided Textures (diffuse texture only)
+    if lbw_mat.is_two_sided() and lbw_mat.sides_are_different():
+        logging.debug("Diffuse texture is two sided")
+        diffuse_back_path = lbw_mat.get_back().diffuse_texture
+        node_back_img = nodes.new(type='ShaderNodeTexImage')
+        node_back_img.location = -NW, 2 * NH
+        node_back_img.image = bpy.data.images.load(diffuse_back_path)
+        node_mix = nodes.new(type='ShaderNodeMixRGB')
+        node_mix.location = NW, 2 * NH
+        node_geometry = nodes.new(type='ShaderNodeNewGeometry')
+        node_geometry.location = -NW, NH
+        links.new(node_geometry.outputs[6], node_mix.inputs[0])
+        links.new(node_img.outputs[0], node_mix.inputs[1])
+        links.new(node_back_img.outputs[0], node_mix.inputs[2])
+        links.new(node_mix.outputs[0], node_dif.inputs[0])
+    else:
+        links.new(node_img.outputs[0], node_dif.inputs[0])
 
     # Alpha Texture
     # Blender render engines support using the diffuse map alpha channel. We
