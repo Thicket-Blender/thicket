@@ -23,9 +23,11 @@
 
 
 import logging
+from math import radians
 import time
 import bpy
 import laubwerk
+from mathutils import Matrix
 
 from . import THICKET_GUID
 
@@ -46,25 +48,9 @@ def new_collection(name, parent, singleton=False, exclude=False):
 def lbw_to_bl_obj(lbw_plant, name, lbw_mesh, qualifier, proxy):
     """ Generate the Blender Object from the Laubwerk mesh and materials """
 
-    verts_list = []
-    polygon_list = []
-    materials = []
-
-    # write vertices
-    # Laubwerk Mesh uses cm units. Blender units *appear* to be meters
-    # regardless of scene units.
-    for point in lbw_mesh.points:
-        verts_list.append((.01*point[0], .01*point[2], .01*point[1]))
-
-    # write polygons
-    for polygon in zip(lbw_mesh.polygons):
-        for idx in zip(polygon):
-            face = idx[0]
-            polygon_list.append(face)
-
     # create mesh and object
     mesh = bpy.data.meshes.new(name)
-    mesh.from_pydata(verts_list, [], polygon_list)
+    mesh.from_pydata(lbw_mesh.points, [], lbw_mesh.polygons)
     mesh.update(calc_edges=True)
 
     # Use smooth shading
@@ -78,7 +64,11 @@ def lbw_to_bl_obj(lbw_plant, name, lbw_mesh, qualifier, proxy):
         uv = lbw_mesh.uvs[i]
         d.uv = (uv[0] * -1, uv[1] * -1)
         i += 1
+
     obj = bpy.data.objects.new(name, mesh)
+    # Rotate 90 degrees around X axis so Z is pointing up
+    # Scale Laubwerk centimeters units to Blender meters units
+    obj.data.transform(Matrix.Rotation(radians(90), 4, 'X') @ Matrix.Scale(.01, 4))
 
     # String operations are expensive, do them here outside the material loop
     wood_mat_name = lbw_plant.name + " wood"
@@ -87,6 +77,7 @@ def lbw_to_bl_obj(lbw_plant, name, lbw_mesh, qualifier, proxy):
     foliage_color = lbw_plant.get_foliage_color()
 
     # read matids and materialnames and create and add materials to the laubwerktree
+    materials = []
     i = 0
     for matID in zip(lbw_mesh.matids):
         mat_id = matID[0]
