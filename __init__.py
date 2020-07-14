@@ -53,7 +53,7 @@ import bpy.utils.previews
 bl_info = {
     "name": "Thicket: Laubwerk Plants Add-on for Blender",
     "author": "Darren Hart",
-    "version": (0, 3, 1),
+    "version": (0, 3, 2),
     "blender": (2, 80, 0),
     "location": "View3D > Sidebar > Thicket",
     "description": "Import Laubwerk Plants (.lbw.gz)",
