@@ -112,6 +112,8 @@ def populate_previews():
     thicket_path = Path(bpy.utils.user_resource('SCRIPTS', "addons", True)) / __name__
     missing_path = thicket_path / "doc" / "missing_preview.png"
     thicket_previews.load("missing_preview", str(missing_path), 'IMAGE')
+    multiple_path = thicket_path / "doc" / "multiple_preview.png"
+    thicket_previews.load("multiple_preview", str(multiple_path), 'IMAGE')
 
     for plant in db:
         # Load the top plant (no model) preview
@@ -366,18 +368,36 @@ class ThicketPropGroup(PropertyGroup):
         for k, v in self.items():
             other[k] = v
 
-    def import_lbw(self):
+    def import_lbw(self, original=None):
         filepath = db.get_plant(name=self.name).filepath
+        tp = self
+        model = self.model
         mesh_args = {}
         mesh_args["qualifier"] = self.qualifier
-        mesh_args["leaf_density"] = self.leaf_density / 100.0
-        if self.use_lod_max_level:
-            mesh_args["max_branch_level"] = self.lod_max_level
-        if self.use_lod_min_thick:
-            mesh_args["min_thickness"] = self.lod_min_thick
-        mesh_args["max_subdiv_level"] = self.lod_subdiv
-        mesh_args["leaf_amount"] = self.leaf_amount / 100.0
-        return thicket_lbw.import_lbw(filepath, self.model, self.viewport_lod, self.render_lod, mesh_args)
+
+        if self.batch_mode:
+            if self.batch_name == "":
+                filepath = db.get_plant(name=original.name).filepath
+            else:
+                filepath = db.get_plant(name=self.batch_name).filepath
+            if not self.batch_use_lod:
+                tp = original
+            model = self.batch_model
+            if model == 'UNCHANGED':
+                model = original.model
+            mesh_args["qualifier"] = self.batch_qualifier
+            if self.batch_qualifier == 'UNCHANGED':
+                mesh_args["qualifier"] = original.qualifier
+
+        mesh_args["leaf_density"] = tp.leaf_density / 100.0
+        if tp.use_lod_max_level:
+            mesh_args["max_branch_level"] = tp.lod_max_level
+        if tp.use_lod_min_thick:
+            mesh_args["min_thickness"] = tp.lod_min_thick
+        mesh_args["max_subdiv_level"] = tp.lod_subdiv
+        mesh_args["leaf_amount"] = tp.leaf_amount / 100.0
+
+        return thicket_lbw.import_lbw(filepath, model, tp.viewport_lod, tp.render_lod, mesh_args)
 
     def model_callback(self, context):
         global db, thicket_ui_mode
@@ -412,6 +432,18 @@ class ThicketPropGroup(PropertyGroup):
                 items.append((q.name, q.label, ""))
         return items
 
+    def batch_model_callback(self, context):
+        global db
+        models = ['01young', '01medium', '01adult',
+                  '02young', '02medium', '02adult',
+                  '03young', '03medium', '03adult']
+        return [(m, db.get_label(m), "") for m in models] + [('UNCHANGED', "--", "")]
+
+    def batch_qualifier_callback(self, context):
+        global db
+        qualifiers = ['spring', 'summer', 'fall', 'winter']
+        return [(q, db.get_label(q), "") for q in qualifiers] + [('UNCHANGED', "--", "")]
+
     def render_lod_update(self, context):
         if self.render_lod == 'PROXY':
             self.viewport_lod = 'PROXY'
@@ -442,6 +474,16 @@ class ThicketPropGroup(PropertyGroup):
     leaf_amount: FloatProperty(name="Leaf Amount", description="How many leaves used for leaf density "
                                "(smaller number means larger leaves)",
                                default=100.0, min=0.01, max=100.0, subtype='PERCENTAGE')
+
+    # These batch properties are not derived from a specific plant, but instead assume
+    # the standard model and season options available for all Laubwerk plants.
+    batch_mode: BoolProperty(default=False)
+    batch_name: StringProperty(default="")
+    batch_model: EnumProperty(name="Model", items=batch_model_callback)
+    batch_qualifier: EnumProperty(name="Season", items=batch_qualifier_callback)
+    batch_use_lod: BoolProperty(name="Show Geometry Options",
+                                description="Show options affecting geometry for selected plants.",
+                                default=False)
 
 
 class THICKET_OT_reset_plant(Operator):
@@ -482,18 +524,12 @@ class THICKET_OT_update_plant(Operator):
 
     next_mode: StringProperty()
 
-    def execute(self, context):
-        global thicket_ui_mode
-        instance = context.active_object
-        if not is_thicket_instance(instance):
-            logging.error("update_plant failed: non-Thicket object: %s" % instance.name)
-            return
-        instance = context.active_object
+    def update_plant(self, instance, tp):
         logging.debug("Updating plant: %s" % instance.name)
         template = instance.instance_collection
 
         # Load new plant model
-        new_instance = context.window_manager.thicket.import_lbw()
+        new_instance = tp.import_lbw(template.thicket)
         new_template = new_instance.instance_collection
 
         # Update the instance_collection reference in the instances
@@ -505,12 +541,32 @@ class THICKET_OT_update_plant(Operator):
         delete_plant(new_instance)
         delete_plant_template(template)
 
-        # Restore the active object
-        instance.select_set(True)
-        bpy.context.view_layer.objects.active = instance
+    def execute(self, context):
+        global thicket_ui_mode
+        active = context.active_object
+        if not is_thicket_instance(active):
+            logging.error("update_plant failed: non-Thicket active object: %s" % active.name)
+            return
 
-        thicket_ui_mode = self.next_mode
+        plants = context.selected_objects
+        templates = []
+        for p in plants:
+            logging.debug("update_plant: updating %s" % p.name)
+            if not is_thicket_instance(p):
+                logging.debug("update_plant: skipped non-Thicket object: %s" % p.name)
+                continue
+            if p.instance_collection not in templates:
+                self.update_plant(p, context.window_manager.thicket)
+                templates.append(p.instance_collection)
+
+        for p in plants:
+            p.select_set(True)
+
+        # Restore the active object
+        bpy.context.view_layer.objects.active = active
+
         context.area.tag_redraw()
+        thicket_ui_mode = self.next_mode
         return {'FINISHED'}
 
 
@@ -554,7 +610,7 @@ class THICKET_OT_delete_plant(Operator):
     """Delete the active plant instance and the template if it is the last user"""
 
     bl_idname = "thicket.delete_plant"
-    bl_label = "Delete Plant"
+    bl_label = "Delete"
     bl_description = "Delete the active plant and remove the template if there are no instances remaining"
     bl_options = {'REGISTER', 'INTERNAL'}
 
@@ -595,6 +651,8 @@ class THICKET_OT_select_plant(Operator):
                 tp.pop(key)
 
         tp.name = plant.name
+        if tp.batch_mode:
+            tp.batch_name = tp.name
 
         # Restore the old values if available, others reset to the defaults
         model = plant.get_model(old_model)
@@ -626,11 +684,12 @@ class THICKET_OT_edit_plant(Operator):
     """Copy the active plant properties to the window_manager.thicket properties"""
 
     bl_idname = "thicket.edit_plant"
-    bl_label = "Edit Plant"
+    bl_label = "Edit"
     bl_description = "Edit the active plant"
     bl_options = {'REGISTER', 'INTERNAL'}
 
     next_mode: StringProperty()
+    batch_mode: BoolProperty(default=False)
 
     @classmethod
     def poll(self, context):
@@ -640,6 +699,13 @@ class THICKET_OT_edit_plant(Operator):
         global thicket_ui_mode, thicket_ui_obj
         thicket_ui_obj = context.active_object
         context.active_object.instance_collection.thicket.copy_to(context.window_manager.thicket)
+
+        tp = context.window_manager.thicket
+        tp.batch_mode = self.batch_mode
+        tp.batch_name = ""
+        tp.batch_model = 'UNCHANGED'
+        tp.batch_qualifier = 'UNCHANGED'
+
         thicket_ui_mode = self.next_mode
         context.area.tag_redraw()
         return {'FINISHED'}
@@ -776,11 +842,19 @@ class THICKET_PT_plant_properties(Panel):
         o = layout.operator("thicket.change_mode", text="Cancel")
         o.next_mode = self.next_mode('CANCEL')
 
-    def draw_props(self, layout, plant, tp):
+    def draw_props(self, layout, tp, batch=False):
         """Draw the plant properties UI"""
 
-        layout.prop(tp, "model")
-        layout.prop(tp, "qualifier")
+        if not batch:
+            layout.prop(tp, "model")
+            layout.prop(tp, "qualifier")
+        else:
+            layout.prop(tp, "batch_model")
+            layout.prop(tp, "batch_qualifier")
+            layout.prop(tp, "batch_use_lod")
+            if not tp.batch_use_lod:
+                return
+
         layout.prop(tp, "leaf_density")
 
         layout.separator()
@@ -825,6 +899,9 @@ class THICKET_PT_plant_properties(Panel):
                 layout.label(text="See Thicket Add-on Preferences")
             return
 
+        plant_count = sum(1 for p in context.selected_objects if is_thicket_instance(p))
+        batch = plant_count > 1
+
         template = None
         num_siblings = 0
         tp = None
@@ -863,17 +940,32 @@ class THICKET_PT_plant_properties(Panel):
             return
 
         plant = db.get_plant(name=tp.name)
+        if batch and tp.batch_name:
+            plant = db.get_plant(name=tp.batch_name)
+
         if plant is None:
             layout.label(text="Plant not found in database")
             layout.operator("thicket.rebuild_db", icon="FILE_REFRESH")
             return
 
-        layout.label(text="%s" % plant.label)
-        layout.label(text="(%s)" % plant.name)
-        layout.template_icon(icon_value=get_preview(plant.name, tp.model).icon_id, scale=THICKET_SCALE)
+        if batch:
+            layout.label(text="Multiple Plants (%d)" % plant_count)
+
+        if batch and tp.batch_name == "":
+            preview = get_preview("multiple_preview", "")
+        else:
+            layout.label(text="%s" % plant.label)
+            layout.label(text="(%s)" % plant.name)
+            preview = get_preview(plant.name, tp.batch_model if batch else tp.model)
+
+        layout.template_icon(preview.icon_id, scale=THICKET_SCALE)
+
         if thicket_ui_mode == 'VIEW':
             o = layout.operator("thicket.edit_plant")
             o.next_mode = self.next_mode('EDIT')
+            o.batch_mode = batch
+            if batch:
+                return
         elif thicket_ui_mode in ['ADD', 'EDIT']:
             o = layout.operator("thicket.change_mode")
             o.next_mode = self.next_mode('CHANGE')
@@ -882,9 +974,10 @@ class THICKET_PT_plant_properties(Panel):
                 r.operator("thicket.make_unique", icon='NONE', text="Make Unique (%d)" % num_siblings)
                 r.enabled = num_siblings > 1
 
+        # Draw the plant properties
         col = layout.column()
         col.enabled = thicket_ui_mode != 'VIEW'
-        self.draw_props(col, plant, tp)
+        self.draw_props(col, tp, batch)
 
         if thicket_ui_mode == 'VIEW':
             v = template.all_objects[0].data
@@ -894,6 +987,7 @@ class THICKET_PT_plant_properties(Panel):
             layout.label(text="Render: Verts:%s | Faces:%s" % (f"{len(r.vertices):,}",  f"{len(r.polygons):,}"))
             return
 
+        # Draw the confirm and cancel buttons
         layout.separator()
         r = layout.row()
         if thicket_ui_mode == 'EDIT':
