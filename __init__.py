@@ -57,7 +57,7 @@ bl_info = {
     "blender": (2, 80, 0),
     "location": "View3D > Sidebar > Thicket",
     "description": "Import Laubwerk Plants (.lbw.gz)",
-    # "warning": "This is an unofficial development release",
+    "warning": "This is an unofficial development release",
     "wiki_url": "https://github.com/Thicket-Blender/thicket/blob/master/README.md",
     "tracker_url": "https://github.com/Thicket-Blender/thicket/issues",
     "support": 'COMMUNITY',
