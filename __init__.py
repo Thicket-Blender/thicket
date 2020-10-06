@@ -112,6 +112,8 @@ def populate_previews():
     thicket_path = Path(bpy.utils.user_resource('SCRIPTS', "addons", True)) / __name__
     missing_path = thicket_path / "doc" / "missing_preview.png"
     thicket_previews.load("missing_preview", str(missing_path), 'IMAGE')
+    multiple_path = thicket_path / "doc" / "multiple_preview.png"
+    thicket_previews.load("multiple_preview", str(multiple_path), 'IMAGE')
 
     for plant in db:
         # Load the top plant (no model) preview
@@ -952,11 +954,10 @@ class THICKET_PT_plant_properties(Panel):
             return
 
         if batch:
-            # TODO: Create a Multiple Plants preview
             layout.label(text="Multiple Plants (%d)" % plant_count)
 
         if batch and tp.batch_name == "":
-            preview = get_preview("missing_preview", "")
+            preview = get_preview("multiple_preview", "")
         else:
             layout.label(text="%s" % plant.label)
             layout.label(text="(%s)" % plant.name)
