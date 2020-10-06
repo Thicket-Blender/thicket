@@ -744,7 +744,7 @@ class THICKET_PT_plant_properties(Panel):
 
         return nm
 
-    def draw_gallery(self, context, tp):
+    def draw_gallery(self, context):
         global THICKET_SCALE
         layout = self.layout
         # TODO:
@@ -849,7 +849,7 @@ class THICKET_PT_plant_properties(Panel):
             tp = context.window_manager.thicket
 
         if thicket_ui_mode in ['SELECT', 'SELECT_ADD']:
-            self.draw_gallery(context, tp)
+            self.draw_gallery(context)
             return
 
         # Draw Add and Delete in VIEW mode only
