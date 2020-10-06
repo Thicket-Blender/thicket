@@ -396,7 +396,7 @@ class ThicketPropGroup(PropertyGroup):
         return items
 
     def qualifier_callback(self, context):
-        global db
+        global db, thicket_ui_mode
 
         tp = context.window_manager.thicket
         if thicket_ui_mode == 'VIEW':
