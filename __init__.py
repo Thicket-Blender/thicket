@@ -747,8 +747,6 @@ class THICKET_PT_plant_properties(Panel):
     def draw_gallery(self, context):
         global THICKET_SCALE
         layout = self.layout
-        # TODO:
-        #  - add a filter box (not sure how this will work yet)
         panel_w = context.region.width
         # cell_w = int(0.75 * scale * bpy.app.render_icon_size)
         cell_w = 175
