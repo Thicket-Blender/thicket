@@ -597,11 +597,25 @@ class THICKET_OT_make_unique(Operator):
         instance.instance_collection = new_template
 
     def execute(self, context):
-        instance = context.active_object
-        if not is_thicket_instance(instance):
-            logging.error("make_unique failed: non-Thicket object: %s" % instance.name)
+        active = context.active_object
+        if not is_thicket_instance(active):
+            logging.error("make_unique failed: non-Thicket active object: %s" % active.name)
             return
-        self.make_unique(instance)
+
+        plants = context.selected_objects
+        for p in plants:
+            logging.debug("make_unique: %s" % p.name)
+            if not is_thicket_instance(p):
+                logging.debug("make_unique: skipped non-Thicket object: %s" % p.name)
+                continue
+            self.make_unique(p)
+
+        for p in plants:
+            p.select_set(True)
+
+        # Restore the active object
+        bpy.context.view_layer.objects.active = active
+
         context.area.tag_redraw()
         return {'FINISHED'}
 
@@ -899,12 +913,22 @@ class THICKET_PT_plant_properties(Panel):
                 layout.label(text="See Thicket Add-on Preferences")
             return
 
-        plant_count = sum(1 for p in context.selected_objects if is_thicket_instance(p))
-        batch = plant_count > 1
-
         template = None
-        num_siblings = 0
+        siblings = 0
         tp = None
+
+        plants = []
+        templates = []
+        for p in context.selected_objects:
+            if is_thicket_instance(p):
+                plants.append(p)
+                if p.instance_collection not in templates:
+                    templates.append(p.instance_collection)
+                    t_siblings = len(p.instance_collection.users_dupli_group)
+                    if t_siblings > 1:
+                        siblings += t_siblings
+        plant_count = len(plants)
+        batch = plant_count > 1
 
         instance = context.active_object
         if instance is not thicket_ui_obj:
@@ -915,7 +939,6 @@ class THICKET_PT_plant_properties(Panel):
         if (instance and is_thicket_instance(instance)):
             thicket_ui_obj = instance
             template = instance.instance_collection
-            num_siblings = len(template.users_dupli_group)
 
         if thicket_ui_mode == 'VIEW':
             if template:
@@ -927,12 +950,15 @@ class THICKET_PT_plant_properties(Panel):
             self.draw_gallery(context)
             return
 
-        # Draw Add and Delete in VIEW mode only
+        # Draw Add, Delete, and Make Unique in VIEW mode only
         if thicket_ui_mode == 'VIEW':
             o = layout.operator("thicket.change_mode", text="Add Plant")
             o.next_mode = self.next_mode('ADD')
             if template:
                 layout.operator("thicket.delete_plant", icon='NONE', text="Delete")
+                r = layout.row()
+                r.operator("thicket.make_unique", icon='NONE', text="Make Unique (%d)" % siblings)
+                r.enabled = siblings > 1
             layout.separator()
 
         # If tp is not set, there is not active plant or no plant being added. Nothing else to draw.
@@ -969,10 +995,6 @@ class THICKET_PT_plant_properties(Panel):
         elif thicket_ui_mode in ['ADD', 'EDIT']:
             o = layout.operator("thicket.change_mode")
             o.next_mode = self.next_mode('CHANGE')
-            if thicket_ui_mode == 'EDIT':
-                r = layout.row()
-                r.operator("thicket.make_unique", icon='NONE', text="Make Unique (%d)" % num_siblings)
-                r.enabled = num_siblings > 1
 
         # Draw the plant properties
         col = layout.column()
