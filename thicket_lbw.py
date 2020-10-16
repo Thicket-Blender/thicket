@@ -76,6 +76,13 @@ def lbw_to_bl_obj(lbw_plant, name, lbw_mesh, qualifier, proxy):
     foliage_mat_name = lbw_plant.name + " foliage"
     foliage_color = lbw_plant.get_foliage_color()
 
+    use_1033 = False
+    lbw_version = laubwerk.version_info
+    if lbw_version[0] <= 1:
+        if lbw_version[1] == 0:
+            if lbw_version[2] <= 33:
+                use_1033 = True
+
     # read matids and materialnames and create and add materials to the laubwerktree
     materials = []
     i = 0
@@ -97,7 +104,10 @@ def lbw_to_bl_obj(lbw_plant, name, lbw_mesh, qualifier, proxy):
             materials.append(mat_id)
             mat = bpy.data.materials.get(mat_name)
             if mat is None:
-                mat = lbw_to_bl_mat(lbw_plant, mat_id, mat_name, qualifier, proxy_color)
+                if use_1033:
+                    mat = lbw_to_bl_mat_1033(lbw_plant, mat_id, mat_name, qualifier, proxy_color)
+                else:
+                    mat = lbw_to_bl_mat(lbw_plant, mat_id, mat_name, qualifier, proxy_color)
             obj.data.materials.append(mat)
 
         mat_index = obj.data.materials.find(mat_name)
@@ -111,7 +121,9 @@ def lbw_to_bl_obj(lbw_plant, name, lbw_mesh, qualifier, proxy):
     return obj
 
 
-def lbw_to_bl_mat(plant, mat_id, mat_name, qualifier=None, proxy_color=None):
+def lbw_to_bl_mat_1033(plant, mat_id, mat_name, qualifier=None, proxy_color=None):
+    logging.warning("Laubwerk 1.0.33 support is deprecated and will be removed "
+                    "in future releases. Please upgrade to 1.0.34 or newer.")
     NW = 300
     NH = 300
 
@@ -183,10 +195,6 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, qualifier=None, proxy_color=None):
             logging.warning("Diffuse Texture: %s" % lbw_mat.get_front().diffuse_texture)
 
     # Subsurface Texture
-    if lbw_mat.subsurface_color:
-        logging.debug("Subsurface Color: %s" % str(lbw_mat.subsurface_color))
-        node_dif.inputs['Subsurface Color'].default_value = lbw_mat.subsurface_color + (1.0,)
-
     sub_path = lbw_mat.subsurface_texture
     if sub_path != "":
         logging.debug("Subsurface Texture: %s" % lbw_mat.subsurface_texture)
@@ -194,10 +202,9 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, qualifier=None, proxy_color=None):
         node_sub.location = 0, NH
         node_sub.image = bpy.data.images.load(sub_path)
 
-        # Laubwerk models only support subsurface as a translucency effect,
-        # indicated by a subsurface_depth of 0.0.
-        logging.debug("Subsurface Depth: %f" % lbw_mat.subsurface_depth)
-        if lbw_mat.subsurface_depth == 0.0:
+        # Laubwerk models only support subsurface as a translucency effect for
+        # thin-shell material, indicated by having two sides:
+        if lbw_mat.is_two_sided():
             node_sub.image.colorspace_settings.is_data = True
             links.new(node_sub.outputs['Color'], node_dif.inputs['Transmission'])
         else:
@@ -226,6 +233,103 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, qualifier=None, proxy_color=None):
         logging.debug("Normal Texture: %s" % lbw_mat.get_front().normal_texture)
     if lbw_mat.get_front().specular_texture:
         logging.debug("Specular Texture: %s" % lbw_mat.get_front().specular_texture)
+
+    return mat
+
+
+def lbw_to_bl_mat(plant, mat_id, mat_name, qualifier=None, proxy_color=None):
+    NW = 300
+    NH = 300
+
+    lbw_mat = plant.materials[mat_id]
+    mat = bpy.data.materials.new(mat_name)
+
+    mat.use_nodes = True
+    nodes = mat.node_tree.nodes
+    nodes.clear()
+    # create Principled BSDF node (primary multi-layer mixer node)
+    node_dif = nodes.new(type='ShaderNodeBsdfPrincipled')
+    node_dif.location = 2 * NW, 2 * NH
+    # create output node
+    node_out = nodes.new(type='ShaderNodeOutputMaterial')
+    node_out.location = 3 * NW, 2 * NH
+    # link nodes
+    links = mat.node_tree.links
+    links.new(node_dif.outputs[0], node_out.inputs[0])
+
+    mat.diffuse_color = proxy_color or lbw_mat.get_front().base_color + (1.0,)
+    node_dif.inputs[0].default_value = mat.diffuse_color
+    if proxy_color:
+        return mat
+
+    # Diffuse Texture (FIXME: Assumes one sided)
+    logging.debug("Diffuse Texture: %s" % lbw_mat.get_front().base_color_texture)
+    diffuse_path = lbw_mat.get_front().base_color_texture
+    node_img = nodes.new(type='ShaderNodeTexImage')
+    node_img.location = 0, 2 * NH
+    node_img.image = bpy.data.images.load(diffuse_path)
+    links.new(node_img.outputs[0], node_dif.inputs[0])
+
+    # Alpha Texture
+    # Blender render engines support using the diffuse map alpha channel. We
+    # assume this rather than a separate alpha image.
+    alpha_path = lbw_mat.opacity_texture
+    logging.debug("Alpha Texture: %s" % lbw_mat.opacity_texture)
+    if alpha_path != "":
+        # Enable leaf clipping in Eevee
+        mat.blend_method = 'CLIP'
+        # TODO: mat.transparent_shadow_method = 'CLIP' ?
+
+        # All tested models either use the diffuse map for alpha or list a
+        # different texture for alpha in error (wrong diffuse map as opposed a
+        # separate alpha map). Ignore the difference if it exists, assume alpha
+        # comes from diffuse, and issue a warning when the difference appears.
+        links.new(node_img.outputs['Alpha'], node_dif.inputs['Alpha'])
+        if alpha_path != diffuse_path:
+            # NOTE: This affects at least 'Howea forsteriana'
+            logging.warning("Alpha Texture differs from diffuse image path:")
+            logging.warning("Alpha Texture: %s" % lbw_mat.opacity_texture)
+            logging.warning("Diffuse Texture: %s" % lbw_mat.get_front().base_color_texture)
+
+    # Subsurface Texture
+    sub_path = lbw_mat.subsurface_texture
+    if sub_path != "":
+        logging.debug("Subsurface Texture: %s" % lbw_mat.subsurface_texture)
+        node_sub = nodes.new(type='ShaderNodeTexImage')
+        node_sub.location = 0, NH
+        node_sub.image = bpy.data.images.load(sub_path)
+
+        # Laubwerk models only support subsurface as a translucency effect for
+        # thin-shell material, indicated by having two sides:
+        if lbw_mat.is_two_sided():
+            node_sub.image.colorspace_settings.is_data = True
+            links.new(node_sub.outputs['Color'], node_dif.inputs['Transmission'])
+        else:
+            logging.warning("Subsurface scattering not supported on closed volumes.")
+
+    # Bump Texture
+    bump_path = lbw_mat.get_front().bump_texture
+    if bump_path != "":
+        logging.debug("Bump Texture: %s" % lbw_mat.get_front().bump_texture)
+        node_bumpimg = nodes.new(type='ShaderNodeTexImage')
+        node_bumpimg.location = 0, 0
+        node_bumpimg.image = bpy.data.images.load(bump_path)
+        node_bumpimg.image.colorspace_settings.is_data = True
+        node_bump = nodes.new(type='ShaderNodeBump')
+        node_bump.location = NW, 0
+        # TODO: Make the Distance configurable to tune for each render engine
+        logging.debug("Bump Strength: %f" % lbw_mat.get_front().bump_strength)
+        node_bump.inputs['Strength'].default_value = lbw_mat.get_front().bump_strength
+        node_bump.inputs['Distance'].default_value = 0.02
+        links.new(node_bumpimg.outputs['Color'], node_bump.inputs['Height'])
+        links.new(node_bump.outputs['Normal'], node_dif.inputs['Normal'])
+
+    if lbw_mat.displacement_texture:
+        logging.debug("Displacement Texture: %s" % lbw_mat.displacement_texture)
+    if lbw_mat.get_front().normal_texture:
+        logging.debug("Normal Texture: %s" % lbw_mat.get_front().normal_texture)
+    if lbw_mat.get_front().specular_color_texture:
+        logging.debug("Specular Color Texture: %s" % lbw_mat.get_front().specular_color_texture)
 
     return mat
 
