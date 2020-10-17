@@ -629,11 +629,19 @@ class THICKET_OT_delete_plant(Operator):
     bl_options = {'REGISTER', 'INTERNAL'}
 
     def execute(self, context):
-        instance = context.active_object
-        if not is_thicket_instance(instance):
-            logging.error("delete_plant failed: non-Thicket object: %s" % instance.name)
-            return
-        delete_plant(instance)
+        plants = context.selected_objects
+        objects = []
+        for p in plants:
+            logging.debug("delete_plant: %s" % p.name)
+            if not is_thicket_instance(p):
+                logging.debug("delete_plant: skipped non-Thicket object: %s" % p.name)
+                objects.append(p)
+                continue
+            delete_plant(p)
+
+        for o in objects:
+            o.select_set(True)
+
         context.area.tag_redraw()
         return {'FINISHED'}
 
@@ -955,7 +963,9 @@ class THICKET_PT_plant_properties(Panel):
             o = layout.operator("thicket.change_mode", text="Add Plant")
             o.next_mode = self.next_mode('ADD')
             if template:
-                layout.operator("thicket.delete_plant", icon='NONE', text="Delete")
+                r = layout.row()
+                r.operator("thicket.delete_plant", icon='NONE', text="Delete (%d)" % plant_count)
+                r.enabled = plant_count > 0
                 r = layout.row()
                 r.operator("thicket.make_unique", icon='NONE', text="Make Unique (%d)" % siblings)
                 r.enabled = siblings > 1
