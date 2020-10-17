@@ -962,34 +962,33 @@ class THICKET_PT_plant_properties(Panel):
         if thicket_ui_mode == 'VIEW':
             o = layout.operator("thicket.change_mode", text="Add Plant")
             o.next_mode = self.next_mode('ADD')
-            if template:
-                r = layout.row()
-                r.operator("thicket.delete_plant", icon='NONE', text="Delete (%d)" % plant_count)
-                r.enabled = plant_count > 0
+            if plant_count > 0:
+                layout.operator("thicket.delete_plant", icon='NONE', text="Delete (%d)" % plant_count)
                 r = layout.row()
                 r.operator("thicket.make_unique", icon='NONE', text="Make Unique (%d)" % siblings)
                 r.enabled = siblings > 1
             layout.separator()
 
-        # If tp is not set, there is not active plant or no plant being added. Nothing else to draw.
-        if tp is None:
-            return
-
-        plant = db.get_plant(name=tp.name)
-        if batch and tp.batch_name:
-            plant = db.get_plant(name=tp.batch_name)
-
-        if plant is None:
-            layout.label(text="Plant not found in database")
-            layout.operator("thicket.rebuild_db", icon="FILE_REFRESH")
-            return
-
+        # Determine the plant name and preview based on the active plant or the
+        # plant chosen from Change Plant if in batch mode.
+        plant = None
+        preview = get_preview("missing_preview", "")
         if batch:
             layout.label(text="Multiple Plants (%d)" % plant_count)
-
-        if batch and tp.batch_name == "":
             preview = get_preview("multiple_preview", "")
+            if tp and not tp.batch_name == "":
+                plant = db.get_plant(name=tp.batch_name)
         else:
+            if tp is None:
+                return
+            plant = db.get_plant(name=tp.name)
+
+            if plant is None:
+                layout.label(text="Plant not found in database")
+                layout.operator("thicket.rebuild_db", icon="FILE_REFRESH")
+                return
+
+        if plant:
             layout.label(text="%s" % plant.label)
             layout.label(text="(%s)" % plant.name)
             preview = get_preview(plant.name, tp.batch_model if batch else tp.model)
