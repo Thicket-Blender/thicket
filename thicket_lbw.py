@@ -210,6 +210,10 @@ def lbw_to_bl_mat_1033(plant, mat_id, mat_name, qualifier=None, proxy_color=None
         else:
             logging.warning("Subsurface Depth > 0. Not supported.")
 
+    # Index of Refraction (IOR)
+    # All Laubwerk Materials default to 1.33 across host applications
+    node_dif.inputs['IOR'].default_value = 1.33
+
     # Bump Texture
     bump_path = lbw_mat.get_front().bump_texture
     if bump_path != "":
@@ -306,6 +310,10 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, qualifier=None, proxy_color=None):
             links.new(node_sub.outputs['Color'], node_dif.inputs['Transmission'])
         else:
             logging.warning("Subsurface scattering not supported on closed volumes.")
+
+    # Index of Refraction (IOR)
+    # All Laubwerk Materials default to 1.33 across host applications
+    node_dif.inputs['IOR'].default_value = 1.33
 
     # Bump Texture
     bump_path = lbw_mat.get_front().bump_texture
