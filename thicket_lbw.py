@@ -255,7 +255,7 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, qualifier=None, proxy_color=None):
     node_dif.location = 2 * NW, 2 * NH
     # create output node
     node_out = nodes.new(type='ShaderNodeOutputMaterial')
-    node_out.location = 3 * NW, 2 * NH
+    node_out.location = 4 * NW, 2 * NH
     # link nodes
     links = mat.node_tree.links
     links.new(node_dif.outputs[0], node_out.inputs[0])
@@ -311,20 +311,27 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, qualifier=None, proxy_color=None):
             logging.warning("Diffuse Texture: %s" % lbw_mat.get_front().base_color_texture)
 
     # Subsurface Texture
+    # Laubwerk models only support subsurface as a translucency effect for
+    # thin-shell material, indicated by having two sides.
     sub_path = lbw_mat.subsurface_texture
-    if sub_path != "":
+    if sub_path != "" and lbw_mat.is_two_sided():
         logging.debug("Subsurface Texture: %s" % lbw_mat.subsurface_texture)
         node_sub = nodes.new(type='ShaderNodeTexImage')
-        node_sub.location = 0, NH
+        node_sub.location = NW, NH
         node_sub.image = bpy.data.images.load(sub_path)
+        node_sub.image.colorspace_settings.is_data = True
 
-        # Laubwerk models only support subsurface as a translucency effect for
-        # thin-shell material, indicated by having two sides:
-        if lbw_mat.is_two_sided():
-            node_sub.image.colorspace_settings.is_data = True
-            links.new(node_sub.outputs['Color'], node_dif.inputs['Transmission'])
-        else:
-            logging.warning("Subsurface scattering not supported on closed volumes.")
+        node_tr = nodes.new(type='ShaderNodeBsdfTranslucent')
+        node_tr.location = 2 * NW, 0
+        node_tr.inputs['Color'].default_value = lbw_mat.subsurface_color + (1.0,)
+
+        node_mix = nodes.new(type='ShaderNodeMixShader')
+        node_mix.location = 3 * NW, 2 * NH
+
+        links.new(node_sub.outputs[0], node_mix.inputs[0])
+        links.new(node_dif.outputs[0], node_mix.inputs[1])
+        links.new(node_tr.outputs[0], node_mix.inputs[2])
+        links.new(node_mix.outputs[0], node_out.inputs[0])
 
     # Index of Refraction (IOR)
     # All Laubwerk Materials default to 1.33 across host applications
