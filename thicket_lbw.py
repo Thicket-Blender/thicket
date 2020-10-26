@@ -33,6 +33,9 @@ from . import THICKET_GUID
 
 VP_MAX_BRANCH_LEVEL = 4
 VP_MIN_THICKNESS = 0.1
+# Node graph units
+NW = 300
+NH = 300
 
 
 def new_collection(name, parent, singleton=False, exclude=False):
@@ -124,8 +127,8 @@ def lbw_to_bl_obj(lbw_plant, name, lbw_mesh, qualifier, proxy):
 def lbw_to_bl_mat_1033(plant, mat_id, mat_name, qualifier=None, proxy_color=None):
     logging.warning("Laubwerk 1.0.33 support is deprecated and will be removed "
                     "in future releases. Please upgrade to 1.0.34 or newer.")
-    NW = 300
-    NH = 300
+
+    global NW, NH
 
     lbw_mat = plant.materials[mat_id]
     mat = bpy.data.materials.new(mat_name)
@@ -240,126 +243,183 @@ def lbw_to_bl_mat_1033(plant, mat_id, mat_name, qualifier=None, proxy_color=None
     return mat
 
 
+def lbw_side_to_bsdf(mat, side, x=0, y=0):
+    global NW, NH
+
+    nodes = mat.node_tree.nodes
+    links = mat.node_tree.links
+
+    node_bsdf = nodes.new(type='ShaderNodeBsdfPrincipled')
+    node_bsdf.location = x + (2 * NW), y + NH
+    # All Laubwerk Materials default to Index of Refraction of 1.33
+    node_bsdf.inputs['IOR'].default_value = 1.33
+
+    # Diffuse Texture
+    logging.debug("Diffuse Texture: %s" % side.base_color_texture)
+    base_path = side.base_color_texture
+    node_img = nodes.new(type='ShaderNodeTexImage')
+    node_img.location = x, y + NH
+    node_img.image = bpy.data.images.load(base_path)
+    links.new(node_img.outputs[0], node_bsdf.inputs[0])
+
+    # Bump Texture
+    bump_path = side.bump_texture
+    if bump_path != "":
+        logging.debug("Bump Texture: %s" % side.bump_texture)
+        node_bumpimg = nodes.new(type='ShaderNodeTexImage')
+        node_bumpimg.location = x, y
+        node_bumpimg.image = bpy.data.images.load(bump_path)
+        node_bumpimg.image.colorspace_settings.is_data = True
+
+        node_bump = nodes.new(type='ShaderNodeBump')
+        node_bump.location = x + NW, y
+        # TODO: Make the Distance configurable to tune for each render engine
+        logging.debug("Bump Strength: %f" % side.bump_strength)
+        node_bump.inputs['Strength'].default_value = side.bump_strength
+        node_bump.inputs['Distance'].default_value = 0.02
+        links.new(node_bumpimg.outputs['Color'], node_bump.inputs['Height'])
+        links.new(node_bump.outputs['Normal'], node_bsdf.inputs['Normal'])
+
+    # TODO: Unused properties
+    #   base_color (front base_color used for material base_color)
+    #   specular_color
+    #   specular_color_texture
+    #   specular_roughness
+    #   specular_roughness_texture
+    #   sheen
+    #   sheen_texture
+    #   sheen_color
+    #   sheen_color_texture
+    #   sheen_roughness
+    #   sheen_roughness_texture
+
+    return node_bsdf
+
+
 def lbw_to_bl_mat(plant, mat_id, mat_name, qualifier=None, proxy_color=None):
-    NW = 300
-    NH = 300
+    global NW, NH
 
     lbw_mat = plant.materials[mat_id]
     mat = bpy.data.materials.new(mat_name)
 
-    mat.use_nodes = True
-    nodes = mat.node_tree.nodes
-    nodes.clear()
-    # create Principled BSDF node (primary multi-layer mixer node)
-    node_dif = nodes.new(type='ShaderNodeBsdfPrincipled')
-    node_dif.location = 2 * NW, 2 * NH
-    # create output node
-    node_out = nodes.new(type='ShaderNodeOutputMaterial')
-    node_out.location = 4 * NW, 2 * NH
-    # link nodes
-    links = mat.node_tree.links
-    links.new(node_dif.outputs[0], node_out.inputs[0])
-
-    mat.diffuse_color = proxy_color or lbw_mat.get_front().base_color + (1.0,)
-    node_dif.inputs[0].default_value = mat.diffuse_color
     if proxy_color:
+        mat.diffuse_color = proxy_color
         return mat
 
-    # Diffuse Texture
-    logging.debug("Diffuse Texture: %s" % lbw_mat.get_front().base_color_texture)
-    diffuse_path = lbw_mat.get_front().base_color_texture
-    node_img = nodes.new(type='ShaderNodeTexImage')
-    node_img.location = 0, 2 * NH
-    node_img.image = bpy.data.images.load(diffuse_path)
-    links.new(node_img.outputs[0], node_dif.inputs[0])
+    mat.diffuse_color = lbw_mat.get_front().base_color + (1.0,)
+    mat.use_nodes = True
 
-    # Handle Two-Sided Textures (diffuse texture only)
+    nodes = mat.node_tree.nodes
+    nodes.clear()
+    links = mat.node_tree.links
+    x, y = (0, 0)
+
+    # Construct the Principled BSDF Shader per Laubwerk Material Side object
+    # We construct the back first to help clean the node graph cleaner
+    node_back_bsdf = None
     if lbw_mat.is_two_sided() and lbw_mat.sides_are_different():
         logging.debug("Diffuse texture is two sided")
-        diffuse_back_path = lbw_mat.get_back().base_color_texture
-        node_back_img = nodes.new(type='ShaderNodeTexImage')
-        node_back_img.location = -NW, 2 * NH
-        node_back_img.image = bpy.data.images.load(diffuse_back_path)
-        node_mix = nodes.new(type='ShaderNodeMixRGB')
-        node_mix.location = NW, 2 * NH
+        node_back_bsdf = lbw_side_to_bsdf(mat, lbw_mat.get_back(), x, y)
+        x, y = node_back_bsdf.location
+        y += NH
+
+    node_front_bsdf = lbw_side_to_bsdf(mat, lbw_mat.get_front(), 0, y)
+    x, y = node_front_bsdf.location
+    y += NH
+    stage_out = node_front_bsdf.outputs[0]
+
+    if node_back_bsdf:
         node_geometry = nodes.new(type='ShaderNodeNewGeometry')
-        node_geometry.location = -NW, NH
+        node_geometry.location = x, y
+
+        node_mix = nodes.new(type='ShaderNodeMixShader')
+        node_mix.location = x + NW, NH
+
         links.new(node_geometry.outputs[6], node_mix.inputs[0])
-        links.new(node_img.outputs[0], node_mix.inputs[1])
-        links.new(node_back_img.outputs[0], node_mix.inputs[2])
-        links.new(node_mix.outputs[0], node_dif.inputs[0])
+        links.new(node_front_bsdf.outputs[0], node_mix.inputs[1])
+        links.new(node_back_bsdf.outputs[0], node_mix.inputs[2])
+        stage_out = node_mix.outputs[0]
 
-    # Alpha Texture
-    # Blender render engines support using the diffuse map alpha channel. We
-    # assume this rather than a separate alpha image.
-    alpha_path = lbw_mat.opacity_texture
-    logging.debug("Alpha Texture: %s" % lbw_mat.opacity_texture)
-    if alpha_path != "":
-        # Enable leaf clipping in Eevee
-        mat.blend_method = 'CLIP'
-        # TODO: mat.transparent_shadow_method = 'CLIP' ?
-
-        # All tested models either use the diffuse map for alpha or list a
-        # different texture for alpha in error (wrong diffuse map as opposed a
-        # separate alpha map). Ignore the difference if it exists, assume alpha
-        # comes from diffuse, and issue a warning when the difference appears.
-        links.new(node_img.outputs['Alpha'], node_dif.inputs['Alpha'])
-        if alpha_path != diffuse_path:
-            # NOTE: This affects at least 'Howea forsteriana'
-            logging.warning("Alpha Texture differs from diffuse image path:")
-            logging.warning("Alpha Texture: %s" % lbw_mat.opacity_texture)
-            logging.warning("Diffuse Texture: %s" % lbw_mat.get_front().base_color_texture)
-
-    # Subsurface Texture
+    # Subsurface / Translucence
     # Laubwerk models only support subsurface as a translucency effect for
     # thin-shell material, indicated by having two sides.
     sub_path = lbw_mat.subsurface_texture
     if sub_path != "" and lbw_mat.is_two_sided():
+        x += NW
         logging.debug("Subsurface Texture: %s" % lbw_mat.subsurface_texture)
+        # Unused properties (specific to a solid vs a thin-shell):
+        #   subsurface
+        #   subsurface_radius
+        #   subsurface_radius_texture
+        #   subsurface_radius_scale
+        node_tr = nodes.new(type='ShaderNodeBsdfTranslucent')
+        node_tr.location = x, 0
+        node_tr.inputs['Color'].default_value = lbw_mat.subsurface_color + (1.0,)
+
         node_sub = nodes.new(type='ShaderNodeTexImage')
-        node_sub.location = NW, NH
+        node_sub.location = x, 2 * NH
         node_sub.image = bpy.data.images.load(sub_path)
         node_sub.image.colorspace_settings.is_data = True
 
-        node_tr = nodes.new(type='ShaderNodeBsdfTranslucent')
-        node_tr.location = 2 * NW, 0
-        node_tr.inputs['Color'].default_value = lbw_mat.subsurface_color + (1.0,)
-
         node_mix = nodes.new(type='ShaderNodeMixShader')
-        node_mix.location = 3 * NW, 2 * NH
+        node_mix.location = x + NW, 0
 
         links.new(node_sub.outputs[0], node_mix.inputs[0])
-        links.new(node_dif.outputs[0], node_mix.inputs[1])
+        links.new(stage_out, node_mix.inputs[1])
         links.new(node_tr.outputs[0], node_mix.inputs[2])
-        links.new(node_mix.outputs[0], node_out.inputs[0])
+        stage_out = node_mix.outputs[0]
 
-    # Index of Refraction (IOR)
-    # All Laubwerk Materials default to 1.33 across host applications
-    node_dif.inputs['IOR'].default_value = 1.33
+    # Alpha Texture
+    alpha_path = lbw_mat.opacity_texture
+    logging.debug("Alpha Texture: %s" % lbw_mat.opacity_texture)
+    if alpha_path != "":
+        x += NW
+        # Enable leaf clipping in Eevee
+        mat.blend_method = 'CLIP'
+        # TODO: mat.transparent_shadow_method = 'CLIP' ?
 
-    # Bump Texture
-    bump_path = lbw_mat.get_front().bump_texture
-    if bump_path != "":
-        logging.debug("Bump Texture: %s" % lbw_mat.get_front().bump_texture)
-        node_bumpimg = nodes.new(type='ShaderNodeTexImage')
-        node_bumpimg.location = 0, 0
-        node_bumpimg.image = bpy.data.images.load(bump_path)
-        node_bumpimg.image.colorspace_settings.is_data = True
-        node_bump = nodes.new(type='ShaderNodeBump')
-        node_bump.location = NW, 0
-        # TODO: Make the Distance configurable to tune for each render engine
-        logging.debug("Bump Strength: %f" % lbw_mat.get_front().bump_strength)
-        node_bump.inputs['Strength'].default_value = lbw_mat.get_front().bump_strength
-        node_bump.inputs['Distance'].default_value = 0.02
-        links.new(node_bumpimg.outputs['Color'], node_bump.inputs['Height'])
-        links.new(node_bump.outputs['Normal'], node_dif.inputs['Normal'])
+        node_tr = nodes.new(type='ShaderNodeBsdfTransparent')
+        node_tr.location = x, NH
 
-    if lbw_mat.displacement_texture:
+        node_alpha = nodes.new(type='ShaderNodeTexImage')
+        node_alpha.location = x, 2 * NH
+        node_alpha.image = bpy.data.images.load(alpha_path)
+
+        node_mix = nodes.new(type='ShaderNodeMixShader')
+        node_mix.location = x + NW, NH
+
+        links.new(node_alpha.outputs['Alpha'], node_mix.inputs[0])
+        links.new(node_tr.outputs[0], node_mix.inputs[1])
+        links.new(stage_out, node_mix.inputs[2])
+        stage_out = node_mix.outputs[0]
+
+    # Create Material Output and additional inputs
+    x += NW
+    # Displacement
+    node_disp = None
+    disp_path = lbw_mat.displacement_texture
+    if disp_path != "":
         logging.debug("Displacement Texture: %s" % lbw_mat.displacement_texture)
-    if lbw_mat.get_front().normal_texture:
-        logging.debug("Normal Texture: %s" % lbw_mat.get_front().normal_texture)
-    if lbw_mat.get_front().specular_color_texture:
-        logging.debug("Specular Color Texture: %s" % lbw_mat.get_front().specular_color_texture)
+        node_dispimg = nodes.new(type='ShaderNodeTexImage')
+        node_dispimg.location = x, 0
+        node_dispimg.image = bpy.data.images.load(disp_path)
+        node_dispimg.image.colorspace_settings.is_data = True
+        x += NW
+
+        node_disp = nodes.new(type='ShaderNodeDisplacement')
+        node_disp.location = x, 0
+
+        links.new(node_dispimg.outputs[0], node_disp.inputs[0])
+        node_disp.inputs[1].default_value = int(lbw_mat.displacement_centered)
+        node_disp.inputs[2].default_value = lbw_mat.displacement_height
+
+    # Create the final output node
+    x += NW
+    node_out = nodes.new(type='ShaderNodeOutputMaterial')
+    node_out.location = x, NH
+    if node_disp:
+        links.new(node_disp.outputs[0], node_out.inputs[2])
+    links.new(stage_out, node_out.inputs[0])
 
     return mat
 
