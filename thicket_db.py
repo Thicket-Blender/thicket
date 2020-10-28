@@ -27,8 +27,9 @@ import sys
 import textwrap
 try:
     import laubwerk as lbw
+    from . import logger
 except ImportError:
-    # Likely running as a subprocess, this will be added in main()
+    # Likely running as a subprocess, these will be added in main()
     pass
 
 # <pep8 compliant>
@@ -126,7 +127,7 @@ class ThicketDB:
             with open(db_filename, "r", encoding="utf-8") as f:
                 self._db = json.load(f)
             if self._db["info"]["schema_version"] < SCHEMA_VERSION:
-                logging.warning("Unknown database schema version")
+                logger.warning("Unknown database schema version")
                 raise ThicketDBOldSchemaError
         except FileNotFoundError:
             if create:
@@ -216,12 +217,13 @@ class ThicketDB:
             num_jobs = 4
         jobs = deque()
 
-        log_level = logging.getLevelName(logging.root.level)
-        logging.info("Parsing %d plants using %d parallel jobs" % (num_plants, num_jobs))
+        log_level = logging.getLevelName(logger.level)
+        logger.info("Parsing %d plants using %d parallel jobs" % (num_plants, num_jobs))
         while len(plant_files) > 0 or len(jobs) > 0:
             # Keep up to num_jobs jobs running
             while len(jobs) < num_jobs and len(plant_files) > 0:
                 f = plant_files.pop()
+                logger.debug("Parsing: %s" % f)
                 job = Popen([self.python, __file__, "-f", f, "-s", sdk_path, "-l", log_level, "parse_plant"],
                             stdout=PIPE)
                 jobs.append(job)
@@ -232,16 +234,16 @@ class ThicketDB:
             p_rec = json.loads(outs)
             self._db["plants"][p_rec["plant"]["name"]] = p_rec["plant"]
             self.update_labels(p_rec["labels"])
-            logging.info('Added "%s"' % p_rec["plant"]["name"])
+            logger.info('Added "%s"' % p_rec["plant"]["name"])
 
         if len(plant_files) > 0:
-            logging.error("Exited worker loop with %d plant files remaining" % len(plant_files))
+            logger.error("Exited worker loop with %d plant files remaining" % len(plant_files))
 
         if len(jobs) > 0:
-            logging.error("Exited worker loop with %d jobs still running" % len(jobs))
+            logger.error("Exited worker loop with %d jobs still running" % len(jobs))
 
         self.save()
-        logging.info("Processed %d/%d plants" % (self.plant_count(), num_plants))
+        logger.info("Processed %d/%d plants" % (self.plant_count(), num_plants))
 
     def read(self):
         self.print_info()
@@ -259,7 +261,6 @@ class ThicketDB:
 
     # Class methods
     def parse_plant(filepath):
-        logging.debug("Parsing: %s" % filepath)
         p = lbw.load(filepath)
         p_rec = {}
 
@@ -271,7 +272,7 @@ class ThicketDB:
         preview_stem = p.name.replace(" ", "_").replace(".", "")
         preview_path = Path(filepath).parent.absolute() / (preview_stem + ".png")
         if not preview_path.is_file():
-            logging.warning("Preview not found: %s" % preview_path)
+            logger.warning("Preview not found: %s" % preview_path)
             preview_path = ""
         plant["preview"] = str(preview_path)
 
@@ -299,7 +300,7 @@ class ThicketDB:
             m_rec["default_qualifier"] = m.default_qualifier
             preview_path = Path(filepath).parent.absolute() / "models" / (preview_stem + "_" + m.name + ".png")
             if not preview_path.is_file():
-                logging.warning("Preview not found: %s" % preview_path)
+                logger.warning("Preview not found: %s" % preview_path)
                 preview_path = ""
             m_rec["preview"] = str(preview_path)
             models[m.name] = m_rec
@@ -321,7 +322,7 @@ class ThicketDB:
 
 
 def main():
-    global lbw
+    global lbw, logger
     argParse = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,
                                        description=textwrap.dedent('''\
 Thicket Database Tool
@@ -335,13 +336,14 @@ Commands:
     argParse.add_argument("-d", help="database filename")
     argParse.add_argument("-f", help="Laubwerk Plant filename (lbw.gz)")
     argParse.add_argument("-l", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
-                          default="INFO", help="Logging level")
+                          default="INFO", help="logger level")
     argParse.add_argument("-p", help="Laubwerk Plants path")
     argParse.add_argument("-s", help="Laubwerk Python SDK path")
 
     args = argParse.parse_args()
 
-    logging.basicConfig(format="%(levelname)s: thicket: %(message)s", level=args.l)
+    logging.basicConfig(format="%(levelname)s: thicket_db: %(message)s", level=args.l)
+    logger = logging.getLogger()
 
     if args.s:
         # If the SDK path was specified, attempt to import the Laubwerk SDK The
