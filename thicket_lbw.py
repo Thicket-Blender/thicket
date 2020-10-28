@@ -22,7 +22,6 @@
 # <pep8 compliant>
 
 
-import logging
 from math import radians
 import time
 import bpy
@@ -30,6 +29,7 @@ import laubwerk
 from mathutils import Matrix
 
 from . import THICKET_GUID
+from . import logger
 
 VP_MAX_BRANCH_LEVEL = 4
 VP_MIN_THICKNESS = 0.1
@@ -117,7 +117,7 @@ def lbw_to_bl_obj(lbw_plant, name, lbw_mesh, qualifier, proxy):
         if mat_index != -1:
             obj.data.polygons[i].material_index = mat_index
         else:
-            logging.warning("Material not found: %s" % mat_name)
+            logger.warning("Material not found: %s" % mat_name)
 
         i += 1
 
@@ -125,8 +125,8 @@ def lbw_to_bl_obj(lbw_plant, name, lbw_mesh, qualifier, proxy):
 
 
 def lbw_to_bl_mat_1033(plant, mat_id, mat_name, qualifier=None, proxy_color=None):
-    logging.warning("Laubwerk 1.0.33 support is deprecated and will be removed "
-                    "in future releases. Please upgrade to 1.0.34 or newer.")
+    logger.warning("Laubwerk 1.0.33 support is deprecated and will be removed "
+                   "in future releases. Please upgrade to 1.0.34 or newer.")
 
     global NW, NH
 
@@ -152,7 +152,7 @@ def lbw_to_bl_mat_1033(plant, mat_id, mat_name, qualifier=None, proxy_color=None
         return mat
 
     # Diffuse Texture
-    logging.debug("Diffuse Texture: %s" % lbw_mat.get_front().diffuse_texture)
+    logger.debug("Diffuse Texture: %s" % lbw_mat.get_front().diffuse_texture)
     diffuse_path = lbw_mat.get_front().diffuse_texture
     node_img = nodes.new(type='ShaderNodeTexImage')
     node_img.location = 0, 2 * NH
@@ -161,7 +161,7 @@ def lbw_to_bl_mat_1033(plant, mat_id, mat_name, qualifier=None, proxy_color=None
 
     # Handle Two-Sided Textures (diffuse texture only)
     if lbw_mat.is_two_sided() and lbw_mat.sides_are_different():
-        logging.debug("Diffuse texture is two sided")
+        logger.debug("Diffuse texture is two sided")
         diffuse_back_path = lbw_mat.get_back().diffuse_texture
         node_back_img = nodes.new(type='ShaderNodeTexImage')
         node_back_img.location = -NW, 2 * NH
@@ -179,7 +179,7 @@ def lbw_to_bl_mat_1033(plant, mat_id, mat_name, qualifier=None, proxy_color=None
     # Blender render engines support using the diffuse map alpha channel. We
     # assume this rather than a separate alpha image.
     alpha_path = lbw_mat.alpha_texture
-    logging.debug("Alpha Texture: %s" % lbw_mat.alpha_texture)
+    logger.debug("Alpha Texture: %s" % lbw_mat.alpha_texture)
     if alpha_path != "":
         # Enable leaf clipping in Eevee
         mat.blend_method = 'CLIP'
@@ -192,14 +192,14 @@ def lbw_to_bl_mat_1033(plant, mat_id, mat_name, qualifier=None, proxy_color=None
         links.new(node_img.outputs['Alpha'], node_dif.inputs['Alpha'])
         if alpha_path != diffuse_path:
             # NOTE: This affects at least 'Howea forsteriana'
-            logging.warning("Alpha Texture differs from diffuse image path:")
-            logging.warning("Alpha Texture: %s" % lbw_mat.alpha_texture)
-            logging.warning("Diffuse Texture: %s" % lbw_mat.get_front().diffuse_texture)
+            logger.warning("Alpha Texture differs from diffuse image path:")
+            logger.warning("Alpha Texture: %s" % lbw_mat.alpha_texture)
+            logger.warning("Diffuse Texture: %s" % lbw_mat.get_front().diffuse_texture)
 
     # Subsurface Texture
     sub_path = lbw_mat.subsurface_texture
     if sub_path != "":
-        logging.debug("Subsurface Texture: %s" % lbw_mat.subsurface_texture)
+        logger.debug("Subsurface Texture: %s" % lbw_mat.subsurface_texture)
         node_sub = nodes.new(type='ShaderNodeTexImage')
         node_sub.location = 0, NH
         node_sub.image = bpy.data.images.load(sub_path)
@@ -210,7 +210,7 @@ def lbw_to_bl_mat_1033(plant, mat_id, mat_name, qualifier=None, proxy_color=None
             node_sub.image.colorspace_settings.is_data = True
             links.new(node_sub.outputs['Color'], node_dif.inputs['Transmission'])
         else:
-            logging.warning("Subsurface Depth > 0. Not supported.")
+            logger.warning("Subsurface Depth > 0. Not supported.")
 
     # Index of Refraction (IOR)
     # All Laubwerk Materials default to 1.33 across host applications
@@ -219,7 +219,7 @@ def lbw_to_bl_mat_1033(plant, mat_id, mat_name, qualifier=None, proxy_color=None
     # Bump Texture
     bump_path = lbw_mat.get_front().bump_texture
     if bump_path != "":
-        logging.debug("Bump Texture: %s" % lbw_mat.get_front().bump_texture)
+        logger.debug("Bump Texture: %s" % lbw_mat.get_front().bump_texture)
         node_bumpimg = nodes.new(type='ShaderNodeTexImage')
         node_bumpimg.location = 0, 0
         node_bumpimg.image = bpy.data.images.load(bump_path)
@@ -227,18 +227,18 @@ def lbw_to_bl_mat_1033(plant, mat_id, mat_name, qualifier=None, proxy_color=None
         node_bump = nodes.new(type='ShaderNodeBump')
         node_bump.location = NW, 0
         # TODO: Make the Distance configurable to tune for each render engine
-        logging.debug("Bump Strength: %f" % lbw_mat.get_front().bump_strength)
+        logger.debug("Bump Strength: %f" % lbw_mat.get_front().bump_strength)
         node_bump.inputs['Strength'].default_value = lbw_mat.get_front().bump_strength
         node_bump.inputs['Distance'].default_value = 0.02
         links.new(node_bumpimg.outputs['Color'], node_bump.inputs['Height'])
         links.new(node_bump.outputs['Normal'], node_dif.inputs['Normal'])
 
     if lbw_mat.displacement_texture:
-        logging.debug("Displacement Texture: %s" % lbw_mat.displacement_texture)
+        logger.debug("Displacement Texture: %s" % lbw_mat.displacement_texture)
     if lbw_mat.get_front().normal_texture:
-        logging.debug("Normal Texture: %s" % lbw_mat.get_front().normal_texture)
+        logger.debug("Normal Texture: %s" % lbw_mat.get_front().normal_texture)
     if lbw_mat.get_front().specular_texture:
-        logging.debug("Specular Texture: %s" % lbw_mat.get_front().specular_texture)
+        logger.debug("Specular Texture: %s" % lbw_mat.get_front().specular_texture)
 
     return mat
 
@@ -255,7 +255,7 @@ def lbw_side_to_bsdf(mat, side, x=0, y=0):
     node_bsdf.inputs['IOR'].default_value = 1.33
 
     # Diffuse Texture
-    logging.debug("Diffuse Texture: %s" % side.base_color_texture)
+    logger.debug("Diffuse Texture: %s" % side.base_color_texture)
     base_path = side.base_color_texture
     node_img = nodes.new(type='ShaderNodeTexImage')
     node_img.location = x, y + NH
@@ -265,7 +265,7 @@ def lbw_side_to_bsdf(mat, side, x=0, y=0):
     # Bump Texture
     bump_path = side.bump_texture
     if bump_path != "":
-        logging.debug("Bump Texture: %s" % side.bump_texture)
+        logger.debug("Bump Texture: %s" % side.bump_texture)
         node_bumpimg = nodes.new(type='ShaderNodeTexImage')
         node_bumpimg.location = x, y
         node_bumpimg.image = bpy.data.images.load(bump_path)
@@ -274,7 +274,7 @@ def lbw_side_to_bsdf(mat, side, x=0, y=0):
         node_bump = nodes.new(type='ShaderNodeBump')
         node_bump.location = x + NW, y
         # TODO: Make the Distance configurable to tune for each render engine
-        logging.debug("Bump Strength: %f" % side.bump_strength)
+        logger.debug("Bump Strength: %f" % side.bump_strength)
         node_bump.inputs['Strength'].default_value = side.bump_strength
         node_bump.inputs['Distance'].default_value = 0.02
         links.new(node_bumpimg.outputs['Color'], node_bump.inputs['Height'])
@@ -318,7 +318,7 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, qualifier=None, proxy_color=None):
     # We construct the back first to help clean the node graph cleaner
     node_back_bsdf = None
     if lbw_mat.is_two_sided() and lbw_mat.sides_are_different():
-        logging.debug("Diffuse texture is two sided")
+        logger.debug("Diffuse texture is two sided")
         node_back_bsdf = lbw_side_to_bsdf(mat, lbw_mat.get_back(), x, y)
         x, y = node_back_bsdf.location
         y += NH
@@ -346,7 +346,7 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, qualifier=None, proxy_color=None):
     sub_path = lbw_mat.subsurface_texture
     if sub_path != "" and lbw_mat.is_two_sided():
         x += NW
-        logging.debug("Subsurface Texture: %s" % lbw_mat.subsurface_texture)
+        logger.debug("Subsurface Texture: %s" % lbw_mat.subsurface_texture)
         # Unused properties (specific to a solid vs a thin-shell):
         #   subsurface
         #   subsurface_radius
@@ -371,7 +371,7 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, qualifier=None, proxy_color=None):
 
     # Alpha Texture
     alpha_path = lbw_mat.opacity_texture
-    logging.debug("Alpha Texture: %s" % lbw_mat.opacity_texture)
+    logger.debug("Alpha Texture: %s" % lbw_mat.opacity_texture)
     if alpha_path != "":
         x += NW
         # Enable leaf clipping in Eevee
@@ -399,7 +399,7 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, qualifier=None, proxy_color=None):
     node_disp = None
     disp_path = lbw_mat.displacement_texture
     if disp_path != "":
-        logging.debug("Displacement Texture: %s" % lbw_mat.displacement_texture)
+        logger.debug("Displacement Texture: %s" % lbw_mat.displacement_texture)
         node_dispimg = nodes.new(type='ShaderNodeTexImage')
         node_dispimg.location = x, 0
         node_dispimg.image = bpy.data.images.load(disp_path)
@@ -429,11 +429,11 @@ def import_lbw(filepath, model, viewport_lod, render_lod, mesh_args):
     lbw_plant = laubwerk.load(filepath)
     # TODO: This should be debug, but we cannot silence the SDK [debug] message
     # which appear without context without this appearing in the log first
-    logging.info('Importing "%s"' % lbw_plant.name)
+    logger.info('Importing "%s"' % lbw_plant.name)
     lbw_model = next((m for m in lbw_plant.models if m.name == model), lbw_plant.default_model)
     if not lbw_model.name == model:
-        logging.warning("Model '%s' not found for '%s', using default model '%s'" %
-                        (model, lbw_plant.name, lbw_model.name))
+        logger.warning("Model '%s' not found for '%s', using default model '%s'" %
+                       (model, lbw_plant.name, lbw_model.name))
     proxy = False
 
     # Create the viewport object (low detail)
@@ -453,17 +453,17 @@ def import_lbw(filepath, model, viewport_lod, render_lod, mesh_args):
         vp_mesh_args["leaf_amount"] = 0.66 * mesh_args["leaf_amount"]
         vp_mesh_args["leaf_density"] = 0.5 * mesh_args["leaf_density"]
         vp_mesh_args["max_subdiv_level"] = 0
-        logging.debug("viewport get_mesh(%s)" % str(vp_mesh_args))
+        logger.debug("viewport get_mesh(%s)" % str(vp_mesh_args))
         lbw_mesh = lbw_model.get_mesh(**vp_mesh_args)
     elif viewport_lod != 'FULL':
-        logging.warning("Unknown viewport_lod: %s" % viewport_lod)
+        logger.warning("Unknown viewport_lod: %s" % viewport_lod)
 
     obj_viewport = None
     if lbw_mesh:
         obj_viewport = lbw_to_bl_obj(lbw_plant, lbw_plant.name, lbw_mesh, mesh_args["qualifier"], proxy)
         obj_viewport.hide_render = True
         obj_viewport.show_name = True
-        logging.debug("Generated low resolution viewport object in %.4fs" % (time.time() - time_local))
+        logger.debug("Generated low resolution viewport object in %.4fs" % (time.time() - time_local))
 
     # Create the render object (high detail)
     time_local = time.time()
@@ -471,12 +471,12 @@ def import_lbw(filepath, model, viewport_lod, render_lod, mesh_args):
         lbw_mesh = lbw_model.get_proxy()
     else:
         if not render_lod == 'FULL':
-            logging.warning("Unknown render_lod: %s" % render_lod)
-        logging.debug("render get_mesh(%s)" % str(mesh_args))
+            logger.warning("Unknown render_lod: %s" % render_lod)
+        logger.debug("render get_mesh(%s)" % str(mesh_args))
         lbw_mesh = lbw_model.get_mesh(**mesh_args)
     obj_render = lbw_to_bl_obj(lbw_plant, lbw_plant.name + " (render)", lbw_mesh, mesh_args["qualifier"],
                                render_lod == 'PROXY')
-    logging.debug("Generated high resolution render object in %.4fs" % (time.time() - time_local))
+    logger.debug("Generated high resolution render object in %.4fs" % (time.time() - time_local))
 
     # Setup viewport and render visibility
     if obj_viewport:
@@ -527,5 +527,5 @@ def import_lbw(filepath, model, viewport_lod, render_lod, mesh_args):
     tp.lod_subdiv = mesh_args["max_subdiv_level"]
     tp.leaf_amount = mesh_args["leaf_amount"] * 100
 
-    logging.info('Imported "%s" in %.4fs' % (lbw_plant.name, time.time() - time_main))
+    logger.info('Imported "%s" in %.4fs' % (lbw_plant.name, time.time() - time_main))
     return obj_inst

@@ -65,6 +65,15 @@ bl_info = {
 }
 
 
+# Create a thicket specific logger which logs to a file and propogates messages to the root logger.
+logger = logging.getLogger(__name__)
+log_path = Path(bpy.utils.user_resource('SCRIPTS', "addons", True)) / __name__ / "thicket.log"
+log_handler = logging.FileHandler(log_path, encoding=None, mode='a', delay=False)
+log_formatter = logging.Formatter('%(asctime)s: %(levelname)s: %(message)s')
+log_handler.setFormatter(log_formatter)
+logger.addHandler(log_handler)
+
+
 class ThicketStatus:
     lbw_plants_valid = False
     lbw_sdk_valid = False
@@ -129,7 +138,7 @@ def populate_previews():
             if preview_path != "" and Path(preview_path).is_file():
                 thicket_previews.load(preview_key, preview_path, 'IMAGE')
 
-    logging.debug("Added %d previews in %0.2fs" % (len(thicket_previews), time.time()-t0))
+    logger.debug("Added %d previews in %0.2fs" % (len(thicket_previews), time.time()-t0))
 
 
 def get_preview(plant_name, model=""):
@@ -157,10 +166,10 @@ def get_preview(plant_name, model=""):
         preview_key = plant_name.replace(" ", "_").replace(".", "") + "_" + model
         if preview_key not in thicket_previews:
             # The model specific preview was not found, try the plant preview
-            logging.debug("Preview key %s not found" % preview_key)
+            logger.debug("Preview key %s not found" % preview_key)
             preview_key = plant_name.replace(" ", "_").replace(".", "")
     if preview_key not in thicket_previews:
-        logging.debug("Preview key %s not found" % preview_key)
+        logger.debug("Preview key %s not found" % preview_key)
         preview_key = "missing_preview"
     return thicket_previews[preview_key]
 
@@ -186,7 +195,7 @@ def thicket_init():
     none
     """
 
-    global thicket_status, db, ThicketDB, thicket_lbw, laubwerk
+    global thicket_status, db, ThicketDB, thicket_lbw, laubwerk, logger
 
     thicket_status = ThicketStatus()
     db = None
@@ -194,20 +203,18 @@ def thicket_init():
     prefs = bpy.context.preferences.addons[__name__].preferences
     if "log_level" not in prefs.keys():
         prefs.log_level = 'INFO'
-
-    logging.basicConfig(format='%(levelname)s: thicket: %(message)s', level=prefs.log_level or logging.INFO)
-    logging.debug("Log level: %s (%d)" % (prefs.log_level, prefs["log_level"]))
+    logger.setLevel(prefs.log_level)
 
     if prefs.lbw_plants_path != "" and Path(prefs.lbw_plants_path).is_dir():
-        logging.info("Laubwerk Plants Path: '%s'" % prefs.lbw_plants_path)
+        logger.info("Laubwerk Plants Path: '%s'" % prefs.lbw_plants_path)
         thicket_status.lbw_plants_valid = True
     else:
-        logging.warning("Invalid Laubwerk Plants Path: '%s'" % prefs.lbw_plants_path)
+        logger.warning("Invalid Laubwerk Plants Path: '%s'" % prefs.lbw_plants_path)
 
     if prefs.lbw_sdk_path != "" and Path(prefs.lbw_sdk_path).is_dir():
-        logging.info("Laubwerk Python Extension Path: '%s'" % prefs.lbw_sdk_path)
+        logger.info("Laubwerk Python Extension Path: '%s'" % prefs.lbw_sdk_path)
     else:
-        logging.warning("Invalid Laubwerk Python Extension Path: '%s'" % prefs.lbw_sdk_path)
+        logger.warning("Invalid Laubwerk Python Extension Path: '%s'" % prefs.lbw_sdk_path)
         return
 
     if str(prefs.lbw_sdk_path) not in sys.path:
@@ -216,13 +223,13 @@ def thicket_init():
     try:
         import laubwerk
     except ImportError:
-        logging.critical("Failed to load laubwerk module")
+        logger.critical("Failed to load laubwerk module")
         return
 
     try:
         from . import thicket_lbw
     except ImportError:
-        logging.critical("Failed to load thicket_lbw")
+        logger.critical("Failed to load thicket_lbw")
         return
     thicket_status.lbw_sdk_valid = True
 
@@ -232,20 +239,20 @@ def thicket_init():
     try:
         from .thicket_db import ThicketDB, ThicketDBOldSchemaError
     except ImportError:
-        logging.critical("Failed to import thicket_db.ThicketDB")
+        logger.critical("Failed to import thicket_db.ThicketDB")
         return
 
     thicket_status.imported = True
-    logging.info(laubwerk.version)
+    logger.info(laubwerk.version)
 
     db_path = Path(bpy.utils.user_resource('SCRIPTS', "addons", True)) / __name__ / "thicket.db"
     try:
         db = ThicketDB(db_path, locale, bpy.app.binary_path_python)
     except ThicketDBOldSchemaError:
-        logging.warning("Old database schema found, creating empty database")
+        logger.warning("Old database schema found, creating empty database")
         db_path.unlink()
     except FileNotFoundError:
-        logging.info("Database not found, creating empty database")
+        logger.info("Database not found, creating empty database")
 
     if db is None or db.plant_count() == 0:
         db_dir = Path(PurePath(db_path).parent)
@@ -256,8 +263,8 @@ def thicket_init():
     populate_previews()
 
     thicket_status.ready = True
-    logging.info("Database (%d plants): %s" % (db.plant_count(), db_path))
-    logging.info("Ready")
+    logger.info("Database (%d plants): %s" % (db.plant_count(), db_path))
+    logger.info("Ready")
 
 
 def is_thicket_instance(obj):
@@ -500,7 +507,7 @@ class THICKET_OT_reset_plant(Operator):
         global thicket_ui_mode
         instance = context.active_object
         if not is_thicket_instance(instance):
-            logging.error("reset_plant failed: non-Thicket object: %s" % instance.name)
+            logger.error("reset_plant failed: non-Thicket object: %s" % instance.name)
             return
         template = instance.instance_collection
         template.thicket.copy_to(context.window_manager.thicket)
@@ -525,7 +532,7 @@ class THICKET_OT_update_plant(Operator):
     next_mode: StringProperty()
 
     def update_plant(self, instance, tp):
-        logging.debug("Updating plant: %s" % instance.name)
+        logger.debug("Updating plant: %s" % instance.name)
         template = instance.instance_collection
 
         # Load new plant model
@@ -545,15 +552,15 @@ class THICKET_OT_update_plant(Operator):
         global thicket_ui_mode
         active = context.active_object
         if not is_thicket_instance(active):
-            logging.error("update_plant failed: non-Thicket active object: %s" % active.name)
+            logger.error("update_plant failed: non-Thicket active object: %s" % active.name)
             return
 
         plants = context.selected_objects
         templates = []
         for p in plants:
-            logging.debug("update_plant: updating %s" % p.name)
+            logger.debug("update_plant: updating %s" % p.name)
             if not is_thicket_instance(p):
-                logging.debug("update_plant: skipped non-Thicket object: %s" % p.name)
+                logger.debug("update_plant: skipped non-Thicket object: %s" % p.name)
                 continue
             if p.instance_collection not in templates:
                 self.update_plant(p, context.window_manager.thicket)
@@ -588,7 +595,7 @@ class THICKET_OT_make_unique(Operator):
     def make_unique(self, instance):
         template = instance.instance_collection
         if len(template.users_dupli_group) == 1:
-            logging.warning("%s already is unique" % instance.name)
+            logger.warning("%s already is unique" % instance.name)
             return
 
         # Create a copy of the template and use the new one
@@ -599,14 +606,14 @@ class THICKET_OT_make_unique(Operator):
     def execute(self, context):
         active = context.active_object
         if not is_thicket_instance(active):
-            logging.error("make_unique failed: non-Thicket active object: %s" % active.name)
+            logger.error("make_unique failed: non-Thicket active object: %s" % active.name)
             return
 
         plants = context.selected_objects
         for p in plants:
-            logging.debug("make_unique: %s" % p.name)
+            logger.debug("make_unique: %s" % p.name)
             if not is_thicket_instance(p):
-                logging.debug("make_unique: skipped non-Thicket object: %s" % p.name)
+                logger.debug("make_unique: skipped non-Thicket object: %s" % p.name)
                 continue
             self.make_unique(p)
 
@@ -632,9 +639,9 @@ class THICKET_OT_delete_plant(Operator):
         plants = context.selected_objects
         objects = []
         for p in plants:
-            logging.debug("delete_plant: %s" % p.name)
+            logger.debug("delete_plant: %s" % p.name)
             if not is_thicket_instance(p):
-                logging.debug("delete_plant: skipped non-Thicket object: %s" % p.name)
+                logger.debug("delete_plant: skipped non-Thicket object: %s" % p.name)
                 objects.append(p)
                 continue
             delete_plant(p)
@@ -791,7 +798,7 @@ class THICKET_PT_plant_properties(Panel):
         nm = m
 
         if op not in ops:
-            logging.error("Unknown ui mode transition operator: %s" % (op))
+            logger.error("Unknown ui mode transition operator: %s" % (op))
             return nm
 
         if m == 'ADD':
@@ -1056,11 +1063,11 @@ class THICKET_OT_rebuild_db(Operator):
 
     def execute(self, context):
         global db
-        logging.info("Rebuilding database, this may take several minutes...")
+        logger.info("Rebuilding database, this may take several minutes...")
         t0 = time.time()
         prefs = context.preferences.addons[__name__].preferences
         db.build(str(prefs.lbw_plants_path), str(prefs.lbw_sdk_path))
-        logging.info("Rebuilt database in %0.2fs" % (time.time()-t0))
+        logger.info("Rebuilt database in %0.2fs" % (time.time()-t0))
         thicket_init()
         context.area.tag_redraw()
         return {'FINISHED'}
@@ -1087,10 +1094,10 @@ class THICKET_Pref(AddonPreferences):
     def lbw_path_on_update(self, context):
         if self.lbw_sdk_path != "":
             self["lbw_sdk_path"] = str(Path(bpy.path.abspath(self.lbw_sdk_path)).resolve())
-            logging.debug("Absolute Laubwerk Python Extension path: '%s'" % self.lbw_sdk_path)
+            logger.debug("Absolute Laubwerk Python Extension path: '%s'" % self.lbw_sdk_path)
         if self.lbw_plants_path != "":
             self["lbw_plants_path"] = str(Path(bpy.path.abspath(self.lbw_plants_path)).resolve())
-            logging.debug("Absolute Laubwerk Plants path: '%s'" % self.lbw_plants_path)
+            logger.debug("Absolute Laubwerk Plants path: '%s'" % self.lbw_plants_path)
         if self.lbw_sdk_path != "" and self.lbw_plants_path != "":
             thicket_init()
 
