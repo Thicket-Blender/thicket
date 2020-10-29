@@ -13,6 +13,20 @@ closed).
 Be sure to review the [code of conduct](CODE_OF_CONDUCT.md) and help maintain an
 open and welcoming environment.
 
+## Goals
+Be sure to consider the following project goals when preparing your
+contributions. If you are interesting in contributing something with might be
+contradictory or significantly out of scope, open an issue and get some feedback
+from user, reviewers, and the project maintainers before getting too far in to
+implementation.
+
+Thicket aims to (in priority order):
+* Follow Blender UI and coding guidelines
+* Prioritize Blender built-in features (e.g. Cycles and Eevee)
+* Support all platforms supported by Blender and Laubwerk Plant Kits
+* Match features and user experience of Laubwerk Plants Add-ons for other applications
+* Support commonly used 3rd party render engines
+
 ## Coding Style
 Thicket follows [PEP8](https://www.python.org/dev/peps/pep-0008/) with 120
 character line length and [Blender
