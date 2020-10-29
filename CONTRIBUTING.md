@@ -13,6 +13,27 @@ closed).
 Be sure to review the [code of conduct](CODE_OF_CONDUCT.md) and help maintain an
 open and welcoming environment.
 
+## Coding Style
+Thicket follows [PEP8](https://www.python.org/dev/peps/pep-0008/) with 120
+character line length and [Blender
+Add-on](https://docs.blender.org/manual/en/latest/advanced/scripting/addon_tutorial.html)
+guidelines. Before commiting your code, even locally, be sure to run the
+`test/pep8.sh` script which will scan your code and report on both critical
+(must fix) and informational warnings (may need fixing).
+
+## Testing
+Blender runs on multiple platforms. Thicket supports all platforms that Laubwerk
+ships Plant Kits for (currently Mac and Windows). Blender also supports multiple
+Render Engines. This creates a complex set of heterogeneous environments
+supported by Thicket.
+
+At a minimum, test your changes on the current version of Blender, the oldest
+supported version of Blender, and using the built-in Eevee and Cycles renderers.
+Whenever possible, test on as many operating systems and render engines as
+possible. Be prepared for users, reviewers, and/or maintainers to request
+changes to ensure changes do not break or otherwise impair environments other
+than the one you targeted.
+
 ## Preparing Commits
 Software is not made of files, functions, and variables. Software is made of
 change. Without the change history, software is a static snapshot in time. When
@@ -72,4 +93,4 @@ https://guides.github.com/activities/forking/
 
 Be prepared to receive feedback and follow-up with requested changes. Your
 changes will be reviewed to ensure they address all use cases, work on all
-platforms, and are generally inline with goals and intents of the project.
+platforms, and are generally inline with the goals and intents of the project.
