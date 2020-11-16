@@ -345,6 +345,45 @@ def delete_plant(instance):
     delete_plant_template(template)
 
 
+def select_plant(filepath, defaults=False):
+    """Setup the UI ThicketPropGroup with the specified plant
+
+    Paramaters
+    ----------
+    filepath : String
+        thicket_db filepath key to the desired plant
+    defaults : Boolean
+        Use the plant defaults (True) or keep the current selection for model
+        and qualifier (or plant defaults if not set or unavailable)
+
+    Returns
+    -------
+    none
+    """
+
+    global db
+
+    tp = bpy.context.window_manager.thicket
+    plant = db.get_plant(filepath=filepath)
+
+    # Store the old values and set the model and qualifier to the 0 entry (should always exist)
+    old_model = tp.model
+    old_qual = tp.qualifier
+
+    if defaults:
+        for key in tp.keys():
+            tp.pop(key)
+
+    tp.name = plant.name
+    if tp.batch_mode:
+        tp.batch_name = tp.name
+
+    # Restore the old values if available, others reset to the defaults
+    model = plant.get_model(old_model)
+    tp.model = model.name
+    tp.qualifier = model.get_qualifier(old_qual).name
+
+
 ################################################################################
 # Thicket Blender classes
 #
@@ -654,7 +693,7 @@ class THICKET_OT_delete_plant(Operator):
 
 
 class THICKET_OT_select_plant(Operator):
-    """Change the plant of the active object"""
+    """Change the plant being added or edited"""
 
     bl_idname = "thicket.select_plant"
     bl_label = "Select"
@@ -665,30 +704,13 @@ class THICKET_OT_select_plant(Operator):
     next_mode: StringProperty()
 
     def execute(self, context):
-        global db, thicket_ui_mode
-
-        tp = context.window_manager.thicket
-        plant = db.get_plant(filepath=self.filepath)
-
-        # Store the old values and set the model and qualifier to the 0 entry (should always exist)
-        old_model = tp.model
-        old_qual = tp.qualifier
-
+        global thicket_ui_mode
         # If adding a new plant, start off with the defaults
-        if self.next_mode == 'ADD':
-            for key in tp.keys():
-                tp.pop(key)
-
-        tp.name = plant.name
-        if tp.batch_mode:
-            tp.batch_name = tp.name
-
-        # Restore the old values if available, others reset to the defaults
-        model = plant.get_model(old_model)
-        tp.model = model.name
-        tp.qualifier = model.get_qualifier(old_qual).name
-
+        defaults = self.next_mode == 'ADD'
+        select_plant(self.filepath, defaults)
         thicket_ui_mode = self.next_mode
+
+        context.area.tag_redraw()
         return {'FINISHED'}
 
 
@@ -703,8 +725,14 @@ class THICKET_OT_change_mode(Operator):
     next_mode: StringProperty()
 
     def execute(self, context):
-        global thicket_ui_mode
+        global db, thicket_ui_mode
         thicket_ui_mode = self.next_mode
+
+        # If there is no UI ThicketPropGroup setup, select the first plant in the DB
+        if thicket_ui_mode == 'ADD' and context.window_manager.thicket.name == '':
+            filepath = next(iter(db)).filepath
+            select_plant(filepath, True)
+
         context.area.tag_redraw()
         return {'FINISHED'}
 
@@ -823,17 +851,17 @@ class THICKET_PT_plant_properties(Panel):
                 nm = 'VIEW'
         elif m == 'SELECT':
             if op == 'CANCEL':
-                nm = 'VIEW'
+                nm = 'EDIT'
             elif op == 'CONFIRM':
                 nm = 'EDIT'
         elif m == 'SELECT_ADD':
             if op == 'CANCEL':
-                nm = 'VIEW'
+                nm = 'ADD'
             elif op == 'CONFIRM':
                 nm = 'ADD'
         elif m == 'VIEW':
             if op == 'ADD':
-                nm = 'SELECT_ADD'
+                nm = 'ADD'
             elif op == 'EDIT':
                 nm = 'EDIT'
 
