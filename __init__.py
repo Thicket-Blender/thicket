@@ -969,11 +969,12 @@ class THICKET_PT_plant_properties(Panel):
         if thicket_ui_mode == 'VIEW':
             o = layout.operator("thicket.change_mode", text="Add Plant")
             o.next_mode = self.next_mode('ADD')
-            if plant_count > 0:
-                layout.operator("thicket.delete_plant", icon='NONE', text="Delete (%d)" % plant_count)
-                r = layout.row()
-                r.operator("thicket.make_unique", icon='NONE', text="Make Unique (%d)" % siblings)
-                r.enabled = siblings > 1
+            if plant_count == 0:
+                return
+            layout.operator("thicket.delete_plant", icon='NONE', text="Delete (%d)" % plant_count)
+            r = layout.row()
+            r.operator("thicket.make_unique", icon='NONE', text="Make Unique (%d)" % siblings)
+            r.enabled = siblings > 1
             layout.separator()
 
         # Determine the plant name and preview based on the active plant or the
