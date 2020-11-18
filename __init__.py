@@ -410,6 +410,18 @@ class ThicketPropGroup(PropertyGroup):
     def __ne__(self, other):
         return not self.__eq__(other)
 
+    def eq_lod(self, other):
+        for k, v in self.items():
+            if k not in ["leaf_density", "use_lod_max_level", "lod_max_level", "use_lod_min_thick", "lod_min_thick",
+                         "lod_subdiv", "leaf_amount"]:
+                continue
+            try:
+                if self[k] != other[k]:
+                    return False
+            except KeyError:
+                return False
+        return True
+
     def copy_to(self, other):
         for k, v in self.items():
             other[k] = v
@@ -421,19 +433,23 @@ class ThicketPropGroup(PropertyGroup):
         mesh_args = {}
         mesh_args["qualifier"] = self.qualifier
 
+        if original:
+            orig_template = original.instance_collection
+            orig_tp = orig_template.thicket
+
         if self.batch_mode:
             if self.batch_name == "":
-                filepath = db.get_plant(name=original.name).filepath
+                filepath = db.get_plant(name=orig_tp.name).filepath
             else:
                 filepath = db.get_plant(name=self.batch_name).filepath
             if not self.batch_use_lod:
-                tp = original
+                tp = orig_tp
             model = self.batch_model
             if model == 'UNCHANGED':
-                model = original.model
+                model = orig_tp.model
             mesh_args["qualifier"] = self.batch_qualifier
             if self.batch_qualifier == 'UNCHANGED':
-                mesh_args["qualifier"] = original.qualifier
+                mesh_args["qualifier"] = orig_tp.qualifier
 
         mesh_args["leaf_density"] = tp.leaf_density / 100.0
         if tp.use_lod_max_level:
@@ -443,7 +459,28 @@ class ThicketPropGroup(PropertyGroup):
         mesh_args["max_subdiv_level"] = tp.lod_subdiv
         mesh_args["leaf_amount"] = tp.leaf_amount / 100.0
 
-        plant_obj = thicket_lbw.import_lbw(filepath, model, tp.viewport_lod, tp.render_lod, mesh_args)
+        viewport_obj = None
+        render_obj = None
+
+        # Determine if either the FULL render object or LOW viewport object can
+        # be reused to save regenerating those meshes.  Do not attempt to avoid
+        # regenerating proxy objects as these are fast enough.
+        if original and self.name == orig_tp.name and self.model == orig_tp.model and \
+           self.qualifier == orig_tp.qualifier:
+            if self.eq_lod(orig_tp):
+                if self.render_lod == orig_tp.render_lod:
+                    render_obj = orig_template.objects[-1]
+
+            if self.viewport_lod != self.render_lod:
+                if self.viewport_lod == 'PROXY' and self.viewport_lod == orig_tp.viewport_lod:
+                    viewport_obj = orig_template.objects[0]
+
+            if self.render_lod == 'PROXY' and orig_tp.viewport_lod == 'PROXY':
+                if self.render_lod != orig_tp.render_lod:
+                    render_obj = orig_template.objects[0]
+
+        plant_obj = thicket_lbw.import_lbw(filepath, model, tp.viewport_lod, tp.render_lod, mesh_args,
+                                           viewport_obj, render_obj)
         self.copy_to(plant_obj.instance_collection.thicket)
         plant_obj.instance_collection.thicket.magic = THICKET_GUID
         return plant_obj
@@ -578,7 +615,7 @@ class THICKET_OT_update_plant(Operator):
         template = instance.instance_collection
 
         # Load new plant model
-        new_instance = tp.import_lbw(template.thicket)
+        new_instance = tp.import_lbw(instance)
         new_template = new_instance.instance_collection
 
         # Update the instance_collection reference in the instances
