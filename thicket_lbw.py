@@ -28,7 +28,6 @@ import bpy
 import laubwerk
 from mathutils import Matrix
 
-from . import THICKET_GUID
 from . import logger
 
 VP_MAX_BRANCH_LEVEL = 4
@@ -48,8 +47,13 @@ def new_collection(name, parent, singleton=False, exclude=False):
     return col
 
 
-def lbw_to_bl_obj(lbw_plant, name, lbw_mesh, qualifier, proxy):
+def lbw_to_bl_obj(lbw_plant, suffix, lbw_mesh, qualifier, proxy):
     """ Generate the Blender Object from the Laubwerk mesh and materials """
+
+    # construct object name
+    name = lbw_plant.name
+    if suffix:
+        name += suffix
 
     # create mesh and object
     mesh = bpy.data.meshes.new(name)
@@ -424,7 +428,7 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, qualifier=None, proxy_color=None):
     return mat
 
 
-def import_lbw(filepath, model, viewport_lod, render_lod, mesh_args):
+def import_lbw(filepath, model, viewport_lod, render_lod, mesh_args, obj_viewport=None, obj_render=None):
     time_main = time.time()
     lbw_plant = laubwerk.load(filepath)
     # TODO: This should be debug, but we cannot silence the SDK [debug] message
@@ -434,57 +438,69 @@ def import_lbw(filepath, model, viewport_lod, render_lod, mesh_args):
     if not lbw_model.name == model:
         logger.warning("Model '%s' not found for '%s', using default model '%s'" %
                        (model, lbw_plant.name, lbw_model.name))
-    proxy = False
 
     # Create the viewport object (low detail)
     time_local = time.time()
-    lbw_mesh = None
-    if viewport_lod == 'PROXY' and not render_lod == 'PROXY':
-        proxy = True
-        lbw_mesh = lbw_model.get_proxy()
-    elif viewport_lod == 'LOW':
-        vp_mesh_args = mesh_args.copy()
-        vp_mesh_args["max_branch_level"] = VP_MAX_BRANCH_LEVEL
-        if "max_branch_level" in mesh_args:
-            vp_mesh_args["max_branch_level"] = min(VP_MAX_BRANCH_LEVEL, mesh_args["max_branch_level"])
-        vp_mesh_args["min_thickness"] = VP_MIN_THICKNESS
-        if "min_thickness" in mesh_args:
-            vp_mesh_args["min_thickness"] = max(VP_MIN_THICKNESS, mesh_args["min_thickness"])
-        vp_mesh_args["leaf_amount"] = 0.66 * mesh_args["leaf_amount"]
-        vp_mesh_args["leaf_density"] = 0.5 * mesh_args["leaf_density"]
-        vp_mesh_args["max_subdiv_level"] = 0
-        logger.debug("viewport get_mesh(%s)" % str(vp_mesh_args))
-        lbw_mesh = lbw_model.get_mesh(**vp_mesh_args)
-    elif viewport_lod != 'FULL':
-        logger.warning("Unknown viewport_lod: %s" % viewport_lod)
-
-    obj_viewport = None
-    if lbw_mesh:
-        obj_viewport = lbw_to_bl_obj(lbw_plant, lbw_plant.name, lbw_mesh, mesh_args["qualifier"], proxy)
-        obj_viewport.hide_render = True
-        obj_viewport.show_name = True
-        logger.debug("Generated low resolution viewport object in %.4fs" % (time.time() - time_local))
+    if viewport_lod != render_lod:
+        if obj_viewport:
+            obj_viewport.name = lbw_plant.name
+            obj_viewport.data.name = lbw_plant.name
+            logger.debug("Reusing existing viewport object")
+        elif viewport_lod == 'PROXY':
+            lbw_mesh = lbw_model.get_proxy()
+            obj_viewport = lbw_to_bl_obj(lbw_plant, None, lbw_mesh, mesh_args["qualifier"], True)
+            logger.debug("Generated proxy viewport object in %.4fs" % (time.time() - time_local))
+        elif viewport_lod == 'LOW':
+            vp_mesh_args = mesh_args.copy()
+            vp_mesh_args["max_branch_level"] = VP_MAX_BRANCH_LEVEL
+            if "max_branch_level" in mesh_args:
+                vp_mesh_args["max_branch_level"] = min(VP_MAX_BRANCH_LEVEL, mesh_args["max_branch_level"])
+            vp_mesh_args["min_thickness"] = VP_MIN_THICKNESS
+            if "min_thickness" in mesh_args:
+                vp_mesh_args["min_thickness"] = max(VP_MIN_THICKNESS, mesh_args["min_thickness"])
+            vp_mesh_args["leaf_amount"] = 0.66 * mesh_args["leaf_amount"]
+            vp_mesh_args["leaf_density"] = 0.5 * mesh_args["leaf_density"]
+            vp_mesh_args["max_subdiv_level"] = 0
+            logger.debug("viewport get_mesh(%s)" % str(vp_mesh_args))
+            lbw_mesh = lbw_model.get_mesh(**vp_mesh_args)
+            obj_viewport = lbw_to_bl_obj(lbw_plant, None, lbw_mesh, mesh_args["qualifier"], False)
+            logger.debug("Generated low resolution viewport object in %.4fs" % (time.time() - time_local))
+        else:
+            logger.warning("Unknown viewport_lod: %s" % viewport_lod)
 
     # Create the render object (high detail)
     time_local = time.time()
-    if render_lod == 'PROXY':
+    if obj_render:
+        obj_render.name = lbw_plant.name + " (render)"
+        obj_render.data.name = lbw_plant.name + " (render)"
+        logger.debug("Reusing existing render object")
+    elif render_lod == 'PROXY':
         lbw_mesh = lbw_model.get_proxy()
-    else:
-        if not render_lod == 'FULL':
-            logger.warning("Unknown render_lod: %s" % render_lod)
+        obj_render = lbw_to_bl_obj(lbw_plant, " (render)", lbw_mesh, mesh_args["qualifier"], True)
+        logger.debug("Generated proxy render object in %.4fs" % (time.time() - time_local))
+    elif render_lod == 'FULL':
         logger.debug("render get_mesh(%s)" % str(mesh_args))
         lbw_mesh = lbw_model.get_mesh(**mesh_args)
-    obj_render = lbw_to_bl_obj(lbw_plant, lbw_plant.name + " (render)", lbw_mesh, mesh_args["qualifier"],
-                               render_lod == 'PROXY')
-    logger.debug("Generated high resolution render object in %.4fs" % (time.time() - time_local))
+        obj_render = lbw_to_bl_obj(lbw_plant, " (render)", lbw_mesh, mesh_args["qualifier"], False)
+        logger.debug("Generated high resolution render object in %.4fs" % (time.time() - time_local))
+    else:
+        logger.warning("Unknown render_lod: %s" % render_lod)
 
     # Setup viewport and render visibility
     if obj_viewport:
+        obj_viewport.parent = None
+        obj_viewport.hide_render = True
+        obj_viewport.show_name = True
+        obj_render.show_name = False
         obj_render.parent = obj_viewport
         obj_render.hide_viewport = True
         obj_render.hide_select = True
     else:
         obj_render.show_name = True
+        obj_render.parent = None
+        obj_render.hide_render = False
+        obj_render.hide_viewport = False
+        obj_render.hide_select = False
 
     # Setup collection hierarchy
     thicket_col = new_collection("Thicket", bpy.context.scene.collection, singleton=True, exclude=True)
