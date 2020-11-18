@@ -443,7 +443,10 @@ class ThicketPropGroup(PropertyGroup):
         mesh_args["max_subdiv_level"] = tp.lod_subdiv
         mesh_args["leaf_amount"] = tp.leaf_amount / 100.0
 
-        return thicket_lbw.import_lbw(filepath, model, tp.viewport_lod, tp.render_lod, mesh_args)
+        plant_obj = thicket_lbw.import_lbw(filepath, model, tp.viewport_lod, tp.render_lod, mesh_args)
+        self.copy_to(plant_obj.instance_collection.thicket)
+        plant_obj.instance_collection.thicket.magic = THICKET_GUID
+        return plant_obj
 
     def model_callback(self, context):
         global db, thicket_ui_mode

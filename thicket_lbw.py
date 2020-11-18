@@ -509,23 +509,5 @@ def import_lbw(filepath, model, viewport_lod, render_lod, mesh_args):
     obj_inst.select_set(True)
     bpy.context.view_layer.objects.active = obj_inst
 
-    # Set Thicket properties on the template plant collection
-    tp = plant_col.thicket
-    tp.magic = THICKET_GUID
-    tp.name = lbw_plant.name
-    tp.model = lbw_model.name
-    tp.qualifier = mesh_args["qualifier"]
-    tp.leaf_density = mesh_args["leaf_density"] * 100
-    tp.viewport_lod = viewport_lod
-    tp.render_lod = render_lod
-    tp.use_lod_max_level = "max_branch_level" in mesh_args
-    if tp.use_lod_max_level:
-        tp.lod_max_level = mesh_args["max_branch_level"]
-    tp.use_lod_min_thick = "min_thickness" in mesh_args
-    if tp.use_lod_min_thick:
-        tp.lod_min_thick = mesh_args["min_thickness"]
-    tp.lod_subdiv = mesh_args["max_subdiv_level"]
-    tp.leaf_amount = mesh_args["leaf_amount"] * 100
-
     logger.info('Imported "%s" in %.4fs' % (lbw_plant.name, time.time() - time_main))
     return obj_inst
