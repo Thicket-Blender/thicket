@@ -15,6 +15,7 @@ Thicket provides a visual plant selection gallery and options to configure the p
   * Visual plant selection gallery
   * Update existing plants
   * Update all identical instances at once
+  * Batch update selected plants
   * Make instances unique
   * Smart delete to manage scene size
 * Plant model options
@@ -62,17 +63,17 @@ Thicket adds a Blender N Panel to Add, Edit, and Delete plants. Access the panel
 ![doc/thicket-panel-add-only.png](doc/thicket-panel-add-only.png)
 
 ### Add Plant
-To add a plant, click `Add Plant` and select from the gallery presented. You can resize the panel to show up to 5 columns of plants. You can filter the results by entering a search term (clear the search by pressing the cancel icon to the right of the search field).
-
-![doc/thicket-panel-select.png](doc/thicket-panel-select.png)
-
-Once selected, the panel presents the plant model, season, leaf density, and level of detail options.
+To add a plant, click `Add Plant`. Tthe panel presents a plant model, season, leaf density, and level of detail options.
 
 ![doc/thicket-panel-add.png](doc/thicket-panel-add.png)
 
+Toa select a different plant from the gallery, press `Change Plant`. You can resize the panel to show up to 5 columns of plants. You can filter the results by entering a search term (clear the search by pressing the cancel icon to the right of the search field).
+
+![doc/thicket-panel-select.png](doc/thicket-panel-select.png)
+
 <image align="right" src="doc/thicket-panel-add-zoom.png">
 
-The image preview will update when you change the `Model` variant and age. You can also configure the season, leaf sensity, and level of detail properties:
+The image preview will update when you change the `Model` variant and age. You can also configure the `Season`, `Leaf Density`, and several `Level of Detail` properties:
 
 ### Plant Model
 **Model:** Select variant and age<br>
@@ -111,12 +112,19 @@ The rendered model is the same for each, resulting in the following rendered ima
 ![doc/thicket-import-render.png](doc/thicket-import-render.png)
 
 ### Edit Plant
-To edit the properties after a plant is added, select the plant in the viewport and press `Edit Plant` under the thumbnail in the panel. Here, you can change the plant and any of the options. Pressing `Update` will replace the selected plant's template, changing all plants using the same template. To change only the selected plant object, press `Make Unique (#)`. The number of "sibling" plants (plants with the same template) is indicated by `(#)` in the `Make Unique (#)` label.
+To edit the properties after a plant is added, select the plant in the viewport and press `Edit` under the thumbnail in the panel. Here, you can change the plant and any of the options. Pressing `Update` will replace the selected plant's template, changing all plants using the same template.
 
-![doc/thicket-panel-view.png](doc/thicket-panel-edit.png)
+![doc/thicket-panel-edit.png](doc/thicket-panel-edit.png)
+
+Batch updates are supported by selected multiple plants. In this mode, you can specify some new properties, and leave some unchanged. For example, you can select two different plant models, and change only the season. All options affecting geometry are changed as a group, made available by checking `Show Geometry Options`.
+
+![doc/thicket-panel-batch-edit.png](doc/thicket-panel-batch-edit.png)
 
 ### Delete Plants
-To delete a plant, avoid using `x`. Instead, select the plant and press `Delete` in the panel. This will remove the plant instance from the viewport and will also remove the template plant when the last instance is removed. This will help keep your Blender file as small as possible.
+Avoid using `x` to delete plants. Instead, select the plants and press `Delete (#)` in the panel, where # indicates the number of plants selected. This will remove the plant instances from the viewport as well as the template plants when the last instance is removed. This will help keep your Blender file as small as possible.
+
+### Make Plants Unique
+To edit plants independently from others based on the same template, select the plants you want to be unique and press `Make Unique (#)`. The number of "sibling" plants (plants with the same template) is indicated by `(#)` in the `Make Unique (#)` label. If multiple plants are selected, each one will be made unique from the rest.
 
 ## Collections and Instancing
 Thicket creates a template for each plant added, and places them in a top level collection named "Thicket" which is excluded from the View Layer by default. Each template is a collection consisting of the viewport object and the render object as a child of the viewport object. Object visibility settings determine which object is visible in the viewport, and which is visible for rendering. At import time, a Collection Instance of the template collection is added to the main scene collection. This is the object that is visible after import.
@@ -127,7 +135,7 @@ The object model is shown in the image below by checking the Thicket collection 
 
 The collection instance can be duplicated with `Shift+D` to add a second identical plant instance to the scene, without doubling the memory used. Because Collection Instances are displayed in the viewport, modifying the template in the Thicket collection will be reflected in all the instances (this is what Editing and Updating a plant with the Thicket N Panel does).
 
-In short, leave the Thicket collection unchecked and duplicate the Collection Instance in the scene to make memory efficient copies of plants you can update in groups. To make a plant unique, select it, press `Edit Plant`, and then `Make Unique (#)`.
+In short, leave the Thicket collection unchecked and duplicate the Collection Instance in the scene to make memory efficient copies of plants you can update in groups. To make a plant unique, select it and press `Make Unique (#)`.
 
 ## Report an Issue
 Thicket is an open source project that is not affiliated with Laubwerk GmbH. If you think you have found a problem or a bug with Thicket, please [Check Existing Issues](/../../issues) to see if someone has already reported it. If not, please [Create a New Issue](/../../issues/new/choose), providing as much detail as possible to help us recreate the problem. Please do not contact Laubwerk directly.
