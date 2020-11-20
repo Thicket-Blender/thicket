@@ -871,9 +871,8 @@ class THICKET_PT_plant_properties(Panel):
         global THICKET_SCALE
         layout = self.layout
         panel_w = context.region.width
-        # cell_w = int(0.75 * scale * bpy.app.render_icon_size)
-        cell_w = 175
-        num_cols = max(1, panel_w / cell_w)
+        cell_w = int(THICKET_SCALE * bpy.app.render_icon_size)
+        num_cols = max(1, int((float(panel_w) / cell_w) - 0.5))
         o = layout.operator("thicket.change_mode", text="Cancel")
         o.next_mode = self.next_mode('CANCEL')
 
