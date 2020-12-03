@@ -135,6 +135,8 @@ class ThicketDB:
                 self.save()
             else:
                 raise FileNotFoundError
+        except json.decoder.JSONDecodeError as e:
+            logger.critical("JSONDecodeError while loading database: %s" % e)
 
     def __iter__(self):
         return DBIter(self)
@@ -231,10 +233,13 @@ class ThicketDB:
             # Wait for the oldest job to complete
             job = jobs.popleft()
             outs, errs = job.communicate()
-            p_rec = json.loads(outs)
-            self._db["plants"][p_rec["plant"]["name"]] = p_rec["plant"]
-            self.update_labels(p_rec["labels"])
-            logger.info('Added "%s"' % p_rec["plant"]["name"])
+            try:
+                p_rec = json.loads(outs)
+                self._db["plants"][p_rec["plant"]["name"]] = p_rec["plant"]
+                self.update_labels(p_rec["labels"])
+                logger.info('Added "%s"' % p_rec["plant"]["name"])
+            except json.decoder.JSONDecodeError as e:
+                logger.error("JSONDecodeError while parsing %s: %s" % (f, e))
 
         if len(plant_files) > 0:
             logger.error("Exited worker loop with %d plant files remaining" % len(plant_files))
