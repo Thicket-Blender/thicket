@@ -247,7 +247,7 @@ def thicket_init():
 
     db_path = Path(bpy.utils.user_resource('SCRIPTS', path="addons", create=True)) / __name__ / "thicket.db"
     try:
-        db = ThicketDB(db_path, locale, bpy.app.binary_path_python)
+        db = ThicketDB(db_path, locale, sys.executable)
     except ThicketDBOldSchemaError:
         logger.warning("Old database schema found, creating empty database")
         db_path.unlink()
@@ -257,7 +257,7 @@ def thicket_init():
     if db is None or db.plant_count() == 0:
         db_dir = Path(PurePath(db_path).parent)
         db_dir.mkdir(parents=True, exist_ok=True)
-        db = ThicketDB(db_path, locale, bpy.app.binary_path_python, True)
+        db = ThicketDB(db_path, locale, sys.executable, True)
         return
 
     populate_previews()
