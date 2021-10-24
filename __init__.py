@@ -67,7 +67,7 @@ bl_info = {
 
 # Create a thicket specific logger which logs to a file and propogates messages to the root logger.
 logger = logging.getLogger(__name__)
-log_path = Path(bpy.utils.user_resource('SCRIPTS', "addons", True)) / __name__ / "thicket.log"
+log_path = Path(bpy.utils.user_resource('SCRIPTS', path="addons", create=True)) / __name__ / "thicket.log"
 log_handler = logging.FileHandler(log_path, encoding=None, mode='a', delay=False)
 log_formatter = logging.Formatter('%(asctime)s: %(levelname)s: %(message)s')
 log_handler.setFormatter(log_formatter)
@@ -118,7 +118,7 @@ def populate_previews():
 
     t0 = time.time()
 
-    thicket_path = Path(bpy.utils.user_resource('SCRIPTS', "addons", True)) / __name__
+    thicket_path = Path(bpy.utils.user_resource('SCRIPTS', path="addons", create=True)) / __name__
     missing_path = thicket_path / "doc" / "missing_preview.png"
     thicket_previews.load("missing_preview", str(missing_path), 'IMAGE')
     multiple_path = thicket_path / "doc" / "multiple_preview.png"
@@ -245,7 +245,7 @@ def thicket_init():
     thicket_status.imported = True
     logger.info(laubwerk.version)
 
-    db_path = Path(bpy.utils.user_resource('SCRIPTS', "addons", True)) / __name__ / "thicket.db"
+    db_path = Path(bpy.utils.user_resource('SCRIPTS', path="addons", create=True)) / __name__ / "thicket.db"
     try:
         db = ThicketDB(db_path, locale, bpy.app.binary_path_python)
     except ThicketDBOldSchemaError:
