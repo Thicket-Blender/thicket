@@ -284,21 +284,33 @@ class ThicketDB:
         labels = {}
         p_labels = {}
         # Store only the first label per locale
-        for label in p.labels.items():
-            p_labels[label[0]] = label[1][0]
+        #for label in p.labels.items():
+        #    p_labels[label[0]] = label[1][0]
+        for label in next(x for x in p.params[1]['enum']['options'] if x['name'] == p.name)['labels']:
+            p_labels[label['lang']] = label['text']
+            
+
         labels[p.name] = p_labels
 
         models = {}
         i = 0
+        seasons = []
+        q_labels = {}
+        for q in p.params[0]['enum']['options']:
+            seasons.append(q['name'])
+            q_labels[q['name']] = {}
+            for q_lang in q['labels']:
+                q_labels[q['name']][q_lang['lang']] = q_lang['text']
+
         for m in p.models:
             m_rec = {}
-            seasons = []
-            q_labels = {}
-            for q in m.qualifiers:
-                seasons.append(q)
-                q_labels[q] = {}
-                for q_lang in m.qualifier_labels[q].items():
-                    q_labels[q][q_lang[0]] = q_lang[1][0]
+            #seasons = []
+            #q_labels = {}
+            #for q in m.qualifiers:
+            #    seasons.append(q)
+            #    q_labels[q] = {}
+            #    for q_lang in m.qualifier_labels[q].items():
+            #        q_labels[q][q_lang[0]] = q_lang[1][0]
             labels.update(q_labels)
             m_rec["index"] = i
             m_rec["qualifiers"] = seasons
