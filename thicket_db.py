@@ -314,7 +314,7 @@ class ThicketDB:
             labels.update(q_labels)
             m_rec["index"] = i
             m_rec["qualifiers"] = seasons
-            m_rec["default_qualifier"] = default_season
+            m_rec["default_qualifier"] = seasons[default_season]
             preview_path = Path(filepath).parent.absolute() / "models" / (preview_stem + "_" + m.name + ".png")
             if not preview_path.is_file():
                 logger.warning("Preview not found: %s" % preview_path)

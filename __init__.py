@@ -370,9 +370,11 @@ def select_plant(filepath, defaults=False):
     old_model = tp.model
     old_qual = tp.qualifier
 
-    if defaults:
-        for key in tp.keys():
-            tp.pop(key)
+    # FIXME: we still want to reset the operator but not this way
+    #if defaults:
+    #    #keys = tp.keys()
+    #    #for key in keys:
+    #    #    tp.pop(key)
 
     tp.name = plant.name
     if tp.batch_mode:
