@@ -274,7 +274,7 @@ class ThicketDB:
         plant["filepath"] = filepath
         plant["md5"] = md5sum(filepath)
         plant["default_model"] = p.default_model.name
-        preview_stem = p.name.replace(" ", "_").replace(".", "")
+        preview_stem = p.plant_meta["botanical_name"].replace(" ", "_").replace(".", "")
         preview_path = Path(filepath).parent.absolute() / (preview_stem + ".png")
         if not preview_path.is_file():
             logger.warning("Preview not found: %s" % preview_path)
