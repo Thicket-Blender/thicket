@@ -102,10 +102,10 @@ def populate_previews():
     """Create a Blender preview collection of plant thumbnails
 
     Walk through all the plants in the Thicket database and add the thumbnails
-    for each plant and each plant model to the previews collection for use in
+    for each plant and each plant variant to the previews collection for use in
     the plant properties panels.
 
-    Previews are keyed on the plant name and model as well as just the plant
+    Previews are keyed on the plant name and variant as well as just the plant
     name as a fall back. In case no previews are available, the
     "missing_preview" key points to a generic preview.
     """
@@ -125,27 +125,27 @@ def populate_previews():
     thicket_previews.load("multiple_preview", str(multiple_path), 'IMAGE')
 
     for plant in db:
-        # Load the top plant (no model) preview
+        # Load the top plant (no variant) preview
         plant_preview_key = plant.name.replace(" ", "_").replace(".", "")
         preview_path = plant.preview
         if preview_path != "" and Path(preview_path).is_file():
             thicket_previews.load(plant_preview_key, preview_path, 'IMAGE')
 
-        # Load the previews for each model of the plant
-        for model in plant.models:
-            preview_key = plant_preview_key + "_" + model.name
-            preview_path = model.preview
+        # Load the previews for each variant of the plant
+        for variant in plant.variants:
+            preview_key = plant_preview_key + "_" + variant.name
+            preview_path = variant.preview
             if preview_path != "" and Path(preview_path).is_file():
                 thicket_previews.load(preview_key, preview_path, 'IMAGE')
 
     logger.debug("Added %d previews in %0.2fs" % (len(thicket_previews), time.time()-t0))
 
 
-def get_preview(plant_name, model=""):
-    """Lookup plant model preview
+def get_preview(plant_name, variant=""):
+    """Lookup plant variant preview
 
     Return the best match from best to worst:
-        * plant and model
+        * plant and variant
         * plant
         * missing_preview
 
@@ -153,8 +153,8 @@ def get_preview(plant_name, model=""):
     ----------
     plant_name : str
         The name of the plant from the db or Laubwerk plant.name
-    model : str
-        The name of the plant model from the db or Laubwerk model.name
+    variant : str
+        The name of the plant variant from the db or Laubwerk variant.name
 
     Returns
     -------
@@ -162,10 +162,10 @@ def get_preview(plant_name, model=""):
     """
 
     preview_key = plant_name.replace(" ", "_").replace(".", "")
-    if model != "":
-        preview_key = plant_name.replace(" ", "_").replace(".", "") + "_" + model
+    if variant != "":
+        preview_key = plant_name.replace(" ", "_").replace(".", "") + "_" + variant
         if preview_key not in thicket_previews:
-            # The model specific preview was not found, try the plant preview
+            # The variant specific preview was not found, try the plant preview
             logger.debug("Preview key %s not found" % preview_key)
             preview_key = plant_name.replace(" ", "_").replace(".", "")
     if preview_key not in thicket_previews:
@@ -353,8 +353,8 @@ def select_plant(filepath, defaults=False):
     filepath : String
         thicket_db filepath key to the desired plant
     defaults : Boolean
-        Use the plant defaults (True) or keep the current selection for model
-        and qualifier (or plant defaults if not set or unavailable)
+        Use the plant defaults (True) or keep the current selection for variant
+        and season (or plant defaults if not set or unavailable)
 
     Returns
     -------
@@ -366,9 +366,9 @@ def select_plant(filepath, defaults=False):
     tp = bpy.context.window_manager.thicket
     plant = db.get_plant(filepath=filepath)
 
-    # Store the old values and set the model and qualifier to the 0 entry (should always exist)
-    old_model = tp.model
-    old_qual = tp.qualifier
+    # Store the old values and set the variant and season to the 0 entry (should always exist)
+    old_variant = tp.variant
+    old_season = tp.season
 
     if defaults:
         for k in list(tp.keys()):
@@ -379,9 +379,9 @@ def select_plant(filepath, defaults=False):
         tp.batch_name = tp.name
 
     # Restore the old values if available, others reset to the defaults
-    model = plant.get_model(old_model)
-    tp.model = model.name
-    tp.qualifier = model.get_qualifier(old_qual).name
+    variant = plant.get_variant(old_variant)
+    tp.variant = variant.name
+    tp.season = variant.get_season(old_season).name
 
 
 ################################################################################
@@ -429,9 +429,9 @@ class ThicketPropGroup(PropertyGroup):
     def import_lbw(self, original=None):
         filepath = db.get_plant(name=self.name).filepath
         tp = self
-        model = self.model
+        variant = self.variant
         mesh_args = {}
-        mesh_args["qualifier"] = self.qualifier
+        mesh_args["season"] = self.season
 
         if original:
             orig_template = original.instance_collection
@@ -444,12 +444,14 @@ class ThicketPropGroup(PropertyGroup):
                 filepath = db.get_plant(name=self.batch_name).filepath
             if not self.batch_use_lod:
                 tp = orig_tp
-            model = self.batch_model
-            if model == 'UNCHANGED':
-                model = orig_tp.model
-            mesh_args["qualifier"] = self.batch_qualifier
-            if self.batch_qualifier == 'UNCHANGED':
-                mesh_args["qualifier"] = orig_tp.qualifier
+            variant = self.batch_variant
+            if variant == 'UNCHANGED':
+                variant = orig_tp.variant
+            mesh_args["season"] = self.batch_season
+            if self.batch_season == 'UNCHANGED':
+                mesh_args["season"] = orig_tp.season
+            # The Laubwerk API v1.0.51 still uses "qualifier" here
+            mesh_args["qualifier"] = mesh_args["season"]
 
         mesh_args["leaf_density"] = tp.leaf_density / 100.0
         if tp.use_lod_max_level:
@@ -465,8 +467,8 @@ class ThicketPropGroup(PropertyGroup):
         # Determine if either the FULL render object or LOW viewport object can
         # be reused to save regenerating those meshes.  Do not attempt to avoid
         # regenerating proxy objects as these are fast enough.
-        if original and self.name == orig_tp.name and self.model == orig_tp.model and \
-           self.qualifier == orig_tp.qualifier:
+        if original and self.name == orig_tp.name and self.variant == orig_tp.variant and \
+           self.season == orig_tp.season:
             if self.eq_lod(orig_tp):
                 if self.render_lod == orig_tp.render_lod:
                     render_obj = orig_template.objects[-1]
@@ -479,13 +481,13 @@ class ThicketPropGroup(PropertyGroup):
                 if self.render_lod != orig_tp.render_lod:
                     render_obj = orig_template.objects[0]
 
-        plant_obj = thicket_lbw.import_lbw(filepath, model, tp.viewport_lod, tp.render_lod, mesh_args,
+        plant_obj = thicket_lbw.import_lbw(filepath, variant, tp.viewport_lod, tp.render_lod, mesh_args,
                                            viewport_obj, render_obj)
         self.copy_to(plant_obj.instance_collection.thicket)
         plant_obj.instance_collection.thicket.magic = THICKET_GUID
         return plant_obj
 
-    def model_callback(self, context):
+    def variant_callback(self, context):
         global db, thicket_ui_mode
 
         tp = context.window_manager.thicket
@@ -497,11 +499,11 @@ class ThicketPropGroup(PropertyGroup):
         if not plant:
             items.append(('DEFAULT', "default", ""))
         else:
-            for m in plant.models:
-                items.append((m.name, m.label, ""))
+            for v in plant.variants:
+                items.append((v.name, v.label, ""))
         return items
 
-    def qualifier_callback(self, context):
+    def season_callback(self, context):
         global db, thicket_ui_mode
 
         tp = context.window_manager.thicket
@@ -514,21 +516,21 @@ class ThicketPropGroup(PropertyGroup):
         if not plant:
             items.append(("default", "default", ""))
         else:
-            for q in plant.get_model(tp.model).qualifiers:
-                items.append((q.name, q.label, ""))
+            for s in plant.get_variant(tp.variant).seasons:
+                items.append((s.name, s.label, ""))
         return items
 
-    def batch_model_callback(self, context):
+    def batch_variant_callback(self, context):
         global db
-        models = ['01young', '01medium', '01adult',
-                  '02young', '02medium', '02adult',
-                  '03young', '03medium', '03adult']
-        return [(m, db.get_label(m), "") for m in models] + [('UNCHANGED', "--", "")]
+        variants = ['01young', '01medium', '01adult',
+                    '02young', '02medium', '02adult',
+                    '03young', '03medium', '03adult']
+        return [(v, db.get_label(v), "") for v in variants] + [('UNCHANGED', "--", "")]
 
-    def batch_qualifier_callback(self, context):
+    def batch_season_callback(self, context):
         global db
-        qualifiers = ['spring', 'summer', 'fall', 'winter']
-        return [(q, db.get_label(q), "") for q in qualifiers] + [('UNCHANGED', "--", "")]
+        seasons = ['spring', 'summer', 'fall', 'winter']
+        return [(s, db.get_label(s), "") for s in seasons] + [('UNCHANGED', "--", "")]
 
     def render_lod_update(self, context):
         if self.render_lod == 'PROXY':
@@ -536,8 +538,8 @@ class ThicketPropGroup(PropertyGroup):
 
     # name is provided by the PropertyGroup and used to store the unique Laubwerk Plant name
     magic: bpy.props.StringProperty()
-    model: EnumProperty(items=model_callback, name="Model")
-    qualifier: EnumProperty(items=qualifier_callback, name="Season")
+    variant: EnumProperty(items=variant_callback, name="Variant")
+    season: EnumProperty(items=season_callback, name="Season")
     leaf_density: FloatProperty(name="Leaf Density", description="How full the foliage appears",
                                 default=100.0, min=0.01, max=100.0, subtype='PERCENTAGE')
     viewport_lod: EnumProperty(name="Viewport",
@@ -562,11 +564,11 @@ class ThicketPropGroup(PropertyGroup):
                                default=100.0, min=0.01, max=100.0, subtype='PERCENTAGE')
 
     # These batch properties are not derived from a specific plant, but instead assume
-    # the standard model and season options available for all Laubwerk plants.
+    # the standard variant and season options available for all Laubwerk plants.
     batch_mode: BoolProperty(default=False)
     batch_name: StringProperty(default="")
-    batch_model: EnumProperty(name="Model", items=batch_model_callback)
-    batch_qualifier: EnumProperty(name="Season", items=batch_qualifier_callback)
+    batch_variant: EnumProperty(name="Variant", items=batch_variant_callback)
+    batch_season: EnumProperty(name="Season", items=batch_season_callback)
     batch_use_lod: BoolProperty(name="Show Geometry Options",
                                 description="Show options affecting geometry for selected plants.",
                                 default=False)
@@ -577,7 +579,7 @@ class THICKET_OT_reset_plant(Operator):
 
     bl_idname = "thicket.reset_plant"
     bl_label = "Reset Plant"
-    bl_description = "Restore the UI properties to the model properties"
+    bl_description = "Restore the UI properties to the variant properties"
     bl_options = {'REGISTER', 'INTERNAL'}
 
     next_mode: StringProperty()
@@ -614,7 +616,7 @@ class THICKET_OT_update_plant(Operator):
         logger.debug("Updating plant: %s" % instance.name)
         template = instance.instance_collection
 
-        # Load new plant model
+        # Load new plant variant
         new_instance = tp.import_lbw(instance)
         new_template = new_instance.instance_collection
 
@@ -800,8 +802,8 @@ class THICKET_OT_edit_plant(Operator):
         tp = context.window_manager.thicket
         tp.batch_mode = self.batch_mode
         tp.batch_name = ""
-        tp.batch_model = 'UNCHANGED'
-        tp.batch_qualifier = 'UNCHANGED'
+        tp.batch_variant = 'UNCHANGED'
+        tp.batch_season = 'UNCHANGED'
 
         thicket_ui_mode = self.next_mode
         context.area.tag_redraw()
@@ -942,11 +944,11 @@ class THICKET_PT_plant_properties(Panel):
         """Draw the plant properties UI"""
 
         if not batch:
-            layout.prop(tp, "model")
-            layout.prop(tp, "qualifier")
+            layout.prop(tp, "variant")
+            layout.prop(tp, "season")
         else:
-            layout.prop(tp, "batch_model")
-            layout.prop(tp, "batch_qualifier")
+            layout.prop(tp, "batch_variant")
+            layout.prop(tp, "batch_season")
             layout.prop(tp, "batch_use_lod")
             if not tp.batch_use_lod:
                 return
@@ -1066,7 +1068,7 @@ class THICKET_PT_plant_properties(Panel):
         if plant:
             layout.label(text="%s" % plant.label)
             layout.label(text="(%s)" % plant.name)
-            preview = get_preview(plant.name, tp.batch_model if batch else tp.model)
+            preview = get_preview(plant.name, tp.batch_variant if batch else tp.variant)
 
         layout.template_icon(preview.icon_id, scale=THICKET_SCALE)
 

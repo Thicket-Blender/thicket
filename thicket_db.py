@@ -47,29 +47,29 @@ def md5sum(filename):
     return md5.hexdigest()
 
 
-class DBQualifier:
+class DBSeason:
     def __init__(self, db, name):
         self.name = name
         self.label = db.get_label(name)
 
 
-class DBModel:
-    def __init__(self, db, name, m_rec, plant_preview):
+class DBVariant:
+    def __init__(self, db, name, v_rec, plant_preview):
         self.name = name
         self.label = db.get_label(self.name)
-        self.qualifiers = [DBQualifier(db, q) for q in m_rec["qualifiers"]]
-        self._default_qualifier = DBQualifier(db, m_rec["default_qualifier"])
-        self.preview = m_rec["preview"]
+        self.seasons = [DBSeason(db, s) for s in v_rec["seasons"]]
+        self._default_season = DBSeason(db, v_rec["default_season"])
+        self.preview = v_rec["preview"]
         if self.preview == "":
             self.preview = plant_preview
 
-    def get_qualifier(self, name=None):
-        """ Return the requested qualifier or the default qualifier if None or not found """
+    def get_season(self, name=None):
+        """ Return the requested season or the default season if None or not found """
         if name is not None:
-            for q in self.qualifiers:
-                if q.name == name:
-                    return q
-        return self._default_qualifier
+            for s in self.seasons:
+                if s.name == name:
+                    return s
+        return self._default_season
 
 
 class DBPlant:
@@ -80,18 +80,18 @@ class DBPlant:
         self.filepath = p_rec["filepath"]
         self.label = db.get_label(self.name)
         preview = p_rec["preview"]
-        self.models = [DBModel(db, m, p_rec["models"][m], preview) for m in p_rec["models"]]
-        def_m = p_rec["default_model"]
-        self._default_model = DBModel(db, def_m, p_rec["models"][def_m], preview)
+        self.variants = [DBVariant(db, v, p_rec["variants"][v], preview) for v in p_rec["variants"]]
+        def_v = p_rec["default_variant"]
+        self._default_variant = DBVariant(db, def_v, p_rec["variants"][def_v], preview)
         self.preview = preview
 
-    def get_model(self, name=None):
-        """ Return the requested model or the default model if None or not found """
+    def get_variant(self, name=None):
+        """ Return the requested variant or the default variant if None or not found """
         if name is not None:
-            for m in self.models:
-                if m.name == name:
-                    return m
-        return self._default_model
+            for v in self.variants:
+                if v.name == name:
+                    return v
+        return self._default_variant
 
 
 class DBIter:
@@ -257,12 +257,12 @@ class ThicketDB:
             print("%s (%s)" % (plant.name, plant.label))
             print("\tfile: %s" % plant.filepath)
             print("\tmd5: %s" % plant.md5)
-            m = plant.get_model()
-            print("\tdefault_model: %s (%s)" % (m.name, m.label))
-            print("\tmodels:")
-            for m in plant.models:
-                print("\t\t%s (%s) %s" % (m.name, m.get_qualifier().label,
-                                          [q.name for q in m.qualifiers]))
+            v = plant.get_variant()
+            print("\tdefault_variant: %s (%s)" % (v.name, v.label))
+            print("\tvariants:")
+            for v in plant.variants:
+                print("\t\t%s (%s) %s" % (v.name, v.get_season().label,
+                                          [s.name for s in v.seasons]))
 
     # Class methods
     def parse_plant(filepath):
@@ -273,7 +273,7 @@ class ThicketDB:
         plant["name"] = p.name
         plant["filepath"] = filepath
         plant["md5"] = md5sum(filepath)
-        plant["default_model"] = p.default_model.name
+        plant["default_variant"] = p.default_model.name
         preview_stem = Path(filepath).name.replace(".lbw.gz", "")
         preview_path = Path(filepath).parent.absolute() / (preview_stem + ".png")
         if not preview_path.is_file():
@@ -288,34 +288,34 @@ class ThicketDB:
             p_labels[label[0]] = label[1][0]
         labels[p.name] = p_labels
 
-        models = {}
+        variants = {}
         i = 0
-        for m in p.models:
-            m_rec = {}
+        for v in p.models:
+            v_rec = {}
             seasons = []
-            q_labels = {}
-            for q in m.qualifiers:
+            s_labels = {}
+            for s in v.qualifiers:
                 seasons.append(q)
-                q_labels[q] = {}
-                for q_lang in m.qualifier_labels[q].items():
-                    q_labels[q][q_lang[0]] = q_lang[1][0]
-            labels.update(q_labels)
-            m_rec["index"] = i
-            m_rec["qualifiers"] = seasons
-            m_rec["default_qualifier"] = m.default_qualifier
-            preview_path = Path(filepath).parent.absolute() / "models" / (preview_stem + "_" + m.name + ".png")
+                s_labels[s] = {}
+                for s_lang in v.qualifier_labels[s].items():
+                    s_labels[s][s_lang[0]] = s_lang[1][0]
+            labels.update(s_labels)
+            v_rec["index"] = i
+            v_rec["seasons"] = seasons
+            v_rec["default_season"] = v.default_qualifier
+            preview_path = Path(filepath).parent.absolute() / "models" / (preview_stem + "_" + v.name + ".png")
             if not preview_path.is_file():
                 logger.warning("Preview not found: %s" % preview_path)
                 preview_path = ""
-            m_rec["preview"] = str(preview_path)
-            models[m.name] = m_rec
-            m_labels = {}
+            v_rec["preview"] = str(preview_path)
+            variants[v.name] = v_rec
+            v_labels = {}
             # FIXME: highly redundant
-            for label in m.labels.items():
-                m_labels[label[0]] = label[1][0]
-            labels[m.name] = m_labels
+            for label in v.labels.items():
+                v_labels[label[0]] = label[1][0]
+            labels[v.name] = v_labels
             i = i + 1
-        plant["models"] = models
+        plant["variants"] = variants
 
         p_rec["plant"] = plant
         p_rec["labels"] = labels
