@@ -270,11 +270,11 @@ class ThicketDB:
         p_rec = {}
 
         plant = {}
-        plant["name"] = p.name
+        plant["name"] = p.plant_meta["name"]
         plant["filepath"] = filepath
         plant["md5"] = md5sum(filepath)
         plant["default_model"] = p.default_model.name
-        preview_stem = p.name.replace(" ", "_").replace(".", "")
+        preview_stem = p.plant_meta["botanical_name"].replace(" ", "_").replace(".", "")
         preview_path = Path(filepath).parent.absolute() / (preview_stem + ".png")
         if not preview_path.is_file():
             logger.warning("Preview not found: %s" % preview_path)
@@ -284,25 +284,30 @@ class ThicketDB:
         labels = {}
         p_labels = {}
         # Store only the first label per locale
-        for label in p.labels.items():
-            p_labels[label[0]] = label[1][0]
+        for label in p.plant_meta['labels']:
+            if not label['lang'] in p_labels:
+                p_labels[label['lang']] = label['text']
+
         labels[p.name] = p_labels
 
         models = {}
         i = 0
+        seasons = []
+        q_labels = {}
+        for q in p.params[0]['enum']['options']:
+            seasons.append(q['name'])
+            q_labels[q['name']] = {}
+            for q_lang in q['labels']:
+                q_labels[q['name']][q_lang['lang']] = q_lang['text']
+        default_season = p.params[0]['enum']['default']
+
+        # in laubwerk API called 'variants'
         for m in p.models:
             m_rec = {}
-            seasons = []
-            q_labels = {}
-            for q in m.qualifiers:
-                seasons.append(q)
-                q_labels[q] = {}
-                for q_lang in m.qualifier_labels[q].items():
-                    q_labels[q][q_lang[0]] = q_lang[1][0]
             labels.update(q_labels)
             m_rec["index"] = i
             m_rec["qualifiers"] = seasons
-            m_rec["default_qualifier"] = m.default_qualifier
+            m_rec["default_qualifier"] = seasons[default_season]
             preview_path = Path(filepath).parent.absolute() / "models" / (preview_stem + "_" + m.name + ".png")
             if not preview_path.is_file():
                 logger.warning("Preview not found: %s" % preview_path)
@@ -310,10 +315,11 @@ class ThicketDB:
             m_rec["preview"] = str(preview_path)
             models[m.name] = m_rec
             m_labels = {}
-            # FIXME: highly redundant
-            for label in m.labels.items():
-                m_labels[label[0]] = label[1][0]
+
+            for label in next(x for x in p.params[1]['enum']['options'] if x['name'] == m.name)['labels']:
+                m_labels[label['lang']] = label['text']
             labels[m.name] = m_labels
+
             i = i + 1
         plant["models"] = models
 

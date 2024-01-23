@@ -79,9 +79,10 @@ def lbw_to_bl_obj(lbw_plant, suffix, lbw_mesh, qualifier, proxy):
 
     # String operations are expensive, do them here outside the material loop
     wood_mat_name = lbw_plant.name + " wood"
-    wood_color = lbw_plant.get_wood_color()
+    # FIXME: fetch proper preview colors somehow
+    wood_color = (0.08423289656639099, 0.13307799398899078, 0.023182500153779984)
     foliage_mat_name = lbw_plant.name + " foliage"
-    foliage_color = lbw_plant.get_foliage_color()
+    foliage_color = (0.08423289656639099, 0.13307799398899078, 0.023182500153779984)
 
     use_1033 = False
     lbw_version = laubwerk.version_info
@@ -93,7 +94,7 @@ def lbw_to_bl_obj(lbw_plant, suffix, lbw_mesh, qualifier, proxy):
     # read matids and materialnames and create and add materials to the laubwerktree
     materials = []
     i = 0
-    for matID in zip(lbw_mesh.matids):
+    for matID in zip(lbw_mesh.mat_idxs):
         mat_id = matID[0]
         lbw_mat = lbw_plant.materials[mat_id]
         mat_name = lbw_mat.name
