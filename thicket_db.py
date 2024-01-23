@@ -304,13 +304,6 @@ class ThicketDB:
         # in laubwerk API called 'variants'
         for m in p.models:
             m_rec = {}
-            #seasons = []
-            #q_labels = {}
-            #for q in m.qualifiers:
-            #    seasons.append(q)
-            #    q_labels[q] = {}
-            #    for q_lang in m.qualifier_labels[q].items():
-            #        q_labels[q][q_lang[0]] = q_lang[1][0]
             labels.update(q_labels)
             m_rec["index"] = i
             m_rec["qualifiers"] = seasons

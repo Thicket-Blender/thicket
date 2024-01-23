@@ -81,10 +81,8 @@ def lbw_to_bl_obj(lbw_plant, suffix, lbw_mesh, qualifier, proxy):
     wood_mat_name = lbw_plant.name + " wood"
     # FIXME: fetch proper preview colors somehow
     wood_color = (0.08423289656639099, 0.13307799398899078, 0.023182500153779984)
- # lbw_plant.get_wood_color()
     foliage_mat_name = lbw_plant.name + " foliage"
     foliage_color = (0.08423289656639099, 0.13307799398899078, 0.023182500153779984)
-# lbw_plant.get_foliage_color()
 
     use_1033 = False
     lbw_version = laubwerk.version_info
