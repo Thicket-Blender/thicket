@@ -1,4 +1,11 @@
-# Thicket
+# Thicket (Archived)
+
+Due to changes in the Laubwerk API and the lack of current API documentation, I am no longer able to develop or maintain Thicket. Consider trying Laubwerk’s fork of thicket:
+
+[Laubwerk Player for Blender](https://github.com/Laubwerk/player-for-blender)
+
+Thank you for using Thicket, it was a lot of fun to develop.
+
 ## Laubwerk Plants Add-on for Blender
 Thicket is a [Blender](http://www.blender.org) Add-on to import [Laubwerk Plants](http://www.laubwerk.com) high resolution plant and tree models.
 
