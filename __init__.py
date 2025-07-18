@@ -429,8 +429,8 @@ class ThicketPropGroup(PropertyGroup):
     def import_lbw(self, original=None):
         filepath = db.get_plant(name=self.name).filepath
         tp = self
-        variant = self.variant
         mesh_args = {}
+        mesh_args["variant"] = self.variant
         mesh_args["season"] = self.season
 
         if original:
@@ -444,9 +444,9 @@ class ThicketPropGroup(PropertyGroup):
                 filepath = db.get_plant(name=self.batch_name).filepath
             if not self.batch_use_lod:
                 tp = orig_tp
-            variant = self.batch_variant
-            if variant == 'UNCHANGED':
-                variant = orig_tp.variant
+            mesh_args["variant"] = self.batch_variant
+            if self.batch_variant == 'UNCHANGED':
+                mesh_args["variant"] = orig_tp.variant
             mesh_args["season"] = self.batch_season
             if self.batch_season == 'UNCHANGED':
                 mesh_args["season"] = orig_tp.season
@@ -481,7 +481,7 @@ class ThicketPropGroup(PropertyGroup):
                 if self.render_lod != orig_tp.render_lod:
                     render_obj = orig_template.objects[0]
 
-        plant_obj = thicket_lbw.import_lbw(filepath, variant, tp.viewport_lod, tp.render_lod, mesh_args,
+        plant_obj = thicket_lbw.import_lbw(filepath, tp.viewport_lod, tp.render_lod, mesh_args,
                                            viewport_obj, render_obj)
         self.copy_to(plant_obj.instance_collection.thicket)
         plant_obj.instance_collection.thicket.magic = THICKET_GUID

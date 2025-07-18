@@ -47,13 +47,8 @@ def new_collection(name, parent, singleton=False, exclude=False):
     return col
 
 
-def lbw_to_bl_obj(lbw_plant, suffix, lbw_mesh, season, proxy):
+def lbw_to_bl_obj(name, lbw_mesh, lbw_materials, proxy=False):
     """ Generate the Blender Object from the Laubwerk mesh and materials """
-
-    # construct object name
-    name = lbw_plant.name
-    if suffix:
-        name += suffix
 
     # create mesh and object
     mesh = bpy.data.meshes.new(name)
@@ -77,41 +72,25 @@ def lbw_to_bl_obj(lbw_plant, suffix, lbw_mesh, season, proxy):
     # Scale Laubwerk centimeters units to Blender meters units
     obj.data.transform(Matrix.Rotation(radians(90), 4, 'X') @ Matrix.Scale(.01, 4))
 
-    # String operations are expensive, do them here outside the material loop
-    wood_mat_name = lbw_plant.name + " wood"
-    wood_color = lbw_plant.get_wood_color()
-    foliage_mat_name = lbw_plant.name + " foliage"
-    foliage_color = lbw_plant.get_foliage_color()
-
     # read matids and materialnames and create and add materials to the laubwerktree
     materials = []
     i = 0
-    for matID in zip(lbw_mesh.matids):
-        mat_id = matID[0]
-        lbw_mat = lbw_plant.materials[mat_id]
-        mat_name = lbw_mat.name
-        proxy_color = None
-
-        if proxy:
-            if mat_id == -1:
-                mat_name = foliage_mat_name
-                proxy_color = foliage_color
-            else:
-                mat_name = wood_mat_name
-                proxy_color = wood_color
+    for mat_idx in zip(lbw_mesh.mat_idxs):
+        mat_id = mat_idx[0]
+        lbw_mat = lbw_materials[mat_id]
 
         if mat_id not in materials:
             materials.append(mat_id)
-            mat = bpy.data.materials.get(mat_name)
+            mat = bpy.data.materials.get(lbw_mat.name)
             if mat is None:
-                mat = lbw_to_bl_mat(lbw_plant, mat_id, mat_name, season, proxy_color)
+                mat = lbw_to_bl_mat(lbw_mat, proxy)
             obj.data.materials.append(mat)
 
-        mat_index = obj.data.materials.find(mat_name)
+        mat_index = obj.data.materials.find(lbw_mat.name)
         if mat_index != -1:
             obj.data.polygons[i].material_index = mat_index
         else:
-            logger.warning("Material not found: %s" % mat_name)
+            logger.warning("Material not found: %s" % lbw_mat.name)
 
         i += 1
 
@@ -171,17 +150,16 @@ def lbw_side_to_bsdf(mat, side, x=0, y=0):
     return node_bsdf
 
 
-def lbw_to_bl_mat(plant, mat_id, mat_name, season=None, proxy_color=None):
+def lbw_to_bl_mat(lbw_mat, proxy=False):
     global NW, NH
 
-    lbw_mat = plant.materials[mat_id]
-    mat = bpy.data.materials.new(mat_name)
-
-    if proxy_color:
-        mat.diffuse_color = proxy_color
-        return mat
+    mat = bpy.data.materials.new(lbw_mat.name)
 
     mat.diffuse_color = lbw_mat.get_front().base_color + (1.0,)
+
+    if proxy:
+        return mat
+
     mat.use_nodes = True
 
     nodes = mat.node_tree.nodes
@@ -299,7 +277,7 @@ def lbw_to_bl_mat(plant, mat_id, mat_name, season=None, proxy_color=None):
     return mat
 
 
-def import_lbw(filepath, variant, viewport_lod, render_lod, mesh_args, obj_viewport=None, obj_render=None):
+def import_lbw(filepath, viewport_lod, render_lod, mesh_args, obj_viewport=None, obj_render=None):
     time_main = time.time()
     lbw_plant = laubwerk.load(filepath)
     # TODO: This should be debug, but we cannot silence the SDK [debug] message
@@ -323,6 +301,8 @@ def import_lbw(filepath, variant, viewport_lod, render_lod, mesh_args, obj_viewp
                        (mesh_args['variant'], lbw_plant.name, def_v_name))
         lbw_variant = lbw_plant.default_variant
 
+    proxy_mesh_args = {key: mesh_args[key] for key in ('variant', 'season')}
+
     # Create the viewport object (low detail)
     time_local = time.time()
     if viewport_lod != render_lod:
@@ -331,8 +311,8 @@ def import_lbw(filepath, variant, viewport_lod, render_lod, mesh_args, obj_viewp
             obj_viewport.data.name = lbw_plant.name
             logger.debug("Reusing existing viewport object")
         elif viewport_lod == 'PROXY':
-            lbw_mesh = lbw_variant.get_proxy()
-            obj_viewport = lbw_to_bl_obj(lbw_plant, None, lbw_mesh, mesh_args["season"], True)
+            lbw_mesh, lbw_materials = lbw_plant.get_proxy(proxy_mesh_args, True)
+            obj_viewport = lbw_to_bl_obj(lbw_plant.name, lbw_mesh, lbw_materials, True)
             logger.debug("Generated proxy viewport object in %.4fs" % (time.time() - time_local))
         elif viewport_lod == 'LOW':
             vp_mesh_args = mesh_args.copy()
@@ -347,7 +327,7 @@ def import_lbw(filepath, variant, viewport_lod, render_lod, mesh_args, obj_viewp
             vp_mesh_args["max_subdiv_level"] = 0
             logger.debug("viewport get_mesh(%s)" % str(vp_mesh_args))
             lbw_mesh = lbw_variant.get_mesh(**vp_mesh_args)
-            obj_viewport = lbw_to_bl_obj(lbw_plant, None, lbw_mesh, mesh_args["season"], False)
+            obj_viewport = lbw_to_bl_obj(lbw_plant.name, lbw_mesh, lbw_plant.materials)
             logger.debug("Generated low resolution viewport object in %.4fs" % (time.time() - time_local))
         else:
             logger.warning("Unknown viewport_lod: %s" % viewport_lod)
@@ -359,13 +339,13 @@ def import_lbw(filepath, variant, viewport_lod, render_lod, mesh_args, obj_viewp
         obj_render.data.name = lbw_plant.name + " (render)"
         logger.debug("Reusing existing render object")
     elif render_lod == 'PROXY':
-        lbw_mesh = lbw_variant.get_proxy()
-        obj_render = lbw_to_bl_obj(lbw_plant, " (render)", lbw_mesh, mesh_args["season"], True)
+        lbw_mesh, lbw_materials = lbw_plant.get_proxy(proxy_mesh_args, True)
+        obj_viewport = lbw_to_bl_obj(lbw_plant.name + " (render)", lbw_mesh, lbw_materials, True)
         logger.debug("Generated proxy render object in %.4fs" % (time.time() - time_local))
     elif render_lod == 'FULL':
         logger.debug("render get_mesh(%s)" % str(mesh_args))
         lbw_mesh = lbw_variant.get_mesh(**mesh_args)
-        obj_render = lbw_to_bl_obj(lbw_plant, " (render)", lbw_mesh, mesh_args["season"], False)
+        obj_render = lbw_to_bl_obj(lbw_plant.name + " (render)", lbw_mesh, lbw_plant.materials)
         logger.debug("Generated high resolution render object in %.4fs" % (time.time() - time_local))
     else:
         logger.warning("Unknown render_lod: %s" % render_lod)
