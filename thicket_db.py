@@ -273,7 +273,8 @@ class ThicketDB:
         plant["name"] = p.name
         plant["filepath"] = filepath
         plant["md5"] = md5sum(filepath)
-        plant["default_variant"] = p.default_model.name
+        def_v_idx = p.params[1]['enum']['default']
+        plant["default_variant"] = p.params[1]['enum']['options'][def_v_idx]['name']
         preview_stem = Path(filepath).name.replace(".lbw.gz", "")
         preview_path = Path(filepath).parent.absolute() / (preview_stem + ".png")
         if not preview_path.is_file():
@@ -283,37 +284,43 @@ class ThicketDB:
 
         labels = {}
         p_labels = {}
+
         # Store only the first label per locale
-        for label in p.labels.items():
-            p_labels[label[0]] = label[1][0]
+        for label in p.plant_meta['labels']:
+            if not label['lang'] in p_labels:
+                p_labels[label['lang']] = label['text']
         labels[p.name] = p_labels
 
         variants = {}
+        seasons = []
+        s_labels = {}
+        for s in p.params[0]['enum']['options']:
+            seasons.append(s['name'])
+            s_labels[s['name']] = {}
+            for s_lang in s['labels']:
+                s_labels[s['name']][s_lang['lang']] = s_lang['text']
+        default_season = p.params[0]['enum']['default']
+
         i = 0
-        for v in p.models:
+        for v in p.variants:
             v_rec = {}
-            seasons = []
-            s_labels = {}
-            for s in v.qualifiers:
-                seasons.append(q)
-                s_labels[s] = {}
-                for s_lang in v.qualifier_labels[s].items():
-                    s_labels[s][s_lang[0]] = s_lang[1][0]
             labels.update(s_labels)
             v_rec["index"] = i
             v_rec["seasons"] = seasons
-            v_rec["default_season"] = v.default_qualifier
-            preview_path = Path(filepath).parent.absolute() / "models" / (preview_stem + "_" + v.name + ".png")
+            v_rec["default_season"] = seasons[default_season]
+            v_name = p.params[1]['enum']['options'][i]['name']
+            logger.debug("Model Name: %s" % v_name)
+            preview_path = Path(filepath).parent.absolute() / "models" / (preview_stem + "_" + v_name + ".png")
             if not preview_path.is_file():
                 logger.warning("Preview not found: %s" % preview_path)
                 preview_path = ""
             v_rec["preview"] = str(preview_path)
-            variants[v.name] = v_rec
+            variants[v_name] = v_rec
+
             v_labels = {}
-            # FIXME: highly redundant
-            for label in v.labels.items():
-                v_labels[label[0]] = label[1][0]
-            labels[v.name] = v_labels
+            for label in next(x for x in p.params[1]['enum']['options'] if x['name'] == v_name)['labels']:
+                v_labels[label['lang']] = label['text']
+            labels[v_name] = v_labels
             i = i + 1
         plant["variants"] = variants
 
