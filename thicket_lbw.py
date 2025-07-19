@@ -109,12 +109,15 @@ def lbw_side_to_bsdf(mat, side, x=0, y=0):
     node_bsdf.inputs['IOR'].default_value = 1.33
 
     # Diffuse Texture
-    logger.debug("Diffuse Texture: %s" % side.base_color_texture)
-    base_path = side.base_color_texture
-    node_img = nodes.new(type='ShaderNodeTexImage')
-    node_img.location = x, y + NH
-    node_img.image = bpy.data.images.load(base_path)
-    links.new(node_img.outputs[0], node_bsdf.inputs[0])
+    if side.base_color_texture:
+        logger.debug("Diffuse Texture: %s" % side.base_color_texture)
+        base_path = side.base_color_texture
+        node_img = nodes.new(type='ShaderNodeTexImage')
+        node_img.location = x, y + NH
+        node_img.image = bpy.data.images.load(base_path)
+        links.new(node_img.outputs[0], node_bsdf.inputs[0])
+    else:
+        node_bsdf.inputs[0].default_value = side.base_color + (1.0,)
 
     # Bump Texture
     bump_path = side.bump_texture
