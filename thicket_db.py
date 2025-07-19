@@ -285,10 +285,17 @@ class ThicketDB:
         labels = {}
         p_labels = {}
 
-        # Store only the first label per locale
-        for label in p.plant_meta['labels']:
-            if not label['lang'] in p_labels:
-                p_labels[label['lang']] = label['text']
+        # FIXME: it really isn't viable to try and accomodate an old model with
+        # a new Laubwerk API. Save off the models and remove this test.
+        try:
+            # Store only the first label per locale
+            for label in p.plant_meta['labels']:
+                if not label['lang'] in p_labels:
+                    p_labels[label['lang']] = label['text']
+        except KeyError:
+            logger.warning("%s plant meta data missing key 'labels', ignoring..." % filepath)
+            # TODO: Use the current lang instead of en-US
+            p_labels["en-US"] = Path(filepath).name.replace("_", " ").replace(".lbw.gz", "")
         labels[p.name] = p_labels
 
         variants = {}
