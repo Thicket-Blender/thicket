@@ -556,7 +556,7 @@ class ThicketPropGroup(PropertyGroup):
     lod_min_thick: FloatProperty(name="Min Branch Thickness", description="Min thickness of trunk or branches",
                                  default=0.1, min=0.1, max=10000.0, step=1.0)
     lod_subdiv: IntProperty(name="Max Subdivisions", description="How round the trunk and branches appear",
-                            default=3, min=0, max=5, step=1)
+                            default=1, min=0, max=5, step=1)
     leaf_amount: FloatProperty(name="Leaf Amount", description="How many leaves used for leaf density "
                                "(smaller number means larger leaves)",
                                default=100.0, min=0.01, max=100.0, subtype='PERCENTAGE')
