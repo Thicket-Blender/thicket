@@ -433,11 +433,24 @@ def import_lbw(filepath, variant, viewport_lod, render_lod, mesh_args, obj_viewp
     lbw_plant = laubwerk.load(filepath)
     # TODO: This should be debug, but we cannot silence the SDK [debug] message
     # which appear without context without this appearing in the log first
-    logger.info('Importing "%s"' % lbw_plant.name)
-    lbw_variant = next((v for v in lbw_plant.variants if v.name == variant), lbw_plant.default_variant)
-    if not lbw_variant.name == variant:
+    logger.info('Importing "%s %s"' % (lbw_plant.name, mesh_args['variant']))
+
+    # FIXME: This is gross. Params parsing needs to be contained to helper
+    # functions or wrapper classes and never open coded in logic like this.
+    lbw_variant = None
+    v_idx = 0
+    for v_opt in lbw_plant.params[1]['enum']['options']:
+        if mesh_args["variant"] == v_opt['name']:
+            lbw_variant = lbw_plant.variants[v_idx]
+            break
+        v_idx = v_idx + 1
+
+    if not lbw_variant:
+        def_v_idx = lbw_plant.params[1]['enum']['default']
+        def_v_name = lbw_plant.params[1]['enum']['options'][def_v_idx]['name']
         logger.warning("Variant '%s' not found for '%s', using default variant '%s'" %
-                       (variant, lbw_plant.name, lbw_variant.name))
+                       (mesh_args['variant'], lbw_plant.name, def_v_name))
+        lbw_variant = lbw_plant.default_variant
 
     # Create the viewport object (low detail)
     time_local = time.time()
